@@ -191,6 +191,7 @@ int main() {
                 serverFailed = true;
             }
 
+            requestsChanged.notify_all();
             const std::string response =
                 "HTTP/1.1 " + std::to_string(status) + " " + reason + "\r\n" +
                 "Content-Type: " + contentType + "\r\n" +
