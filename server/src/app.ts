@@ -125,6 +125,24 @@ function safeDisplayName(rawName: string | undefined): string {
     .slice(0, 120) || "Untitled image";
 }
 
+function ensurePrivateDirectory(path: string): void {
+  const absolutePath = resolve(path);
+  const unsafeTargets = new Set([
+    "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
+    "/etc", "/usr", "/opt", "/run", "/mnt", "/media", "/dev", "/proc",
+    "/sys", "/boot",
+  ]);
+  if (unsafeTargets.has(absolutePath)) {
+    throw new Error("Veyra media storage must use a dedicated private directory");
+  }
+  mkdirSync(absolutePath, { recursive: true, mode: 0o700 });
+  const info = lstatSync(absolutePath);
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    throw new Error("Veyra media storage path must be a real directory, not a symlink");
+  }
+  chmodSync(absolutePath, 0o700);
+}
+
 function hashPairingCode(code: string, secret: Buffer): string {
   return createHmac("sha256", secret).update(code).digest("hex");
 }
@@ -413,8 +431,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const createdAt = new Date().toISOString();
     const sha256 = createHash("sha256").update(image).digest("hex");
 
-    mkdirSync(mediaDirectory, { recursive: true, mode: 0o700 });
-    chmodSync(mediaDirectory, 0o700);
+    ensurePrivateDirectory(mediaDirectory);
     const filePath = join(mediaDirectory, storageKey);
     let fileCreated = false;
     try {
