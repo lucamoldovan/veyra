@@ -116,6 +116,7 @@ export interface Device {
   playbackMode: string;
   ndiSourceName: string | null;
   uptimeSeconds: number | null;
+  deviceUptimeSeconds: number | null;
   createdAt: string;
   credentialRevokedAt: string | null;
   credentialStatus: "active" | "revoked";

@@ -778,7 +778,7 @@ test("operator can queue receiver restart and full-device reboot separately", as
     const paired = await app.inject({ method: "POST", url: "/api/v1/receiver/pair", payload: { code: code.json().code, deviceName: "Restart test", platform: "linux-x86_64", version: "0.1.0" } });
     const credentials = paired.json() as { deviceId: string; deviceToken: string };
     const auth = { authorization: "Bearer " + credentials.deviceToken };
-    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 10, playbackMode: "ndi" } });
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 10, deviceUptimeSeconds: 1000, playbackMode: "ndi" } });
     const unauthorized = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart" });
     assert.equal(unauthorized.statusCode, 401);
     const requested = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart", headers: { cookie } });
@@ -794,12 +794,13 @@ test("operator can queue receiver restart and full-device reboot separately", as
     const commandId = poll.json().command.id as string;
     const status = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/" + commandId + "/status", headers: auth, payload: { status: "restarting" } });
     assert.equal(status.statusCode, 200);
-    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 11, playbackMode: "ndi" } });
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 11, deviceUptimeSeconds: 1010, playbackMode: "ndi" } });
     const beforeRestart = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
     assert.equal(beforeRestart.json().devices[0].restartCommand.status, "restarting");
-    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 2, playbackMode: "ndi" } });
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 2, deviceUptimeSeconds: 1011, playbackMode: "ndi" } });
     const afterRestart = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
     assert.equal(afterRestart.json().devices[0].restartCommand.status, "completed");
+    assert.equal(afterRestart.json().devices[0].deviceUptimeSeconds, 1011);
     const rebootRequested = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/reboot", headers: { cookie } });
     assert.equal(rebootRequested.statusCode, 201);
     const rebootPoll = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/poll", headers: auth, payload: {} });
@@ -807,9 +808,10 @@ test("operator can queue receiver restart and full-device reboot separately", as
     const rebootCommandId = rebootPoll.json().command.id as string;
     const rebootStatus = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/" + rebootCommandId + "/status", headers: auth, payload: { status: "restarting" } });
     assert.equal(rebootStatus.statusCode, 200);
-    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 1, playbackMode: "ndi" } });
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 1, deviceUptimeSeconds: 1, playbackMode: "ndi" } });
     const devices = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
     assert.equal(devices.json().devices[0].rebootCommand.status, "completed");
+    assert.equal(devices.json().devices[0].deviceUptimeSeconds, 1);
     const cooldown = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart", headers: { cookie } });
     assert.equal(cooldown.statusCode, 429);
   } finally {

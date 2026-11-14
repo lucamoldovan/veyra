@@ -82,9 +82,9 @@ Current implementation:
 
 Remaining receiver work:
 
-- Poll and acknowledge allowlisted remote commands over the authenticated receiver API.
+- The authenticated receiver command polling/status flow is implemented for receiver-application restart and full-device reboot.
 - Add richer health metrics and playback diagnostics.
-- Add explicit failure-injection tests for interrupted downloads, corrupt caches, and version mismatches.
+- Expand failure-injection tests for interrupted downloads and version mismatches; corrupt-cache rejection and failed media downloads are already covered.
 - Build the complete player against the official NDI SDK and validate source recovery, fallback, and server outages on target hardware.
 
 The receiver must not require the dashboard or server to remain running for normal playback.
@@ -107,7 +107,7 @@ Responsibilities:
 
 The server exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, authenticated heartbeats with source snapshots, an aggregated NDI source inventory endpoint, local image upload/storage, playlist CRUD, device credential revocation, per-device source and fallback assignments, versioned receiver configuration, assigned-media manifests, and receiver-authenticated asset downloads. The C++ client verifies TLS, stores its bearer credential locally, synchronizes the assigned state, and caches fallback images. Receiver restart and device reboot commands are implemented; WebSocket events remain planned.
 
-The server currently uses a local SQLite database in WAL mode with versioned migrations through schema version 8. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
+The server currently uses a local SQLite database in WAL mode with versioned migrations through schema version 9. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
 
 ### 3. NDIView Dashboard
 
