@@ -828,9 +828,9 @@ function SystemPage({
         <div className="panel system-card">
           <div className="system-card-icon"><Wifi size={19} /></div>
           <div className="system-card-label">RECEIVER NETWORK</div>
-          <h2>Awaiting receiver client</h2>
+          <h2>Receiver control plane</h2>
           <p>Pairing, heartbeat, and receiver configuration APIs are connected. Full NDI SDK build and hardware validation remain.</p>
-          <div className="system-card-foot"><span className="status-dot dot-pending" />Server APIs ready · receiver integration pending</div>
+          <div className="system-card-foot"><span className="status-dot dot-pending" />Pairing and config APIs ready · SDK validation pending</div>
         </div>
         <div className="panel system-card">
           <div className="system-card-icon"><ShieldCheck size={19} /></div>
