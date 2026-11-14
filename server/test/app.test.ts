@@ -753,6 +753,7 @@ test("database upgrades a version-seven command table while preserving its index
       CREATE INDEX device_commands_device_created_idx ON device_commands(device_id, created_at DESC);
       CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
     `);
+    legacy.exec("ALTER TABLE devices DROP COLUMN device_uptime_seconds");
     legacy.pragma("user_version = 7");
     legacy.close();
 
