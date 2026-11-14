@@ -1,7 +1,7 @@
 import { buildApp } from "./app.js";
 
-const host = process.env.VEYRA_HOST ?? "127.0.0.1";
-const port = Number.parseInt(process.env.VEYRA_PORT ?? "8787", 10);
+const host = process.env.VEYRA_HOST?.trim() || "127.0.0.1";
+const port = Number(process.env.VEYRA_PORT ?? "8787");
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("VEYRA_PORT must be an integer between 1 and 65535");
