@@ -47,6 +47,7 @@ Renderer::Renderer(const config::DisplayConfig& config) {
 
     if (window_ == nullptr) {
         const auto error = sdlError("Could not create the Veyra window");
+        SDL_EnableScreenSaver();
         SDL_Quit();
         sdlInitialized_ = false;
         throw error;
@@ -73,6 +74,7 @@ Renderer::Renderer(const config::DisplayConfig& config) {
         const auto error = sdlError("Could not create an SDL renderer");
         SDL_DestroyWindow(window_);
         window_ = nullptr;
+        SDL_EnableScreenSaver();
         SDL_Quit();
         sdlInitialized_ = false;
         throw error;
