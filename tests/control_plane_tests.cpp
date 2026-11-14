@@ -132,8 +132,8 @@ int main() {
 
             const std::string asset1 = "ndiview-cache-test";
             const std::string asset2 = "ndiview-cache-test-2";
-            const std::string hash1 = "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
-            const std::string hash2 = "ce77149707044eb10bb49e818060c08acfd34609f9469edf17927156929d349f";
+            const std::string hash1 = "68f6da47211e0732eca673fe1644112768331b196d08dc924ce5ec8b2d308237";
+            const std::string hash2 = "e32da527f76837564dbbe9e69d008dc844e1e589a28d04297fcc05fdbd25612a";
             std::string responseBody;
             std::string contentType = "application/json";
             int status = 200;
@@ -166,7 +166,7 @@ int main() {
                 const std::string mediaHash = requestNumber == 1 ? hash1
                     : requestNumber == 2 ? hash2
                     : "803d6fc47dd865eed3bb18593778d6e752885e926a99075fc5c0c42eab7da017";
-                const int size = requestNumber == 1 ? 16 : 18;
+                const int size = requestNumber == 1 ? 18 : 20;
                 const int duration = requestNumber == 1 ? 12 : requestNumber == 2 ? 20 : 30;
                 responseBody = "{\"schemaVersion\":1,\"configVersion\":" +
                     std::to_string(version) + ",\"playlistId\":\"fallback-1\",\"playlistRevision\":" +

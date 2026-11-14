@@ -310,7 +310,7 @@ bool Client::sendHeartbeat() {
 void Client::processPendingCommand() {
     const auto response = postJson("/api/v1/receiver/commands/poll", "{}", deviceToken_);
     if (response.status != 200) {
-        if (response.status != 0) std::clog << "NDIView command poll returned HTTP " << response.status << '\\n';
+        if (response.status != 0) std::clog << "NDIView command poll returned HTTP " << response.status << '\n';
         return;
     }
     try {
@@ -326,10 +326,10 @@ void Client::processPendingCommand() {
         if (!reportCommandStatus(id, "restarting")) return;
         if (!requestSystemAction(type)) {
             (void)reportCommandStatus(id, "failed", "Restricted NDIView action helper failed");
-            std::cerr << "NDIView could not execute the requested device action\\n";
+            std::cerr << "NDIView could not execute the requested device action\n";
         }
     } catch (const std::exception& error) {
-        std::clog << "NDIView command response was invalid: " << error.what() << '\\n';
+        std::clog << "NDIView command response was invalid: " << error.what() << '\n';
     }
 }
 
