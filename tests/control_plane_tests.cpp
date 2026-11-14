@@ -1,19 +1,215 @@
 #include "veyra/control_plane/client.hpp"
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <chrono>
+#include <condition_variable>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <mutex>
+#include <string>
+#include <thread>
 #include <utility>
+#include <vector>
+
+namespace {
+
+std::string readRequest(const int clientSocket) {
+    std::string request;
+    char buffer[4096];
+    std::size_t expectedBytes = 0;
+    bool contentLengthRead = false;
+
+    while (true) {
+        const ssize_t received = ::recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (received <= 0) break;
+        request.append(buffer, static_cast<std::size_t>(received));
+
+        const auto headerEnd = request.find("\r\n\r\n");
+        if (headerEnd != std::string::npos && !contentLengthRead) {
+            const auto lengthStart = request.find("Content-Length:");
+            if (lengthStart != std::string::npos) {
+                const auto valueStart = lengthStart + std::strlen("Content-Length:");
+                const auto valueEnd = request.find("\r\n", valueStart);
+                expectedBytes = static_cast<std::size_t>(
+                    std::stoul(request.substr(valueStart, valueEnd - valueStart))
+                );
+            }
+            contentLengthRead = true;
+        }
+
+        if (contentLengthRead && headerEnd != std::string::npos &&
+            request.size() >= headerEnd + 4 + expectedBytes) {
+            break;
+        }
+    }
+    return request;
+}
+
+bool sendAll(const int socket, const std::string& response) {
+    std::size_t sent = 0;
+    while (sent < response.size()) {
+        const ssize_t count = ::send(
+            socket,
+            response.data() + sent,
+            response.size() - sent,
+            0
+        );
+        if (count <= 0) return false;
+        sent += static_cast<std::size_t>(count);
+    }
+    return true;
+}
+
+}  // namespace
 
 int main() {
-    veyra::config::ControlPlaneConfig config;
-    veyra::control_plane::Client client(config);
+    const int listener = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) {
+        std::cerr << "Could not create mock control-plane socket\n";
+        return 1;
+    }
 
-    veyra::control_plane::PlaybackSnapshot status;
-    status.mode = "idle";
-    status.uptimeSeconds = 1;
-    client.updateStatus(std::move(status));
-    client.start();
-    client.stop();
+    int reuseAddress = 1;
+    ::setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &reuseAddress, sizeof(reuseAddress));
 
-    std::cout << "Control-plane disabled-mode test passed\n";
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = 0;
+    if (::bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||
+        ::listen(listener, 4) != 0) {
+        std::cerr << "Could not bind mock control-plane socket\n";
+        ::close(listener);
+        return 1;
+    }
+
+    socklen_t addressLength = sizeof(address);
+    if (::getsockname(listener, reinterpret_cast<sockaddr*>(&address), &addressLength) != 0) {
+        std::cerr << "Could not read mock control-plane port\n";
+        ::close(listener);
+        return 1;
+    }
+
+    std::mutex requestsMutex;
+    std::condition_variable requestsChanged;
+    std::vector<std::string> requests;
+    bool serverFailed = false;
+    const std::string token(43, 't');
+
+    std::thread mockServer([&] {
+        for (int index = 0; index < 2; ++index) {
+            pollfd descriptor{listener, POLLIN, 0};
+            if (::poll(&descriptor, 1, 7000) <= 0) {
+                serverFailed = true;
+                break;
+            }
+            const int clientSocket = ::accept(listener, nullptr, nullptr);
+            if (clientSocket < 0) {
+                serverFailed = true;
+                break;
+            }
+
+            const std::string request = readRequest(clientSocket);
+            {
+                std::lock_guard lock(requestsMutex);
+                requests.push_back(request);
+            }
+            requestsChanged.notify_all();
+
+            const std::string responseBody = index == 0
+                ? "{\"deviceId\":\"device-test\",\"deviceToken\":\"" + token +
+                    "\",\"heartbeatIntervalSeconds\":5}"
+                : "{}";
+            const int status = index == 0 ? 201 : 200;
+            const std::string reason = index == 0 ? "Created" : "OK";
+            const std::string response =
+                "HTTP/1.1 " + std::to_string(status) + " " + reason + "\r\n" +
+                "Content-Type: application/json\r\n" +
+                "Content-Length: " + std::to_string(responseBody.size()) + "\r\n" +
+                "Connection: close\r\n\r\n" + responseBody;
+            if (!sendAll(clientSocket, response)) serverFailed = true;
+            ::shutdown(clientSocket, SHUT_RDWR);
+            ::close(clientSocket);
+        }
+    });
+
+    const auto temporaryRoot = std::filesystem::temp_directory_path() /
+        ("veyra-control-plane-test-" + std::to_string(static_cast<long long>(::getpid())));
+    const auto credentialPath = temporaryRoot / "state" / "veyra" / "device-token";
+    std::filesystem::remove_all(temporaryRoot);
+
+    bool success = false;
+    {
+        veyra::config::ControlPlaneConfig config;
+        config.serverUrl = "http://127.0.0.1:" + std::to_string(ntohs(address.sin_port));
+        config.deviceName = "Test Display";
+        config.pairingCode = "123456789012";
+        config.credentialPath = credentialPath;
+        config.heartbeatIntervalSeconds = 5;
+
+        veyra::control_plane::Client client(config);
+        veyra::control_plane::PlaybackSnapshot snapshot;
+        snapshot.mode = "ndi";
+        snapshot.ndiSourceName = "Camera 1";
+        snapshot.uptimeSeconds = 42;
+        snapshot.ndiSources.push_back({"Camera 1", "ndi://camera-1.local"});
+        client.updateStatus(std::move(snapshot));
+        client.start();
+
+        {
+            std::unique_lock lock(requestsMutex);
+            requestsChanged.wait_for(lock, std::chrono::seconds(8), [&] {
+                return requests.size() >= 2 || serverFailed;
+            });
+        }
+
+        client.stop();
+
+        std::ifstream credentialFile(credentialPath);
+        std::string storedToken;
+        std::getline(credentialFile, storedToken);
+
+        struct stat fileInfo {};
+        struct stat directoryInfo {};
+        const bool fileModeOk =
+            ::stat(credentialPath.c_str(), &fileInfo) == 0 &&
+            (fileInfo.st_mode & 0777) == 0600;
+        const bool directoryModeOk =
+            ::stat(credentialPath.parent_path().c_str(), &directoryInfo) == 0 &&
+            (directoryInfo.st_mode & 0777) == 0700;
+
+        std::lock_guard lock(requestsMutex);
+        const bool pairRequestOk = requests.size() >= 1 &&
+            requests[0].find("POST /api/v1/receiver/pair ") != std::string::npos &&
+            requests[0].find("123456789012") != std::string::npos &&
+            requests[0].find("Test Display") != std::string::npos;
+        const bool heartbeatRequestOk = requests.size() >= 2 &&
+            requests[1].find("POST /api/v1/receiver/heartbeat ") != std::string::npos &&
+            requests[1].find("Authorization: Bearer " + token) != std::string::npos &&
+            requests[1].find("Camera 1") != std::string::npos &&
+            requests[1].find("\"playbackMode\":\"ndi\"") != std::string::npos;
+
+        success = !serverFailed && pairRequestOk && heartbeatRequestOk &&
+            storedToken == token && fileModeOk && directoryModeOk;
+    }
+
+    mockServer.join();
+    ::close(listener);
+    std::filesystem::remove_all(temporaryRoot);
+
+    if (!success) {
+        std::cerr << "Control-plane pairing, heartbeat, or credential persistence test failed\n";
+        return 1;
+    }
+
+    std::cout << "Control-plane pairing, heartbeat, and credential persistence test passed\n";
     return 0;
 }
