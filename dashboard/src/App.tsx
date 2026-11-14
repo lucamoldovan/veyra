@@ -489,7 +489,7 @@ function Overview({
             <div className="network-connector"><span /></div>
             <div className="network-node network-node-receivers">
               <div className="network-node-icon receiver-icon"><MonitorPlay size={22} /></div>
-              <div><strong>Receivers</strong><span>{deviceCount === 0 ? "Waiting for devices to pair" : `${deviceCount} registered receiver${deviceCount === 1 ? "" : "s"}`}</span></div>
+              <div><strong>Receivers</strong><span>{deviceCount === null ? "Device status unavailable" : deviceCount === 0 ? "Waiting for devices to pair" : `${deviceCount} registered receiver${deviceCount === 1 ? "" : "s"}`}</span></div>
               <span className="node-count">{deviceCount === null ? "—" : deviceCount}</span>
             </div>
           </div>
