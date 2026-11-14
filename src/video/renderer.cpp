@@ -100,7 +100,9 @@ Renderer::~Renderer() {
 bool Renderer::pollEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event) != 0) {
-        if (event.type == SDL_QUIT) {
+        if (event.type == SDL_QUIT ||
+            (event.type == SDL_WINDOWEVENT &&
+             event.window.event == SDL_WINDOWEVENT_CLOSE)) {
             return false;
         }
 
@@ -279,6 +281,11 @@ void Renderer::present(const ndi::VideoFrame& frame) {
         throw std::runtime_error("Renderer received an invalid video frame");
     }
 
+    if (frame.format != ndi::PixelFormat::UYVY &&
+        frame.format != ndi::PixelFormat::BGRA) {
+        throw std::runtime_error("Renderer received an unsupported pixel format");
+    }
+
     const int bytesPerPixel =
         frame.format == ndi::PixelFormat::UYVY ? 2 : 4;
     if (frame.format == ndi::PixelFormat::UYVY && (frame.width % 2) != 0) {
@@ -360,6 +367,9 @@ void Renderer::present(const ndi::VideoFrame& frame) {
             &outputHeight
         ) != 0) {
         throw sdlError("Could not read renderer output dimensions");
+    }
+    if (outputWidth <= 0 || outputHeight <= 0) {
+        throw std::runtime_error("Renderer output dimensions are invalid");
     }
 
     const double scale = std::min(
