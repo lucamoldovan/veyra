@@ -5,6 +5,8 @@ import {
   ArrowRight,
   AudioWaveform,
   CircleHelp,
+  Check,
+  Clipboard,
   Command,
   Disc3,
   HardDrive,
@@ -18,13 +20,14 @@ import {
   MonitorPlay,
   Network,
   Radio,
+  RefreshCw,
   Server,
   Settings,
   ShieldCheck,
   Wifi,
   X,
 } from "lucide-react";
-import { createInitialOperator, getAuthSession, getServerHealth, getSetupStatus, login, logout, type ConnectionState, type Operator, type ServerHealth } from "./api";
+import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getServerHealth, getSetupStatus, login, logout, type ConnectionState, type Device, type Operator, type PairingCode, type ServerHealth } from "./api";
 
 type Page = "overview" | "devices" | "sources" | "media" | "playlists" | "system";
 type AuthState = "checking" | "setup" | "login" | "authenticated" | "unavailable";
@@ -239,7 +242,7 @@ function App() {
               onNavigate={navigate}
             />
           )}
-          {page === "devices" && <EmptyPage kind="devices" onNavigate={navigate} />}
+          {page === "devices" && <DevicesPage />}
           {page === "sources" && <EmptyPage kind="sources" onNavigate={navigate} />}
           {page === "media" && <EmptyPage kind="media" onNavigate={navigate} />}
           {page === "playlists" && <EmptyPage kind="playlists" onNavigate={navigate} />}
@@ -523,6 +526,148 @@ function StatCard({
       <div className="stat-value">{value}</div>
       <div className="stat-detail">{detail}</div>
     </div>
+  );
+}
+
+
+function DevicesPage() {
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [pairingCode, setPairingCode] = useState<PairingCode | null>(null);
+  const [creatingCode, setCreatingCode] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let controller: AbortController | null = null;
+
+    const loadDevices = async () => {
+      controller?.abort();
+      const currentController = new AbortController();
+      controller = currentController;
+
+      try {
+        const result = await getDevices(currentController.signal);
+        if (!active) return;
+        setDevices(result.devices);
+        setError("");
+      } catch (loadError) {
+        if (!active || currentController.signal.aborted) return;
+        setError(loadError instanceof Error ? loadError.message : "Could not load devices.");
+      } finally {
+        if (active && !currentController.signal.aborted) setLoading(false);
+      }
+    };
+
+    void loadDevices();
+    const interval = window.setInterval(() => void loadDevices(), 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      controller?.abort();
+    };
+  }, []);
+
+  const createCode = async () => {
+    setCreatingCode(true);
+    setError("");
+    setCopied(false);
+    try {
+      const result = await createDevicePairingCode();
+      setPairingCode(result);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Could not create a pairing code.");
+    } finally {
+      setCreatingCode(false);
+    }
+  };
+
+  const copyCode = async () => {
+    if (!pairingCode) return;
+    try {
+      await navigator.clipboard.writeText(pairingCode.code);
+      setCopied(true);
+    } catch {
+      setError("Clipboard access is unavailable. You can select and copy the code manually.");
+    }
+  };
+
+  return (
+    <>
+      <section className="page-heading">
+        <div>
+          <div className="eyebrow">RECEIVER MANAGEMENT</div>
+          <h1>Devices</h1>
+          <p>Manage Veyra receivers, display assignments and playback state.</p>
+        </div>
+        <button className="button button-dark" onClick={() => void createCode()} disabled={creatingCode}>
+          {creatingCode ? <LoaderCircle size={15} className="auth-spinner" /> : <Plus size={16} />}
+          {creatingCode ? "Creating code…" : "Pair receiver"}
+        </button>
+      </section>
+
+      {pairingCode && (
+        <section className="panel pairing-panel">
+          <div className="pairing-heading">
+            <div className="pairing-icon"><Network size={19} /></div>
+            <div><h2>One-time pairing code</h2><p>Generated for a new Veyra receiver</p></div>
+            <button className="icon-button" aria-label="Dismiss pairing code" onClick={() => setPairingCode(null)}><X size={17} /></button>
+          </div>
+          <div className="pairing-code-row">
+            <code>{pairingCode.code}</code>
+            <button className="button button-secondary" onClick={() => void copyCode()}>
+              {copied ? <Check size={15} /> : <Clipboard size={15} />}
+              {copied ? "Copied" : "Copy code"}
+            </button>
+          </div>
+          <div className="pairing-foot">
+            <span>This code expires at {new Date(pairingCode.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} and can only be used once.</span>
+            <span>Receiver enrollment client is the next integration step.</span>
+          </div>
+        </section>
+      )}
+
+      {error && <div className="inline-error" role="alert">{error}</div>}
+
+      <section className="panel devices-panel">
+        <div className="panel-heading">
+          <div><h2>Registered receivers</h2><p>Live status is refreshed every 15 seconds</p></div>
+          <button className="icon-button refresh-button" aria-label="Refresh device list" onClick={() => window.location.reload()}><RefreshCw size={16} /></button>
+        </div>
+
+        {loading ? (
+          <div className="devices-empty"><LoaderCircle size={22} className="auth-spinner" /><span>Loading devices…</span></div>
+        ) : devices.length === 0 ? (
+          <div className="devices-empty">
+            <div className="empty-icon"><Monitor size={20} /></div>
+            <strong>No receivers paired yet</strong>
+            <span>Create a one-time pairing code to prepare a receiver for enrollment.</span>
+            <button className="button button-secondary" onClick={() => void createCode()} disabled={creatingCode}>
+              <Plus size={15} /> Generate pairing code
+            </button>
+          </div>
+        ) : (
+          <div className="device-list">
+            <div className="device-list-head"><span>DEVICE</span><span>STATUS</span><span>PLAYBACK</span><span>LAST SEEN</span></div>
+            {devices.map((device) => (
+              <div className="device-row" key={device.id}>
+                <div className="device-identity">
+                  <div className="device-avatar"><MonitorPlay size={18} /></div>
+                  <div><strong>{device.name}</strong><span>{device.platform} · v{device.softwareVersion}</span></div>
+                </div>
+                <div><span className={`device-status device-status-${device.status}`}><span />{device.status}</span></div>
+                <div className="device-playback"><strong>{device.playbackMode}</strong><span>{device.ndiSourceName ?? "No NDI source reported"}</span></div>
+                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <footer className="page-footer"><span>VEYRA <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Receiver status from local heartbeats <ShieldCheck size={13} /></span></footer>
+    </>
   );
 }
 
