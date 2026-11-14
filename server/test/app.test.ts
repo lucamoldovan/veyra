@@ -223,6 +223,19 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
     assert.equal(device.softwareVersion, "0.1.1");
     assert.equal(device.playbackMode, "ndi");
     assert.equal(device.ndiSourceName, "Camera 1");
+    const unauthenticatedRevoke = await app.inject({
+      method: "POST",
+      url: `/api/v1/devices/${credentials.deviceId}/revoke`,
+    });
+    assert.equal(unauthenticatedRevoke.statusCode, 401);
+
+    const removeActive = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/devices/${credentials.deviceId}`,
+      headers: { cookie: operatorCookie },
+    });
+    assert.equal(removeActive.statusCode, 409);
+
     const revoke = await app.inject({
       method: "POST",
       url: `/api/v1/devices/${credentials.deviceId}/revoke`,
