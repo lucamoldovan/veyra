@@ -59,6 +59,10 @@ Open http://127.0.0.1:5173. During development, Vite proxies API requests to the
 
 See [the Debian 13 kiosk installation guide](docs/kiosk-installation.md) for automatic fullscreen startup, recovery behavior, maintenance access and physical validation.
 
+## Central server deployment
+
+See [the central server and dashboard deployment guide](docs/server-deployment.md) for signed releases, HTTPS hosting, backups and rollback.
+
 ## Architecture
 
 See [docs/architecture.md](docs/architecture.md) for the system topology, component responsibilities, offline behavior, security boundaries, and implementation proposals.
