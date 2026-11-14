@@ -261,6 +261,14 @@ test("secure cookie policy can be enforced by the HTTPS deployment", async () =>
 
     assert.equal(response.statusCode, 201);
     assert.match(String(response.headers["set-cookie"]), /; Secure/i);
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/session",
+      payload: { username: "admin", password: "a-very-long-test-password" },
+    });
+    assert.equal(login.statusCode, 200);
+    assert.match(String(login.headers["set-cookie"]), /; Secure/i);
   } finally {
     await app.close();
   }
