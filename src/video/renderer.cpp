@@ -311,18 +311,27 @@ void Renderer::present(const ndi::VideoFrame& frame) {
         ? SDL_PIXELFORMAT_UYVY
         : SDL_PIXELFORMAT_BGRA32;
 
-    bool converted = false;
+    bool converted =
+        frame.format == ndi::PixelFormat::UYVY && uyvyTextureUnavailable_;
+
+    if (converted) {
+        convertUyvyToBgra(frame);
+        desiredFormat = SDL_PIXELFORMAT_BGRA32;
+    }
+
     if (!createTexture(frame.width, frame.height, desiredFormat)) {
-        if (frame.format != ndi::PixelFormat::UYVY) {
+        if (frame.format != ndi::PixelFormat::UYVY || converted) {
             throw sdlError("Could not create the video texture");
         }
 
+        uyvyTextureUnavailable_ = true;
         convertUyvyToBgra(frame);
         desiredFormat = SDL_PIXELFORMAT_BGRA32;
         converted = true;
-        if (!createTexture(frame.width, frame.height, desiredFormat)) {
-            throw sdlError("Could not create the fallback video texture");
-        }
+    }
+
+    if (texture_ == nullptr) {
+        throw sdlError("Could not create the fallback video texture");
     }
 
     bool uploaded = false;
@@ -333,6 +342,13 @@ void Renderer::present(const ndi::VideoFrame& frame) {
             rowBytes,
             frame.height
         );
+    } else {
+        uploaded = uploadPixels(
+            conversionBuffer_.data(),
+            frame.width * 4,
+            frame.width * 4,
+            frame.height
+        );
     }
 
     if (!uploaded) {
@@ -340,6 +356,7 @@ void Renderer::present(const ndi::VideoFrame& frame) {
             throw sdlError("Could not upload the video frame");
         }
 
+        uyvyTextureUnavailable_ = true;
         convertUyvyToBgra(frame);
         if (!createTexture(
                 frame.width,
