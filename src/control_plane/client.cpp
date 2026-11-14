@@ -195,6 +195,7 @@ bool Client::sendHeartbeat() {
     Json sources = Json::array();
     for (const auto& source : snapshot.ndiSources) {
         if (source.name.empty()) continue;
+        if (sources.size() >= 100) break;
         sources.push_back({
             {"name", source.name},
             {"url", source.url},
