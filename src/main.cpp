@@ -348,33 +348,33 @@ int main(int argc, char* argv[]) {
 
                 if (selected.has_value()) {
                     try {
-                    spdlog::info(
-                        "Connecting to NDI source '{}' [{}]",
-                        selected->name,
-                        selected->identity()
-                    );
-                    receiver =
-                        std::make_unique<veyra::ndi::Receiver>(*selected);
-                    activeSourceName = selected->name;
+                        spdlog::info(
+                            "Connecting to NDI source '{}' [{}]",
+                            selected->name,
+                            selected->identity()
+                        );
+                        receiver =
+                            std::make_unique<veyra::ndi::Receiver>(*selected);
+                        activeSourceName = selected->name;
 
-                    auto* activeReceiver = receiver.get();
-                    captureThread = std::jthread(
-                        [activeReceiver, &latestFrameMutex, &latestFrame,
-                         &captureFailed, &sourceConnected](
-                            const std::stop_token stopToken
-                        ) {
-                            try {
-                                while (!stopToken.stop_requested()) {
-                                    auto captured = activeReceiver->capture(100);
-                                    sourceConnected.store(
-                                        activeReceiver->isConnected()
-                                    );
-                                    if (captured.has_value()) {
-                                        std::lock_guard lock(latestFrameMutex);
-                                        latestFrame = std::move(*captured);
+                        auto* activeReceiver = receiver.get();
+                        captureThread = std::jthread(
+                            [activeReceiver, &latestFrameMutex, &latestFrame,
+                             &captureFailed, &sourceConnected](
+                                const std::stop_token stopToken
+                            ) {
+                                try {
+                                    while (!stopToken.stop_requested()) {
+                                        auto captured = activeReceiver->capture(100);
+                                        sourceConnected.store(
+                                            activeReceiver->isConnected()
+                                        );
+                                        if (captured.has_value()) {
+                                            std::lock_guard lock(latestFrameMutex);
+                                            latestFrame = std::move(*captured);
+                                        }
                                     }
-                                }
-                            } catch (const std::exception& error) {
+                                } catch (const std::exception& error) {
                                 spdlog::error(
                                     "NDI capture worker failed: {}",
                                     error.what()
