@@ -1,11 +1,11 @@
 #include <cstddef>
 #include <Processing.NDI.Lib.h>
 
-#include "veyra/config/config.hpp"
-#include "veyra/control_plane/client.hpp"
-#include "veyra/ndi/discovery.hpp"
-#include "veyra/ndi/receiver.hpp"
-#include "veyra/video/renderer.hpp"
+#include "ndiview/config/config.hpp"
+#include "ndiview/control_plane/client.hpp"
+#include "ndiview/ndi/discovery.hpp"
+#include "ndiview/ndi/receiver.hpp"
+#include "ndiview/video/renderer.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -35,7 +35,7 @@ void handleShutdownSignal(int) {
 
 int listSources() {
     try {
-        veyra::ndi::Discovery discovery;
+        ndiview::ndi::Discovery discovery;
         const auto discoveryDeadline =
             std::chrono::steady_clock::now() + std::chrono::seconds(5);
         while (std::chrono::steady_clock::now() < discoveryDeadline) {
@@ -60,9 +60,9 @@ int listSources() {
     }
 }
 
-std::optional<veyra::ndi::Source> selectSource(
-    const std::vector<veyra::ndi::Source>& sources,
-    const veyra::config::NdiConfig& config,
+std::optional<ndiview::ndi::Source> selectSource(
+    const std::vector<ndiview::ndi::Source>& sources,
+    const ndiview::config::NdiConfig& config,
     const bool allowAutomaticSelection
 ) {
     if (!config.sourceAddress.empty()) {
@@ -93,14 +93,14 @@ std::optional<veyra::ndi::Source> selectSource(
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    std::filesystem::path configPath = "/etc/veyra/config.json";
+    std::filesystem::path configPath = "/etc/ndiview/config.json";
     bool listSourcesOnly = false;
 
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--help" || argument == "-h") {
             spdlog::info(
-                "Usage: veyra [--config /path/to/config.json] [--list-sources]"
+                "Usage: ndiview [--config /path/to/config.json] [--list-sources]"
             );
             return EXIT_SUCCESS;
         }
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
 
         spdlog::error("Unknown or incomplete argument: {}", argument);
         spdlog::info(
-            "Usage: veyra [--config /path/to/config.json] [--list-sources]"
+            "Usage: ndiview [--config /path/to/config.json] [--list-sources]"
         );
         return EXIT_FAILURE;
     }
@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, handleShutdownSignal);
     std::signal(SIGTERM, handleShutdownSignal);
 
-    spdlog::info("Veyra {} starting", "0.1.0");
+    spdlog::info("NDIView {} starting", "0.1.0");
 
     if (!NDIlib_initialize()) {
         spdlog::critical("Failed to initialize the NDI runtime");
@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
 
     int exitCode = EXIT_SUCCESS;
     try {
-        const auto config = veyra::config::load(configPath);
+        const auto config = ndiview::config::load(configPath);
         if (!std::filesystem::exists(configPath)) {
             spdlog::warn(
                 "Configuration file '{}' was not found; using defaults",
@@ -148,22 +148,22 @@ int main(int argc, char* argv[]) {
             );
         }
 
-        veyra::video::Renderer renderer(config.display);
-        veyra::ndi::Discovery discovery;
-        std::unique_ptr<veyra::control_plane::Client> controlPlane;
+        ndiview::video::Renderer renderer(config.display);
+        ndiview::ndi::Discovery discovery;
+        std::unique_ptr<ndiview::control_plane::Client> controlPlane;
         if (!config.controlPlane.serverUrl.empty()) {
             try {
-                controlPlane = std::make_unique<veyra::control_plane::Client>(
+                controlPlane = std::make_unique<ndiview::control_plane::Client>(
                     config.controlPlane
                 );
                 controlPlane->start();
             } catch (const std::exception& error) {
-                spdlog::error("Veyra control plane could not start: {}", error.what());
+                spdlog::error("NDIView control plane could not start: {}", error.what());
             }
         }
-        std::unique_ptr<veyra::ndi::Receiver> receiver;
+        std::unique_ptr<ndiview::ndi::Receiver> receiver;
         std::mutex latestFrameMutex;
-        std::optional<veyra::ndi::VideoFrame> latestFrame;
+        std::optional<ndiview::ndi::VideoFrame> latestFrame;
         std::atomic_bool captureFailed{false};
         std::atomic_bool sourceConnected{false};
         std::jthread captureThread;
@@ -178,10 +178,10 @@ int main(int argc, char* argv[]) {
         int appliedPlaylistRevision = -1;
         std::uint64_t appliedSyncGeneration = 0;
         std::string appliedFallbackSignature;
-        veyra::config::NdiConfig activeNdiConfig = config.ndi;
-        std::vector<veyra::control_plane::CachedMediaItem> fallbackItems;
+        ndiview::config::NdiConfig activeNdiConfig = config.ndi;
+        std::vector<ndiview::control_plane::CachedMediaItem> fallbackItems;
         std::string activeSourceName;
-        std::vector<veyra::ndi::Source> currentSources;
+        std::vector<ndiview::ndi::Source> currentSources;
         const auto frameInterval =
             std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                 std::chrono::duration<double>(1.0 / config.display.targetFps)
@@ -233,7 +233,7 @@ int main(int argc, char* argv[]) {
         const auto reportControlPlaneStatus = [&]() {
             if (!controlPlane) return;
             const auto now = std::chrono::steady_clock::now();
-            veyra::control_plane::PlaybackSnapshot snapshot;
+            ndiview::control_plane::PlaybackSnapshot snapshot;
             snapshot.uptimeSeconds = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::seconds>(
                     now - discoveryStartedAt
@@ -365,7 +365,7 @@ int main(int argc, char* argv[]) {
                             selected->identity()
                         );
                         receiver =
-                            std::make_unique<veyra::ndi::Receiver>(*selected);
+                            std::make_unique<ndiview::ndi::Receiver>(*selected);
                         activeSourceName = selected->name;
 
                         auto* activeReceiver = receiver.get();
@@ -474,7 +474,7 @@ int main(int argc, char* argv[]) {
             }
 
             const auto now = std::chrono::steady_clock::now();
-            std::optional<veyra::ndi::VideoFrame> frame;
+            std::optional<ndiview::ndi::VideoFrame> frame;
             if (now >= nextPresentationAt) {
                 std::lock_guard lock(latestFrameMutex);
                 if (latestFrame.has_value()) {
@@ -537,13 +537,13 @@ int main(int argc, char* argv[]) {
             captureThread.join();
         }
     } catch (const std::exception& error) {
-        spdlog::critical("Veyra stopped after an error: {}", error.what());
+        spdlog::critical("NDIView stopped after an error: {}", error.what());
         exitCode = EXIT_FAILURE;
     }
 
     // All NDI finder and receiver instances are destroyed before the runtime.
     NDIlib_destroy();
 
-    spdlog::info("Veyra shut down");
+    spdlog::info("NDIView shut down");
     return exitCode;
 }

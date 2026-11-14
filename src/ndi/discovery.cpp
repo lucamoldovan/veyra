@@ -1,9 +1,9 @@
-#include "veyra/ndi/discovery.hpp"
+#include "ndiview/ndi/discovery.hpp"
 
 #include <stdexcept>
 #include <utility>
 
-namespace veyra::ndi {
+namespace ndiview::ndi {
 
 std::string Source::identity() const {
     return url.empty() ? name : url;
@@ -57,8 +57,8 @@ std::vector<Source> Discovery::currentSources() {
     }
 
     // NDI owns ndiSources and may invalidate it on the next finder call.
-    // Every string used by Veyra has therefore been copied above.
+    // Every string used by NDIView has therefore been copied above.
     return sources;
 }
 
-}  // namespace veyra::ndi
+}  // namespace ndiview::ndi
