@@ -104,6 +104,10 @@ std::optional<VideoFrame> Receiver::capture(const std::uint32_t timeoutMs) {
             return std::nullopt;
     }
 
+    if (pixelFormat == PixelFormat::UYVY && (ndiFrame.xres % 2) != 0) {
+        return std::nullopt;
+    }
+
     const auto width = static_cast<std::size_t>(ndiFrame.xres);
     const auto height = static_cast<std::size_t>(ndiFrame.yres);
     const auto stride = static_cast<std::size_t>(ndiFrame.line_stride_in_bytes);
