@@ -32,6 +32,12 @@ private:
         Uint32 format
     );
     void destroyTexture() noexcept;
+    [[nodiscard]] bool uploadPixels(
+        const std::uint8_t* pixels,
+        int sourcePitch,
+        int rowBytes,
+        int height
+    );
     void convertUyvyToBgra(const ndi::VideoFrame& frame);
 
     SDL_Window* window_{nullptr};
