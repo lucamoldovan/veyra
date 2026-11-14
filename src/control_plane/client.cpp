@@ -9,6 +9,7 @@
 #include <cerrno>
 #include <cctype>
 #include <cstring>
+#include <cstdio>
 #include <fcntl.h>
 #include <fstream>
 #include <stdexcept>
@@ -38,12 +39,12 @@ std::size_t appendResponse(
 }
 
 std::string platformName() {
-#if defined(__x86_64__)
+#if defined(__APPLE__)
+    return "macos";
+#elif defined(__x86_64__)
     return "linux-x86_64";
 #elif defined(__aarch64__)
     return "linux-aarch64";
-#elif defined(__APPLE__)
-    return "macos";
 #else
     return "linux-unknown";
 #endif
