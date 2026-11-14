@@ -307,7 +307,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.get("/api/v1/auth/session", async (request) => {
-    const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE]);
+    const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE] ?? request.cookies[LEGACY_SESSION_COOKIE]);
     return operator
       ? { authenticated: true, operator }
       : { authenticated: false, operator: null };
@@ -336,8 +336,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.delete("/api/v1/auth/session", async (request, reply) => {
-    const token = request.cookies[SESSION_COOKIE];
-    if (token) database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashSessionToken(token));
+    for (const token of [request.cookies[SESSION_COOKIE], request.cookies[LEGACY_SESSION_COOKIE]]) {
+      if (token) database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashSessionToken(token));
+    }
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
     reply.clearCookie(LEGACY_SESSION_COOKIE, { path: "/" });
     return { authenticated: false };
