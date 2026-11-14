@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   Activity,
-  ArrowDownRight,
   ArrowRight,
   AudioWaveform,
   CircleHelp,
