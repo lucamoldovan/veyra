@@ -157,6 +157,8 @@ int main() {
                 const int revision = ++manifestRequestCount == 1 ? 3 : 4;
                 const int version = revision == 3 ? 2 : 3;
                 const std::string mediaId = revision == 3 ? "media-1" : "media-2";
+                const std::string mediaHash = revision == 3 ? assetHash
+                    : "360f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
                 responseBody = "{\"schemaVersion\":1,\"configVersion\":" +
                     std::to_string(version) + ",\"playlistId\":\"fallback-1\",\"playlistRevision\":" +
                     std::to_string(revision) + ",\"items\":[{\"mediaId\":\"" + mediaId +
