@@ -798,7 +798,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
     const now = Date.now();
     const isoNow = new Date(now).toISOString();
-    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Receiver did not reconnect after restart' WHERE status='restarting' AND created_at <= ? AND device_id IN (SELECT id FROM devices WHERE last_seen_at IS NULL OR last_seen_at <= device_commands.created_at)").run(isoNow, new Date(now-180_000).toISOString());
+    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Receiver did not confirm the requested action before timeout' WHERE status='restarting' AND claimed_at IS NOT NULL AND claimed_at <= ?").run(isoNow, new Date(now-180_000).toISOString());
     database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Command expired before delivery' WHERE status IN ('queued','claimed') AND expires_at <= ?").run(isoNow, isoNow);
     return {
       devices: rows.map((device) => {
