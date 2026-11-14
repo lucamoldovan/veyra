@@ -194,10 +194,12 @@ int main(int argc, char* argv[]) {
 
         const auto renderFallback = [&](const std::chrono::steady_clock::time_point now) -> bool {
             if (fallbackItems.empty()) return false;
-            if (fallbackVisible &&
-                now - fallbackSlideStartedAt <
+            if (fallbackVisible) {
+                if (now - fallbackSlideStartedAt <
                     std::chrono::seconds(fallbackItems[fallbackIndex].durationSeconds)) {
-                return true;
+                    return true;
+                }
+                fallbackIndex = (fallbackIndex + 1) % fallbackItems.size();
             }
             for (std::size_t attempt = 0; attempt < fallbackItems.size(); ++attempt) {
                 fallbackIndex %= fallbackItems.size();
