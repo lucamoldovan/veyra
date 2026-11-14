@@ -333,6 +333,18 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     };
   });
 
+  app.delete<{ Params: { deviceId: string } }>("/api/v1/devices/:deviceId", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const result = database.prepare("DELETE FROM devices WHERE id = ? AND credential_revoked_at IS NOT NULL")
+      .run(request.params.deviceId);
+    if (result.changes === 0) {
+      return reply.code(409).send({ error: "Revoke the device credential before removing the device" });
+    }
+    return reply.code(204).send();
+  });
+
   app.post<{ Params: { deviceId: string } }>("/api/v1/devices/:deviceId/revoke", async (request, reply) => {
     const operator = getAuthenticatedOperator(database, request, reply);
     if (!operator) return;
