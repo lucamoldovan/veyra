@@ -123,6 +123,7 @@ export interface Device {
   assignedNdiSourceName: string | null;
   assignedNdiSourceAddress: string | null;
   fallbackPlaylistId: string | null;
+  restartCommand: { id: string; status: "queued" | "claimed" | "restarting" | "completed" | "failed" | "timed_out"; createdAt: string; message: string | null } | null;
 }
 
 export interface PairingCode {
@@ -138,6 +139,10 @@ export function createDevicePairingCode(): Promise<PairingCode> {
   return request<PairingCode>("/api/v1/devices/pairing-codes", {
     method: "POST",
   });
+}
+
+export function requestDeviceRestart(deviceId: string): Promise<{ id: string; status: "queued"; createdAt: string; expiresAt: string }> {
+  return request(`/api/v1/devices/${encodeURIComponent(deviceId)}/restart`, { method: "POST" });
 }
 
 export function revokeDeviceCredential(deviceId: string): Promise<{ revoked: true }> {

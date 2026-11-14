@@ -27,7 +27,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getPlaylists, getSources, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, removeRevokedDevice, updateDeviceConfig, type ConnectionState, type Device, type NdiSource, type PlaylistSummary, type Operator, type PairingCode, type ServerHealth } from "./api";
+import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getPlaylists, getSources, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, removeRevokedDevice, requestDeviceRestart, updateDeviceConfig, type ConnectionState, type Device, type NdiSource, type PlaylistSummary, type Operator, type PairingCode, type ServerHealth } from "./api";
 import { MediaPage, PlaylistsPage, SourcesPage } from "./MediaPages";
 
 type Page = "overview" | "devices" | "sources" | "media" | "playlists" | "system";
@@ -571,6 +571,7 @@ function DevicesPage() {
   const [copied, setCopied] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
+  const [restartingDeviceId, setRestartingDeviceId] = useState<string | null>(null);
   const [sources, setSources] = useState<NdiSource[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [drafts, setDrafts] = useState<Record<string, { sourceAddress: string; fallbackPlaylistId: string }>>({});
@@ -662,6 +663,20 @@ function DevicesPage() {
   };
 
 
+  const restartDevice = async (device: Device) => {
+    if (device.credentialStatus !== "active" || device.status !== "online") return;
+    if (!window.confirm(`Restart receiver "${device.name}"? Its video output will stop briefly while the Mac mini reboots.`)) return;
+    setRestartingDeviceId(device.id);
+    setError("");
+    try {
+      await requestDeviceRestart(device.id);
+      setRefreshTick((tick) => tick + 1);
+    } catch (restartError) {
+      setError(restartError instanceof Error ? restartError.message : "Could not request receiver restart.");
+    } finally {
+      setRestartingDeviceId(null);
+    }
+  };
   const saveDeviceConfig = async (device: Device) => {
     const draft = drafts[device.id] ?? { sourceAddress: device.assignedNdiSourceAddress ?? "", fallbackPlaylistId: device.fallbackPlaylistId ?? "" };
     const selectedSource = sources.find((source) => source.address === draft.sourceAddress);
@@ -766,7 +781,7 @@ function DevicesPage() {
                 </div>
                 <div><span className={`device-status device-status-${device.status}`}><span />{device.status}</span></div>
                 <div className="device-playback"><strong>{device.playbackMode}</strong><span>{device.ndiSourceName ?? "No NDI source reported"}</span></div>
-                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}{device.credentialStatus === "active" ? <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void revokeCredential(device)}>{revokingDeviceId === device.id ? "Revoking…" : "Revoke access"}</button> : <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void removeDevice(device)}>{revokingDeviceId === device.id ? "Removing…" : "Remove device"}</button>}</div>
+                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}{device.credentialStatus === "active" ? <><button className="button button-secondary device-revoke-button" disabled={restartingDeviceId === device.id || device.status !== "online" || device.restartCommand?.status === "queued" || device.restartCommand?.status === "claimed" || device.restartCommand?.status === "restarting"} onClick={() => void restartDevice(device)}>{restartingDeviceId === device.id ? "Requesting…" : "Restart receiver"}</button><button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void revokeCredential(device)}>{revokingDeviceId === device.id ? "Revoking…" : "Revoke access"}</button></> : <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void removeDevice(device)}>{revokingDeviceId === device.id ? "Removing…" : "Remove device"}</button>}{device.restartCommand && <span className="device-command-status">Restart: {device.restartCommand.status.replace("_", " ")}{device.restartCommand.message ? ` · ${device.restartCommand.message}` : ""}</span>}</div>
                 <div className="device-assignment">
                   <label>NDI source
                     <select disabled={device.credentialStatus !== "active"} value={(drafts[device.id]?.sourceAddress ?? device.assignedNdiSourceAddress) ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { sourceAddress: event.target.value, fallbackPlaylistId: current[device.id]?.fallbackPlaylistId ?? device.fallbackPlaylistId ?? "" } }))}>
