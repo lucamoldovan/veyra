@@ -82,7 +82,7 @@ Current implementation:
 
 Remaining receiver work:
 
-- Receive and acknowledge allowlisted remote commands over a persistent channel.
+- Poll and acknowledge allowlisted remote commands over the authenticated receiver API.
 - Add richer health metrics and playback diagnostics.
 - Add explicit failure-injection tests for interrupted downloads, corrupt caches, and version mismatches.
 - Build the complete player against the official NDI SDK and validate source recovery, fallback, and server outages on target hardware.
@@ -102,7 +102,7 @@ Responsibilities:
 - Media upload, storage, and library metadata.
 - Playlist and per-device assignment management.
 - Configuration distribution and synchronization.
-- Remote commands, including changing source, selecting a playlist, requesting a resync, and restarting the receiver process.
+- Remote commands currently include restarting the NDIView receiver application and rebooting the full device. Other actions remain planned.
 - Playback state, health metrics, logs, and diagnostics.
 
 The server exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, authenticated heartbeats with source snapshots, an aggregated NDI source inventory endpoint, local image upload/storage, playlist CRUD, device credential revocation, per-device source and fallback assignments, versioned receiver configuration, assigned-media manifests, and receiver-authenticated asset downloads. The C++ client verifies TLS, stores its bearer credential locally, synchronizes the assigned state, and caches fallback images. Receiver restart and device reboot commands are implemented; WebSocket events remain planned.
@@ -160,7 +160,7 @@ The initial fallback content scope includes image-based sequences with explicit 
 - NDI discovery and video transport remain separate from the management API.
 - The receiver's playback loop must not block on server requests.
 - Device identity and authentication are implemented for pairing and heartbeats; receiver restart and device reboot commands use an authenticated, allowlisted command contract.
-- Remote commands need acknowledgements, timeouts, and observable outcomes.
+- Receiver restart and device reboot commands have authenticated polling, expiry, acknowledgements, cooldowns, and observable outcomes.
 - Configuration and media updates should be versioned and applied atomically so a partial download cannot corrupt the last working state.
 
 Do not expose an unauthenticated remote shell or arbitrary command execution. A restart action should invoke a narrowly defined receiver operation, not accept arbitrary shell text.
@@ -176,11 +176,11 @@ These are implementation proposals, not immutable product requirements:
 - Use a typed, versioned HTTP API plus WebSockets for live state and commands.
 - Keep receiver configuration and cached fallback data on disk.
 
-The current implementation uses Node.js 22+, TypeScript, Fastify 5, React 19, Vite 6, and SQLite via better-sqlite3. The database and initial framework choices are therefore settled for the current development phase. Remote commands, WebSocket events, long-term media retention policy beyond active-cache pruning, and production deployment still require explicit design and validation.
+The current implementation uses Node.js 22+, TypeScript, Fastify 5, React 19, Vite 6, and SQLite via better-sqlite3. The database and initial framework choices are therefore settled for the current development phase. WebSocket events, detailed diagnostics, long-term media retention policy beyond active-cache pruning, and physical production validation still require explicit design and validation.
 
 ## Repository status
 
-The repository now contains a native NDI receiver foundation, a Fastify/SQLite local server, and a React/Vite dashboard. Implemented capabilities include operator authentication, device pairing and revocation, TLS-verified C++ heartbeats with NDI source snapshots, an aggregated source inventory, local media uploads, ordered playlists with per-image durations, database/media backups, and a responsive dashboard for devices, sources, media, and playlists. Remaining major work includes the complete NDI SDK build, target hardware validation, remote commands, WebSocket updates, detailed diagnostics, media quotas/retention, and production dashboard packaging.
+The repository now contains a native NDI receiver foundation, a Fastify/SQLite local server, and a React/Vite dashboard. Implemented capabilities include operator authentication, device pairing and revocation, TLS-verified C++ heartbeats with NDI source snapshots, an aggregated source inventory, local media uploads, ordered playlists with per-image durations, database/media backups, and a responsive dashboard for devices, sources, media, and playlists. Remaining major work includes the complete NDI SDK build, target hardware validation, authenticated native receiver update distribution, WebSocket updates, detailed diagnostics, and media quotas/retention.
 
 The full NDI player has not yet been built against an installed official NDI SDK or tested with a real sender on the target Mac mini. The control-plane client is compiled and integration-tested independently, but that does not verify the complete player. Do not describe the platform as production-ready until the receiver, server, dashboard, offline behavior, and target hardware have all been validated.
 

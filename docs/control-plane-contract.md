@@ -19,7 +19,7 @@ This document defines the intended communication contract for the NDIView local 
 - Dashboard subscribes to a server WebSocket for live device state and operation updates.
 - Receivers establish an outbound connection to the local server. The server should not need to initiate arbitrary inbound connections to receiver machines.
 - Receivers send periodic heartbeats and playback reports.
-- The server sends commands and version notifications over the receiver's persistent channel. Receivers acknowledge commands and report completion or failure.
+- The server queues allowlisted commands. Receivers poll the authenticated command endpoint, acknowledge a claimed command, and report failure or completion after a subsequent heartbeat.
 - If a persistent connection drops, the receiver retries with bounded exponential backoff and continues local playback.
 
 ## API versioning
@@ -44,6 +44,8 @@ Implemented endpoints:
 | POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |
 | POST | `/api/v1/devices/{deviceId}/revoke` | Revoke a receiver credential (authenticated operator only) |
 | DELETE | `/api/v1/devices/{deviceId}` | Remove a receiver record after its credential has been revoked (authenticated operator only) |
+| POST | `/api/v1/devices/{deviceId}/restart` | Queue an application-only NDIView receiver restart (authenticated operator only) |
+| POST | `/api/v1/devices/{deviceId}/reboot` | Queue a full-device reboot (authenticated operator only) |
 | GET | `/api/v1/sources` | List NDI sources reported by active receivers (authenticated operator only) |
 | GET | `/api/v1/media` | List local media assets (authenticated operator only) |
 | POST | `/api/v1/media` | Upload a PNG, JPEG, or WebP image (authenticated operator only) |
@@ -55,6 +57,13 @@ Implemented endpoints:
 | PUT | `/api/v1/playlists/{playlistId}` | Replace a playlist and its ordered items (authenticated operator only) |
 | DELETE | `/api/v1/playlists/{playlistId}` | Delete a playlist (authenticated operator only) |
 
+Receiver command endpoints:
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/api/v1/receiver/commands/poll` | Claim one queued command for the authenticated receiver |
+| POST | `/api/v1/receiver/commands/{commandId}/status` | Acknowledge a command or report failure; completion is confirmed by a later heartbeat |
+
 Remaining planned management endpoints:
 
 | Method | Route | Purpose |
@@ -65,15 +74,12 @@ Remaining planned management endpoints:
 | GET | `/api/v1/system/health` | Read detailed local server health |
 | GET | `/api/v1/devices/{deviceId}/logs` | Read retained receiver diagnostics |
 
-The dashboard must not have a route that accepts arbitrary shell commands. Remote actions are a fixed allowlist, initially:
+The dashboard must not have a route that accepts arbitrary shell commands. Remote actions are a fixed allowlist. Implemented actions:
 
-- `set_ndi_source`
-- `set_fallback_playlist`
-- `request_config_sync`
-- `request_media_sync`
-- `restart_receiver`
+- `restart` — restart the NDIView receiver process only
+- `reboot` — reboot the full Debian device
 
-A machine reboot command is intentionally not part of the initial allowlist.
+The implemented actions are `restart` (restart only the NDIView receiver application) and `reboot` (reboot the entire Debian device). Both are explicit allowlisted actions; arbitrary shell commands are never accepted.
 
 ## Receiver enrollment and identity
 
