@@ -34,7 +34,7 @@ The receiver requests NDI's UYVY/BGRA receive format:
 - Audio and metadata pointers passed to the NDI capture function are null; Veyra does not receive or play NDI audio.
 - Interlaced sources are deinterlaced by the SDK by setting the video-fields option to false.
 
-UYVY is uploaded directly to an SDL streaming texture when supported. If the renderer cannot create or lock a UYVY texture, Veyra converts the frame to BGRA and uses a BGRA texture instead. The conversion uses BT.709 coefficients for HD and BT.601 for SD.
+UYVY is uploaded directly to an SDL streaming texture when supported. SDL's YUV conversion mode is set to automatic so SD uses BT.601 and HD uses BT.709. If the renderer cannot create or lock a UYVY texture, Veyra converts the frame to BGRA and uses a BGRA texture instead, using the same SD/HD matrix choice.
 
 ## Source selection
 
