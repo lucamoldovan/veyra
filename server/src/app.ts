@@ -754,6 +754,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const operator = getAuthenticatedOperator(database, request, reply);
     if (!operator) return;
 
+    const now = Date.now();
+    const isoNow = new Date(now).toISOString();
+    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Receiver did not confirm the requested action before timeout' WHERE status='restarting' AND claimed_at IS NOT NULL AND claimed_at <= ?").run(isoNow, new Date(now-180_000).toISOString());
+    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Command expired before delivery' WHERE status IN ('queued','claimed') AND expires_at <= ?").run(isoNow, isoNow);
+
     const rows = database.prepare(`
       SELECT d.id, d.name, d.platform, d.software_version, d.last_seen_at, d.last_ip,
              d.playback_mode, d.ndi_source_name, d.uptime_seconds, d.device_uptime_seconds, d.created_at,
@@ -796,10 +801,6 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       reboot_command_message: string | null;
     }>;
 
-    const now = Date.now();
-    const isoNow = new Date(now).toISOString();
-    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Receiver did not confirm the requested action before timeout' WHERE status='restarting' AND claimed_at IS NOT NULL AND claimed_at <= ?").run(isoNow, new Date(now-180_000).toISOString());
-    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Command expired before delivery' WHERE status IN ('queued','claimed') AND expires_at <= ?").run(isoNow, isoNow);
     return {
       devices: rows.map((device) => {
         const age = device.last_seen_at ? now - Date.parse(device.last_seen_at) : Number.POSITIVE_INFINITY;
