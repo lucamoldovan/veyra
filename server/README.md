@@ -12,7 +12,7 @@ TypeScript/Fastify service and SQLite-backed control plane for the Veyra local-n
 From this directory:
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
