@@ -299,7 +299,8 @@ test("database upgrades a populated version-one schema without losing devices", 
         name: "Lobby",
         credential_revoked_at: null,
       });
-      assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM operators").get().count, 1);
+      const operatorCount = migrated.prepare("SELECT COUNT(*) AS count FROM operators").get() as { count: number };
+      assert.equal(operatorCount.count, 1);
     } finally {
       migrated.close();
     }
