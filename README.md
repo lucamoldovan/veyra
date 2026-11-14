@@ -62,7 +62,13 @@ sudo cp config/veyra.example.json /etc/veyra/config.json
 sudo nano /etc/veyra/config.json
 ```
 
-Set `ndi.sourceAddress` to the source address shown in Veyra's discovery log. This is preferred because it identifies the NDI source more precisely. If the address is unavailable, set `ndi.sourceName`. If neither is set and exactly one source is discovered, Veyra selects that source automatically.
+Before editing the config, list the sources visible on the LAN:
+
+```bash
+./build/veyra --list-sources
+```
+
+Set `ndi.sourceAddress` to the address printed by that command. This is preferred because it identifies the NDI source more precisely. If the address is unavailable, set `ndi.sourceName`. If neither is set and exactly one source is discovered after the initial five-second discovery window, Veyra selects that source automatically.
 
 Run the player:
 
