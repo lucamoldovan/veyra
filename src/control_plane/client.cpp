@@ -162,7 +162,11 @@ bool Client::pair() {
         const Json result = Json::parse(response.body);
         const std::string token = result.at("deviceToken").get<std::string>();
         const std::string id = result.at("deviceId").get<std::string>();
-        if (token.size() < 32 || token.size() > 512 || id.empty()) {
+        if (token.size() != 43 ||
+            !std::all_of(token.begin(), token.end(), [](unsigned char c) {
+                return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                       (c >= '0' && c <= '9') || c == '-' || c == '_';
+            }) || id.empty()) {
             std::cerr << "Veyra server returned an invalid receiver credential\n";
             return false;
         }
@@ -313,7 +317,11 @@ std::string Client::loadCredential() const {
     std::string token;
     std::getline(input, token);
     token = trim(std::move(token));
-    if (!token.empty() && (token.size() < 32 || token.size() > 512)) {
+    if (!token.empty() && (token.size() != 43 ||
+        !std::all_of(token.begin(), token.end(), [](unsigned char c) {
+            return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                   (c >= '0' && c <= '9') || c == '-' || c == '_';
+        }))) {
         throw std::runtime_error("device credential file contains an invalid token");
     }
     return token;
