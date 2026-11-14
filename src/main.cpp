@@ -32,7 +32,11 @@ void handleShutdownSignal(int) {
 int listSources() {
     try {
         veyra::ndi::Discovery discovery;
-        (void)discovery.waitForChanges(3000);
+        const auto discoveryDeadline =
+            std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (std::chrono::steady_clock::now() < discoveryDeadline) {
+            (void)discovery.waitForChanges(250);
+        }
         const auto sources = discovery.currentSources();
 
         if (sources.empty()) {
@@ -54,7 +58,8 @@ int listSources() {
 
 std::optional<veyra::ndi::Source> selectSource(
     const std::vector<veyra::ndi::Source>& sources,
-    const veyra::config::NdiConfig& config
+    const veyra::config::NdiConfig& config,
+    const bool allowAutomaticSelection
 ) {
     if (!config.sourceAddress.empty()) {
         for (const auto& source : sources) {
@@ -74,7 +79,7 @@ std::optional<veyra::ndi::Source> selectSource(
         return std::nullopt;
     }
 
-    if (sources.size() == 1) {
+    if (allowAutomaticSelection && sources.size() == 1) {
         return sources.front();
     }
 
@@ -154,6 +159,7 @@ int main(int argc, char* argv[]) {
                 std::chrono::duration<double>(1.0 / config.display.targetFps)
             );
         auto nextPresentationAt = std::chrono::steady_clock::now();
+        const auto discoveryStartedAt = nextPresentationAt;
         auto lastFrameAt = nextPresentationAt;
         auto lastDiscoveryLog = lastFrameAt;
 
@@ -163,7 +169,14 @@ int main(int argc, char* argv[]) {
             if (!receiver) {
                 (void)discovery.waitForChanges(250);
                 const auto sources = discovery.currentSources();
-                const auto selected = selectSource(sources, config.ndi);
+                const bool automaticSelectionReady =
+                    std::chrono::steady_clock::now() - discoveryStartedAt >=
+                    std::chrono::seconds(3);
+                const auto selected = selectSource(
+                    sources,
+                    config.ndi,
+                    automaticSelectionReady
+                );
 
                 if (selected.has_value()) {
                     spdlog::info(
