@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. On first launch, copy the one-time setup key printed in the server terminal into the setup screen. The Vite development server proxies `/api` requests to the local server at `127.0.0.1:8787`.
+Open http://127.0.0.1:5173. On first launch, copy the one-time setup key printed in the server terminal into the setup screen. The Vite development server proxies `/api` requests to `http://127.0.0.1:8787` by default. To develop against a TLS-enabled server, set `VEYRA_API_TARGET` to its HTTPS origin before starting Vite (for example, `VEYRA_API_TARGET=https://localhost:8787 npm run dev`). The certificate must be trusted by Node.js; do not disable TLS certificate verification.
 
 ## Build
 
