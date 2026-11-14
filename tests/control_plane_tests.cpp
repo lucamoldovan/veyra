@@ -233,9 +233,18 @@ int main() {
                 reloaded.fallbackItems[0].sha256 == synced.fallbackItems[0].sha256;
         }
 
+        bool corruptCacheRejected = false;
+        if (synced.hasValidCachedState && synced.fallbackItems.size() == 1) {
+            std::ofstream corrupt(synced.fallbackItems[0].path, std::ios::binary | std::ios::trunc);
+            corrupt << "tampered-cache-data";
+            corrupt.close();
+            const auto damaged = veyra::control_plane::ReceiverSync(config).loadCached();
+            corruptCacheRejected = damaged.hasValidCachedState && damaged.fallbackItems.empty();
+        }
+
         success = !serverFailed && pairRequestOk && heartbeatRequestOk &&
             configRequestOk && manifestRequestOk && assetRequestOk && cachedAssetOk &&
-            storedToken == token && fileModeOk && directoryModeOk;
+            corruptCacheRejected && storedToken == token && fileModeOk && directoryModeOk;
     }
 
     mockServer.join();
