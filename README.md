@@ -31,7 +31,7 @@ The native receiver foundation includes:
 - Leaves the NDI receiver alive during source loss so the SDK can reconnect when the source returns.
 - Loads and validates local JSON configuration.
 
-Device registration, receiver authentication, live device/source data, media uploads, playlist editing, remote commands, and per-device cached fallback are **not yet implemented**. The dashboard's current empty states are intentional and do not use fabricated device or media data. On first server launch, copy the one-time setup key from the server terminal into the dashboard to create the local administrator.
+Receiver-side enrollment, source discovery/reporting, media uploads, playlist editing, remote commands, and per-device cached fallback are **not yet implemented**. The server can issue one-time pairing codes, register a receiver, accept authenticated heartbeats, and provide a protected device inventory. The dashboard's current empty states are intentional and do not use fabricated device or media data. On first server launch, copy the one-time setup key from the server terminal into the dashboard to create the local administrator.
 
 The player has not yet been compiled against an installed official NDI SDK or validated on the target Mac mini. The SDK-independent configuration tests run in GitHub Actions. See the [development plan](docs/development.md) for implementation and validation status.
 
