@@ -35,6 +35,7 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
     CREATE INDEX IF NOT EXISTS sessions_operator_id_idx ON sessions(operator_id);
     CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
   `);
+  database.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(new Date().toISOString());
 
   return database;
 }
