@@ -1,6 +1,7 @@
 #pragma once
 
 #include "veyra/config/config.hpp"
+#include "veyra/control_plane/sync.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -35,6 +36,7 @@ public:
     void start();
     void stop();
     void updateStatus(PlaybackSnapshot snapshot);
+    [[nodiscard]] SyncSnapshot syncSnapshot() const;
 
 private:
     struct HttpResponse {
@@ -56,6 +58,9 @@ private:
     void waitFor(std::stop_token stopToken, std::chrono::seconds duration) const;
 
     config::ControlPlaneConfig config_;
+    ReceiverSync sync_;
+    mutable std::mutex syncMutex_;
+    SyncSnapshot syncSnapshot_;
     std::string deviceToken_;
     std::string deviceId_;
     int heartbeatIntervalSeconds_{15};
