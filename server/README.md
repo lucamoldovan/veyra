@@ -76,7 +76,8 @@ Implemented:
 - Authenticated device inventory and one-time, 12-digit pairing codes (10-minute expiry), stored as HMAC-SHA-256 verifiers using a separate 32-byte local secret file.
 - Single-use receiver pairing that returns a device ID and one-time device credential; only a hash of the credential is stored.
 - Bearer-authenticated receiver heartbeats and derived online/stale/offline state.
-- Operator-controlled device credential revocation and safe removal of revoked device records.\n- Per-device NDI discovery snapshots reported through heartbeats and an authenticated aggregated source inventory endpoint.
+- Operator-controlled device credential revocation and safe removal of revoked device records.
+- Per-device NDI discovery snapshots reported through heartbeats and an authenticated aggregated source inventory endpoint.
 - Transactional SQLite schema migrations through version 4, including a populated version-1 upgrade test.
 - Authenticated local image uploads for PNG, JPEG, and WebP, with content-signature checks, a 20 MB limit, SHA-256 metadata, and owner-only file storage.
 - Authenticated media listing, inline content delivery, and safe deletion blocked while a playlist references the asset.
