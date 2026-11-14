@@ -1,4 +1,4 @@
-#include "veyra/config/config.hpp"
+#include "ndiview/config/config.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace veyra::config {
+namespace ndiview::config {
 namespace {
 
 using Json = nlohmann::json;
@@ -150,8 +150,8 @@ bool readBoolean(const Json& object, const char* key, const bool fallback) {
 
 AppConfig load(const std::filesystem::path& path) {
     AppConfig config;
-    config.controlPlane.credentialPath = expandHome("~/.local/state/veyra/device-token");
-    config.controlPlane.cachePath = expandHome("~/.local/state/veyra/cache");
+    config.controlPlane.credentialPath = expandHome("~/.local/state/ndiview/device-token");
+    config.controlPlane.cachePath = expandHome("~/.local/state/ndiview/cache");
 
     if (!std::filesystem::exists(path)) {
         return config;
@@ -199,7 +199,7 @@ AppConfig load(const std::filesystem::path& path) {
         config.controlPlane.serverUrl.pop_back();
     }
     validateServerUrl(config.controlPlane.serverUrl);
-    config.controlPlane.deviceName = readString(controlPlane, "deviceName", "Veyra Receiver");
+    config.controlPlane.deviceName = readString(controlPlane, "deviceName", "NDIView Receiver");
     if (config.controlPlane.deviceName.empty() || config.controlPlane.deviceName.size() > 64) {
         throw std::runtime_error("controlPlane.deviceName must contain 1 to 64 characters");
     }
@@ -215,13 +215,13 @@ AppConfig load(const std::filesystem::path& path) {
         ? std::filesystem::path{}
         : expandHome(caPath);
     const auto credentialPath = readString(
-        controlPlane, "credentialPath", "~/.local/state/veyra/device-token"
+        controlPlane, "credentialPath", "~/.local/state/ndiview/device-token"
     );
     if (credentialPath.empty()) {
         throw std::runtime_error("controlPlane.credentialPath must not be empty");
     }
     config.controlPlane.credentialPath = expandHome(credentialPath);
-    const auto cachePath = readString(controlPlane, "cachePath", "~/.local/state/veyra/cache");
+    const auto cachePath = readString(controlPlane, "cachePath", "~/.local/state/ndiview/cache");
     if (cachePath.empty()) throw std::runtime_error("controlPlane.cachePath must not be empty");
     config.controlPlane.cachePath = expandHome(cachePath);
     config.controlPlane.syncIntervalSeconds = readInteger(controlPlane, "syncIntervalSeconds", 10, 5, 300);
@@ -232,4 +232,4 @@ AppConfig load(const std::filesystem::path& path) {
     return config;
 }
 
-}  // namespace veyra::config
+}  // namespace ndiview::config

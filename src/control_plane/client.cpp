@@ -1,4 +1,4 @@
-#include "veyra/control_plane/client.hpp"
+#include "ndiview/control_plane/client.hpp"
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -19,7 +19,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-namespace veyra::control_plane {
+namespace ndiview::control_plane {
 namespace {
 
 using Json = nlohmann::json;
@@ -513,4 +513,4 @@ void Client::waitFor(
     }
 }
 
-}  // namespace veyra::control_plane
+}  // namespace ndiview::control_plane
