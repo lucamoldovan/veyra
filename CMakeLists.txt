@@ -56,6 +56,36 @@ if(VEYRA_BUILD_PLAYER)
         )
     endif()
 
+    # NDI SDK headers have used both p_ndi_name and p_ndi_recv_name for
+    # the receiver's advertised name. Detect the installed header instead
+    # of assuming one SDK generation's spelling.
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_INCLUDES "${NDI_INCLUDE_DIR}")
+    check_cxx_source_compiles("
+        #include <Processing.NDI.Lib.h>
+        int main() {
+            NDIlib_recv_create_v3_t settings{};
+            settings.p_ndi_name = \"Veyra Receiver\";
+            return 0;
+        }
+    " VEYRA_NDI_HAS_P_NDI_NAME)
+    if(NOT VEYRA_NDI_HAS_P_NDI_NAME)
+        check_cxx_source_compiles("
+            #include <Processing.NDI.Lib.h>
+            int main() {
+                NDIlib_recv_create_v3_t settings{};
+                settings.p_ndi_recv_name = \"Veyra Receiver\";
+                return 0;
+            }
+        " VEYRA_NDI_HAS_P_NDI_RECV_NAME)
+    endif()
+    unset(CMAKE_REQUIRED_INCLUDES)
+    if(NOT VEYRA_NDI_HAS_P_NDI_NAME AND NOT VEYRA_NDI_HAS_P_NDI_RECV_NAME)
+        message(FATAL_ERROR
+            "The installed NDI SDK has an unsupported NDIlib_recv_create_v3_t receiver-name field."
+        )
+    endif()
+
     add_executable(veyra
         src/main.cpp
         src/config/config.cpp
@@ -86,6 +116,12 @@ if(VEYRA_BUILD_PLAYER)
         BUILD_RPATH "${NDI_LIBRARY_DIR}"
         INSTALL_RPATH "${NDI_LIBRARY_DIR}"
     )
+
+    if(VEYRA_NDI_HAS_P_NDI_NAME)
+        target_compile_definitions(veyra PRIVATE VEYRA_NDI_RECV_NAME_FIELD_P_NDI_NAME)
+    else()
+        target_compile_definitions(veyra PRIVATE VEYRA_NDI_RECV_NAME_FIELD_P_NDI_RECV_NAME)
+    endif()
 
     target_compile_options(veyra PRIVATE
         -Wall
