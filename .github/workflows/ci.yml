@@ -49,8 +49,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+      - name: Synchronize and install locked dependencies
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --no-audit --no-fund
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=moderate
