@@ -23,7 +23,7 @@ if [[ ! -f /etc/veyra/release-signing.pub ]]; then
   echo "Install the trusted Ed25519 public key at /etc/veyra/release-signing.pub first." >&2; exit 1
 fi
 [[ -f "$ARCHIVE" && -f "$SIGNATURE" && -f "$CA_BUNDLE" ]] || { echo "Archive, signature or CA bundle is missing." >&2; exit 1; }
-printf '%s  %s\\n' "$EXPECTED_SHA" "$ARCHIVE" | sha256sum --check --status || { echo "Release SHA-256 mismatch." >&2; exit 1; }
+printf '%s  %s\n' "$EXPECTED_SHA" "$ARCHIVE" | sha256sum --check --status || { echo "Release SHA-256 mismatch." >&2; exit 1; }
 openssl pkeyutl -verify -rawin -pubin -inkey /etc/veyra/release-signing.pub -sigfile "$SIGNATURE" -in "$ARCHIVE" >/dev/null
 PREFIX="ndiview-$VERSION/"
 python3 - "$ARCHIVE" "$PREFIX" <<'PY'
