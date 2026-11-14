@@ -6,16 +6,13 @@
 
 #include <algorithm>
 #include <array>
-#include <cerrno>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
+#include <fcntl.h>
 #include <fstream>
 #include <iterator>
-#include <fcntl.h>
-#include <iterator>
-#include <utility>
 #include <stdexcept>
-#include <string_view>
+#include <string>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <unordered_set>
@@ -125,6 +122,30 @@ std::string extensionFor(const std::string& mime) {
     throw std::runtime_error("Unsupported media MIME type in receiver manifest");
 }
 
+std::unordered_set<std::string> previousStateFiles(const std::filesystem::path& statePath) {
+    std::unordered_set<std::string> files;
+    try {
+        std::ifstream input(statePath);
+        if (!input) return files;
+        Json state;
+        input >> state;
+        if (!state.contains("items") || !state["items"].is_array()) return files;
+        for (const auto& item : state["items"]) {
+            const auto hash = item.value("sha256", "");
+            const auto mime = item.value("mimeType", "");
+            if (!validHash(hash)) continue;
+            try {
+                files.insert(hash + extensionFor(mime));
+            } catch (...) {
+                // Ignore invalid metadata from an older/corrupt cache manifest.
+            }
+        }
+    } catch (...) {
+        // A corrupt old manifest must not block a fresh synchronization.
+    }
+    return files;
+}
+
 void ensurePrivateDirectory(const std::filesystem::path& path) {
     std::filesystem::create_directories(path);
     struct stat info{};
@@ -210,6 +231,8 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
                                        const std::filesystem::path& caCertificatePath,
                                        const std::stop_token& stopToken) {
     ensurePrivateDirectory(config_.cachePath);
+    const auto statePath = config_.cachePath / "state.json";
+    const auto previousFiles = previousStateFiles(statePath);
     const auto mediaRoot = config_.cachePath / "media";
     ensurePrivateDirectory(mediaRoot);
 
@@ -291,9 +314,11 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
         {"fallbackPlaylistId", snapshot.fallbackPlaylistId},
         {"playlistRevision", snapshot.playlistRevision}, {"items", committedItems}
     };
-    atomicWrite(config_.cachePath / "state.json", state.dump(2));
+    atomicWrite(statePath, state.dump(2));
 
-    std::unordered_set<std::string> retainedFiles;
+    // Keep the previous snapshot's files until the main playback loop has
+    // observed the new snapshot. A later successful sync prunes that old set.
+    std::unordered_set<std::string> retainedFiles = previousFiles;
     for (const auto& item : snapshot.fallbackItems) retainedFiles.insert(item.path.filename().string());
     for (const auto& entry : std::filesystem::directory_iterator(mediaRoot)) {
         if (!retainedFiles.contains(entry.path().filename().string())) {
