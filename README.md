@@ -2,13 +2,23 @@
 
 **Network video. Simplified.**
 
-Veyra is a lightweight Linux NDI receiver that turns a small computer into an unattended video display.
+Veyra is a local-network video and display platform built around lightweight NDI receivers, a local management server, and a browser-based dashboard.
 
-The first target is an Apple Mac mini (Late 2014) running Debian 13, with a 1920×1080 display at 30 FPS. Veyra is video-only; NDI audio is intentionally not captured or played.
+Its first deployment environment is churches, but Veyra is designed as a general-purpose network-video product.
 
-## Current implementation
+## The platform
 
-The first end-to-end playback path is now in the repository:
+- **Veyra Receiver** — native Linux playback process for video-only NDI reception, fullscreen display, and locally cached fallback playback.
+- **Veyra Server** — local management service for authentication, devices, sources, media, playlists, configuration, commands, and system state.
+- **Veyra Dashboard** — browser-based interface for device management, NDI source assignment, media, playlists, diagnostics, and system settings.
+
+The server is hosted locally and communicates with receivers over the LAN. Receivers keep their last valid configuration and their own fallback content locally, so playback can continue during a server outage. Each receiver has its own fallback assignment.
+
+NDI audio is intentionally not captured or played.
+
+## Current implementation status
+
+The repository currently contains the **native receiver foundation**:
 
 - Discovers NDI sources on the local network.
 - Selects a source using its NDI address, or its name as a fallback.
@@ -17,10 +27,17 @@ The first end-to-end playback path is now in the repository:
 - Renders fullscreen through SDL2, preserving the source aspect ratio.
 - Clears the display after two seconds without a fresh frame.
 - Leaves the NDI receiver alive during source loss so the SDK can reconnect when the source returns.
+- Loads and validates local JSON configuration.
 
-The player has not yet been compiled against an installed official NDI SDK or validated on the target Mac mini. The SDK-independent configuration tests run in GitHub Actions.
+The dashboard, local server, device registration, media library, playlist management, remote commands, and per-device cached fallback are **planned and not yet implemented**.
 
-## Requirements
+The player has not yet been compiled against an installed official NDI SDK or validated on the target Mac mini. The SDK-independent configuration tests run in GitHub Actions. See the [development plan](docs/development.md) for implementation and validation status.
+
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for the system topology, component responsibilities, offline behavior, security boundaries, and implementation proposals.
+
+## Receiver requirements
 
 - Debian 13, 64-bit x86_64
 - C++20 compiler
@@ -41,7 +58,7 @@ sudo systemctl enable --now avahi-daemon
 
 Install the official NDI SDK separately and keep its proprietary files out of this repository.
 
-## Build
+## Build the receiver
 
 Point CMake at the SDK installation directory:
 
@@ -91,7 +108,6 @@ cp systemd/veyra.service ~/.config/systemd/user/veyra.service
 systemctl --user daemon-reload
 systemctl --user enable --now veyra.service
 
-# Check status and follow the player logs
 systemctl --user status veyra.service
 journalctl --user -u veyra.service -f
 ```
