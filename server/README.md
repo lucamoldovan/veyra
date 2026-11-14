@@ -42,7 +42,8 @@ npm start
 | `VEYRA_PORT` | `8787` | HTTP port |
 | `LOG_LEVEL` | `info` | Fastify/Pino log level |
 | `VEYRA_DATABASE_PATH` | `data/veyra.sqlite` | SQLite database path |
-| `VEYRA_SETUP_KEY_PATH` | `data/setup-key` | First-run setup key file |\n| `VEYRA_PAIRING_SECRET_PATH` | `data/pairing-secret` | Secret key used to HMAC pairing-code verifiers; back up securely with the database |
+| `VEYRA_SETUP_KEY_PATH` | `data/setup-key` | First-run setup key file |
+| `VEYRA_PAIRING_SECRET_PATH` | `data/pairing-secret` | Secret key used to HMAC pairing-code verifiers; back up securely with the database |
 | `VEYRA_TLS_CERT_PATH` | unset | PEM certificate path; required with the private key for non-loopback binds |
 | `VEYRA_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
 | `VEYRA_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
