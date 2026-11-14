@@ -64,6 +64,26 @@ std::string trim(std::string value) {
     return value;
 }
 
+void ensurePrivateDirectory(const std::filesystem::path& path) {
+    const auto absolute = std::filesystem::absolute(path).lexically_normal();
+    static const std::array<std::filesystem::path, 17> unsafeTargets{
+        "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
+        "/etc", "/usr", "/opt", "/run", "/mnt", "/media", "/dev", "/proc",
+        "/sys", "/boot"
+    };
+    if (std::find(unsafeTargets.begin(), unsafeTargets.end(), absolute) != unsafeTargets.end()) {
+        throw std::runtime_error("Credential directory must be a dedicated subdirectory, not a shared system directory");
+    }
+    std::filesystem::create_directories(absolute);
+    struct stat info{};
+    if (::lstat(absolute.c_str(), &info) != 0 || !S_ISDIR(info.st_mode) || S_ISLNK(info.st_mode)) {
+        throw std::runtime_error("Credential directory must be a real directory, not a symlink");
+    }
+    if (::chmod(absolute.c_str(), S_IRWXU) != 0) {
+        throw std::runtime_error("Could not restrict device credential directory permissions");
+    }
+}
+
 }  // namespace
 
 Client::Client(config::ControlPlaneConfig config)
@@ -368,10 +388,7 @@ std::string Client::loadCredential() const {
 void Client::storeCredential(const std::string& token) const {
     const auto parent = config_.credentialPath.parent_path();
     if (!parent.empty()) {
-        std::filesystem::create_directories(parent);
-        if (::chmod(parent.c_str(), S_IRWXU) != 0) {
-            throw std::runtime_error("could not restrict device credential directory permissions");
-        }
+        ensurePrivateDirectory(parent);
     }
 
     const auto temporaryPath = config_.credentialPath.string() +
