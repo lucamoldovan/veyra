@@ -41,8 +41,14 @@ std::size_t writeBody(const char* data, std::size_t size, std::size_t count, voi
     return bytes;
 }
 
+int transferProgress(void* context, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
+    const auto* stopToken = static_cast<const std::stop_token*>(context);
+    return stopToken->stop_requested() ? 1 : 0;
+}
+
 Response get(const std::string& base, const std::string& path,
-             const std::string& token, const std::filesystem::path& caPath) {
+             const std::string& token, const std::filesystem::path& caPath,
+             const std::stop_token& stopToken) {
     Response response;
     CURL* curl = curl_easy_init();
     if (!curl) { response.error = "could not create sync request"; return response; }
@@ -61,6 +67,9 @@ Response get(const std::string& base, const std::string& path,
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 1500L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 10000L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, transferProgress);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &stopToken);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
@@ -198,12 +207,13 @@ SyncSnapshot ReceiverSync::loadCached() const {
 }
 
 SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::string& deviceToken,
-                                       const std::filesystem::path& caCertificatePath) {
+                                       const std::filesystem::path& caCertificatePath,
+                                       const std::stop_token& stopToken) {
     ensurePrivateDirectory(config_.cachePath);
     const auto mediaRoot = config_.cachePath / "media";
     ensurePrivateDirectory(mediaRoot);
 
-    const auto configResponse = get(serverUrl, "/api/v1/receiver/config", deviceToken, caCertificatePath);
+    const auto configResponse = get(serverUrl, "/api/v1/receiver/config", deviceToken, caCertificatePath, stopToken);
     if (configResponse.status != 200) throw std::runtime_error("Receiver config request failed (HTTP " + std::to_string(configResponse.status) + ")");
     const Json remoteConfig = Json::parse(configResponse.body);
     if (remoteConfig.value("schemaVersion", 0) != 1) throw std::runtime_error("Unsupported receiver config schema");
@@ -218,7 +228,7 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     const std::string sourceAddress = optionalString(ndi, "sourceAddress");
     if (sourceName.empty() != sourceAddress.empty()) throw std::runtime_error("Server returned an incomplete NDI source assignment");
 
-    const auto manifestResponse = get(serverUrl, "/api/v1/receiver/media-manifest", deviceToken, caCertificatePath);
+    const auto manifestResponse = get(serverUrl, "/api/v1/receiver/media-manifest", deviceToken, caCertificatePath, stopToken);
     if (manifestResponse.status != 200) throw std::runtime_error("Receiver media manifest request failed (HTTP " + std::to_string(manifestResponse.status) + ")");
     const Json manifest = Json::parse(manifestResponse.body);
     if (manifest.value("schemaVersion", 0) != 1 || manifest.value("configVersion", -1) != configVersion)
@@ -262,7 +272,7 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
             cached = cached && sha256(cachedBytes) == hash;
         }
         if (!cached) {
-            const auto mediaResponse = get(serverUrl, path, deviceToken, caCertificatePath);
+            const auto mediaResponse = get(serverUrl, path, deviceToken, caCertificatePath, stopToken);
             if (mediaResponse.status != 200 || mediaResponse.body.size() != size ||
                 sha256(mediaResponse.body) != hash)
                 throw std::runtime_error("Media download failed integrity verification for " + mediaId);
