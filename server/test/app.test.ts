@@ -245,6 +245,20 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
       headers: { cookie: operatorCookie },
     });
     assert.equal(revokedList.json().devices[0].credentialStatus, "revoked");
+
+    const removeRevoked = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/devices/${credentials.deviceId}`,
+      headers: { cookie: operatorCookie },
+    });
+    assert.equal(removeRevoked.statusCode, 204);
+
+    const afterRemoval = await app.inject({
+      method: "GET",
+      url: "/api/v1/devices",
+      headers: { cookie: operatorCookie },
+    });
+    assert.equal(afterRemoval.json().devices.length, 0);
   } finally {
     await app.close();
   }
