@@ -43,10 +43,12 @@ Implemented:
 - Local username/password sign-in and sign-out using HttpOnly session cookies.
 - Responsive application shell and workspace navigation.
 - Overview with honest empty states for unregistered devices and media.
-- Protected receiver inventory with online/stale/offline state and heartbeat details.
+- Protected receiver inventory with online/stale/offline state, heartbeat details, credential revocation, and safe removal.
 - One-time receiver pairing-code generation with copy-to-clipboard and expiry display.
 - Live local-server health indicator, polled every 15 seconds.
 - System status page showing server, database, receiver network, and security implementation state.
-- Dedicated Devices, NDI Sources, Media Library, and Playlists sections that explain their next integration steps.
+- NDI Sources page displaying aggregated receiver-reported source snapshots.
+- Media Library with authenticated PNG/JPEG/WebP uploads, previews, metadata, and deletion protection for playlist-referenced assets.
+- Playlist editor with create/delete, ordered image items, per-image display durations, and save/reload.
 
-Not implemented yet: the receiver-side enrollment client, live NDI source discovery, media uploads, playlist editing, and remote commands. The UI does not fabricate devices, sources, activity, or server health.
+Not implemented yet: per-device source/playlist assignment, remote configuration, live WebSocket updates, detailed logs/diagnostics, and production dashboard serving. NDI source data appears after a receiver reports its discovery snapshot; an empty source list is expected before a receiver has paired and reported.
