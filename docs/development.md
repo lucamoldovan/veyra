@@ -61,14 +61,16 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
 - [x] Add setup, login, session inspection, and logout tests
-- [ ] Implement device registration and stable device identity
-- [ ] Implement heartbeat ingestion and online/offline state
+- [x] Implement one-time pairing-code generation and single-use receiver enrollment API
+- [x] Issue per-device credentials and store only credential hashes
+- [x] Implement bearer-authenticated heartbeat ingestion and online/stale/offline state
 - [ ] Implement source inventory and per-device source assignment
 - [ ] Implement media upload and library metadata
 - [ ] Implement playlist and device assignment APIs
 - [ ] Implement versioned configuration distribution
 - [ ] Implement live WebSocket events and narrowly scoped remote commands
-- [ ] Add server tests, database migration tests, and API contract tests
+- [x] Add server tests for pairing, one-time code use, protected inventory, and heartbeat updates
+- [ ] Add database migration tests and broader API contract tests
 
 ## Phase 6 — Dashboard
 
@@ -79,7 +81,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add dashboard TypeScript and production build to GitHub Actions
 - [x] Create shared API types and client helpers
 - [x] Implement first-run setup, login, session persistence, and logout
-- [ ] Implement device overview and live status
+- [x] Implement protected device inventory with 15-second refresh and live status
 - [ ] Implement NDI source inventory and assignment
 - [ ] Implement media library and uploads
 - [ ] Implement playlist editor with ordering and image durations
