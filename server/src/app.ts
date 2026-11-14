@@ -1,9 +1,9 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
-import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { openDatabase, type VeyraDatabase } from "./database.js";
 import { createSession, hashPassword, SESSION_COOKIE, SESSION_TTL, hashSessionToken, verifyPassword } from "./security.js";
 
@@ -13,6 +13,7 @@ interface BuildAppOptions {
   setupKey?: string;
   pairingSecretPath?: string;
   pairingSecret?: string;
+  mediaDirectory?: string;
   https?: { key: Buffer; cert: Buffer; minVersion: "TLSv1.2" };
   secureCookies?: boolean;
 }
@@ -85,6 +86,36 @@ function readPairingSecret(options: BuildAppOptions): Buffer {
   return secret;
 }
 
+const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
+
+function detectImageMime(buffer: Buffer): "image/png" | "image/jpeg" | "image/webp" | null {
+  if (buffer.length >= 8 &&
+      buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return "image/png";
+  }
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (buffer.length >= 12 &&
+      buffer.toString("ascii", 0, 4) === "RIFF" &&
+      buffer.toString("ascii", 8, 12) === "WEBP") {
+    return "image/webp";
+  }
+  return null;
+}
+
+function safeDisplayName(rawName: string | undefined): string {
+  let decoded = "";
+  if (rawName) {
+    try { decoded = decodeURIComponent(rawName); } catch { decoded = rawName; }
+  }
+  return decoded
+    .replace(/[\\x00-\\x1f\\x7f]/g, "")
+    .replace(/[\\/\\\\]/g, "_")
+    .trim()
+    .slice(0, 120) || "Untitled image";
+}
+
 function hashPairingCode(code: string, secret: Buffer): string {
   return createHmac("sha256", secret).update(code).digest("hex");
 }
@@ -152,6 +183,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
     ...(options.https ? { https: options.https } : {}),
   });
+  const mediaDirectory = resolve(options.mediaDirectory ?? process.env.VEYRA_MEDIA_DIRECTORY ?? "data/media");
+  app.addContentTypeParser(
+    ["image/png", "image/jpeg", "image/webp"],
+    { parseAs: "buffer", bodyLimit: MAX_MEDIA_BYTES },
+    (_request, body, done) => done(null, body),
+  );
 
   app.addHook("onSend", async (_request, reply, payload) => {
     reply.header("X-Content-Type-Options", "nosniff");
