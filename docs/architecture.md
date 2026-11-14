@@ -176,7 +176,7 @@ These are implementation proposals, not immutable product requirements:
 - Use a typed, versioned HTTP API plus WebSockets for live state and commands.
 - Keep receiver configuration and cached fallback data on disk.
 
-The current implementation uses Node.js 22+, TypeScript, Fastify 5, React 19, Vite 6, and SQLite via better-sqlite3. The database and initial framework choices are therefore settled for the current development phase. API evolution, device transport security, schema migrations, and media storage still require explicit design and validation.
+The current implementation uses Node.js 22+, TypeScript, Fastify 5, React 19, Vite 6, and SQLite via better-sqlite3. The database and initial framework choices are therefore settled for the current development phase. Per-device assignments, remote configuration/media synchronization, media quotas and retention, and production deployment still require explicit design and validation.
 
 ## Repository status
 
