@@ -10,3 +10,11 @@
 .DS_Store
 .vscode/
 .idea/
+
+# Veyra local server
+/server/node_modules/
+/server/dist/
+/server/data/
+/server/.env
+/server/.env.*
+!/server/.env.example
