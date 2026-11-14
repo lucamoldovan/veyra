@@ -184,13 +184,16 @@ SyncSnapshot parseState(const Json& state, const std::filesystem::path& root, bo
     snapshot.playlistRevision = state.value("playlistRevision", 0);
     if (snapshot.configVersion < 0 || snapshot.playlistRevision < 0) return {};
     if (!state.contains("items") || !state["items"].is_array() || state["items"].size() > 200) return {};
+    std::uint64_t totalBytes = 0;
     for (const auto& item : state["items"]) {
         const auto hash = item.value("sha256", "");
         const auto mime = item.value("mimeType", "");
         const auto size = item.value("sizeBytes", std::uint64_t{0});
         const auto duration = item.value("durationSeconds", 0);
-        if (!validHash(hash) || size == 0 || size > 20U * 1024U * 1024U || duration < 1 || duration > 3600)
+        if (!validHash(hash) || size == 0 || size > 20U * 1024U * 1024U ||
+            size > kMaxPlaylistBytes - totalBytes || duration < 1 || duration > 3600)
             return {};
+        totalBytes += size;
         const auto file = root / (hash + extensionFor(mime));
         struct stat info{};
         if (::lstat(file.c_str(), &info) != 0 || !S_ISREG(info.st_mode) ||
@@ -241,6 +244,7 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     const Json remoteConfig = Json::parse(configResponse.body);
     if (remoteConfig.value("schemaVersion", 0) != 1) throw std::runtime_error("Unsupported receiver config schema");
     const int configVersion = remoteConfig.at("configVersion").get<int>();
+    if (configVersion < 0) throw std::runtime_error("Server returned an invalid receiver config version");
     const auto ndi = remoteConfig.at("ndi");
     const auto optionalString = [](const Json& object, const char* key) {
         if (!object.contains(key) || object.at(key).is_null()) return std::string{};
@@ -268,6 +272,7 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     snapshot.playlistRevision = manifest.contains("playlistRevision") &&
         manifest.at("playlistRevision").is_number_integer()
         ? manifest.at("playlistRevision").get<int>() : 0;
+    if (snapshot.playlistRevision < 0) throw std::runtime_error("Server returned an invalid playlist revision");
 
     std::uint64_t totalPlaylistBytes = 0;
     for (const auto& item : manifest["items"]) {
