@@ -1,6 +1,6 @@
 # Development plan
 
-This roadmap covers the complete Veyra platform. Checkboxes describe repository implementation and validation, not merely design decisions.
+This roadmap covers the complete NDIView platform. Checkboxes describe repository implementation and validation, not merely design decisions.
 
 ## Phase 1 — Native receiver foundation
 
@@ -60,7 +60,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
 - [x] Commit npm lockfiles and use reproducible npm ci installs in CI
-- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 7
+- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 8
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
@@ -77,11 +77,11 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement per-device fallback playlist assignment API
 - [x] Implement versioned configuration and assigned-media manifest endpoints
 - [x] Keep heartbeat reporting independent from large media downloads and cancel sync on shutdown
-- [x] Implement the allowlisted receiver-restart command queue, receiver polling/status reporting, and completion after heartbeat
+- [x] Implement the allowlisted receiver application-restart and full-device reboot command queue, receiver polling/status reporting, and completion after heartbeat
 - [ ] Implement live WebSocket events and additional remote commands
 - [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, credential revocation, media uploads, playlist editing, and backups
 - [x] Add a populated legacy database migration test
-- [x] Add restart-command authorization, claim, cooldown, and completion tests
+- [x] Add restart/reboot authorization, claim, cooldown, overlap-prevention, and completion tests
 - [x] Add credential revocation and safe removal API tests
 - [ ] Add broader API contract and abuse-case tests
 
@@ -101,8 +101,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement media library uploads, previews, and deletion
 - [x] Implement playlist editor with ordering and editable image durations
 - [x] Implement per-device fallback playlist assignment
-- [x] Implement confirmed per-device receiver restart action with live command status
-- [ ] Implement update actions and detailed diagnostics
+- [x] Implement confirmed per-device receiver restart and full-device reboot actions with live command status
+- [ ] Implement per-device update actions, rollout progress and detailed diagnostics
 - [ ] Implement system health, logs, and diagnostics
 - [x] Add responsive layout for desktop and mobile
 - [ ] Add accessibility review and dashboard interaction tests
@@ -133,7 +133,13 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Serve the production dashboard from the server with safe HTML/hashed-asset cache headers
 - [x] Add signed server/dashboard release packaging, staged activation, health check and rollback scripts
 - [x] Add Debian 13 LightDM/Xorg kiosk installer, automatic login, fullscreen session startup and bounded receiver service recovery
-- [ ] Package and distribute signed native receiver updates
+- [x] Rebrand receiver executable, service and config path to NDIView with legacy config migration
+- [x] Package signed Linux x86_64 receiver artifacts with an Ed25519-signed manifest
+- [x] Validate and publish immutable receiver artifacts to the local server-side release store
+- [ ] Add authenticated HTTP release discovery and artifact download endpoints
+- [ ] Add per-device update assignment and rollout status APIs
+- [ ] Implement receiver polling, download, signature verification, atomic install and health confirmation
+- [ ] Implement automatic rollback when the new receiver fails its health window
 - [x] Provide backup and restore for SQLite data, pairing secret, and media assets
 - [ ] Include server configuration and TLS key/certificate backup guidance
 - [ ] Test multiple receivers on one LAN
@@ -150,7 +156,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 1. The local server is the management authority; the receiver is the playback authority for its own display.
 2. Normal playback must not depend on the dashboard, local server availability, or internet access.
 3. Keep the receiver independent of server request latency and dashboard implementation details.
-4. Treat NDI video transport and Veyra management traffic as separate concerns.
+4. Treat NDI video transport and NDIView management traffic as separate concerns.
 5. Keep fallback assets and the last valid configuration local to each receiver.
 6. Version API messages, configuration, and media manifests; reject incompatible data safely.
 7. Use bounded queues, explicit timeouts, retries, and observable state transitions.
