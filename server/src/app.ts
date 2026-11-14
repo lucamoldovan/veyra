@@ -339,8 +339,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       devices: Map<string, string>;
       lastSeenAt: string | null;
     }>();
+    const nowMs = Date.now();
 
     for (const device of deviceRows) {
+      if (!device.last_seen_at) continue;
+      const lastSeenMs = Date.parse(device.last_seen_at);
+      if (!Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 120_000) continue;
       let reported: unknown;
       try { reported = JSON.parse(device.discovered_sources_json); } catch { reported = []; }
       if (!Array.isArray(reported)) continue;
