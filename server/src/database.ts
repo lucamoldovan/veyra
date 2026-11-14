@@ -12,6 +12,10 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
   if (resolvedPath !== ":memory:") {
     const directory = dirname(resolvedPath);
     const absoluteDirectory = resolve(directory);
+    const homeDirectory = process.env.HOME ? resolve(process.env.HOME) : "";
+    if (absoluteDirectory === process.cwd() || (homeDirectory && absoluteDirectory === homeDirectory)) {
+      throw new Error("Veyra database must live in a dedicated private subdirectory");
+    }
     const unsafeTargets = new Set([
       "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
       "/etc", "/usr", "/opt", "/run", "/mnt", "/media", "/dev", "/proc",
