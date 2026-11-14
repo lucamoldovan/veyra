@@ -1,59 +1,120 @@
 # Development plan
 
-## Phase 1 — Build foundation
+This roadmap covers the complete Veyra platform. Checkboxes describe repository implementation and validation, not merely design decisions.
+
+## Phase 1 — Native receiver foundation
 
 - [x] C++20 project and CMake configuration
 - [x] Dependency discovery for SDL2, spdlog, nlohmann/json, and the NDI SDK
-- [x] Configuration loading and validation
+- [x] Local configuration loading and validation
 - [x] Structured logging
 - [x] Clean startup/shutdown path
 - [x] SDK-independent configuration tests in GitHub Actions
 
 ## Phase 2 — NDI discovery and receiving
 
-- [x] Initialize and shut down the NDI runtime safely
+- [x] Initialize and shut down the NDI runtime
 - [x] Discover sources on the local network
 - [x] Copy source names and addresses before the finder updates its list
 - [x] Select a source by configured address or exact name
 - [x] Connect and receive video frames
 - [x] Ignore audio and metadata deliberately
-- [x] Keep the receiver alive to use the SDK's automatic reconnect behavior
+- [x] Keep the receiver alive to use the SDK's reconnect behavior
 - [ ] Validate source disappearance and reappearance with a real NDI sender
 
-## Phase 3 — Video presentation
+## Phase 3 — Video presentation and reliability
 
 - [x] SDL2 fullscreen output
 - [x] UYVY and BGRA frame handling
 - [x] UYVY-to-BGRA fallback when the SDL renderer cannot use UYVY
 - [x] Bounded latest-frame slot between capture and rendering
 - [x] Preserve source aspect ratio
-- [ ] Measure 1920×1080 at 30 FPS on the target Mac mini
-- [ ] Validate display recovery after renderer/device reset on target hardware
-
-## Phase 4 — Reliability
-
-- [x] Frame-staleness detection and black-screen fallback
+- [x] Frame-staleness detection and black-screen state
 - [x] Cooperative capture-thread shutdown
 - [x] State and health logging for discovery/playback transitions
-- [ ] Verify NDI SDK reconnect timing and behavior during LAN interruption
-- [ ] Add and validate the systemd user service for unattended startup
-- [x] Configuration validation and safe defaults
-
-## Phase 5 — Target-hardware validation
-
+- [ ] Measure 1920×1080 at 30 FPS on the target Mac mini
+- [ ] Validate display recovery after renderer/device reset on target hardware
+- [ ] Verify NDI reconnect timing and behavior during LAN interruption
 - [ ] Build against the official NDI SDK on Debian 13
-- [ ] Test on Mac mini Late 2014
-- [ ] Measure CPU, memory, dropped frames, and latency
-- [ ] Test source loss/recovery
-- [ ] Test LAN interruption/recovery
 - [ ] Run a 24-hour playback test
-- [ ] Document installation and recovery
+
+## Phase 4 — Platform architecture and contracts
+
+- [x] Restore the full-product scope in the architecture documentation
+- [x] Define dashboard sections and local-server responsibilities
+- [x] Define separate receiver/server failure behavior
+- [x] Define per-device fallback and local-cache requirements
+- [ ] Specify versioned server API and WebSocket event contract
+- [ ] Specify device identity, pairing, and authentication
+- [ ] Specify media storage, upload limits, and asset validation
+- [ ] Specify playlist schema, ordering, durations, and per-device assignment
+- [ ] Specify command acknowledgement, timeout, and retry behavior
+- [ ] Define database schema and migrations
+
+## Phase 5 — Local server
+
+- [ ] Create the server workspace and development scripts
+- [ ] Implement local authentication and session handling
+- [ ] Implement device registration and stable device identity
+- [ ] Implement heartbeat ingestion and online/offline state
+- [ ] Implement source inventory and per-device source assignment
+- [ ] Implement media upload and library metadata
+- [ ] Implement playlist and device assignment APIs
+- [ ] Implement versioned configuration distribution
+- [ ] Implement live WebSocket events and narrowly scoped remote commands
+- [ ] Add server tests, database migration tests, and API contract tests
+
+## Phase 6 — Dashboard
+
+- [ ] Create the dashboard workspace and shared API types
+- [ ] Implement login and session handling
+- [ ] Implement device overview and live status
+- [ ] Implement NDI source inventory and assignment
+- [ ] Implement media library and uploads
+- [ ] Implement playlist editor with ordering and image durations
+- [ ] Implement per-device and group playlist assignment
+- [ ] Implement device configuration and remote actions
+- [ ] Implement system health, logs, and diagnostics
+- [ ] Add responsive layout, accessibility, and dashboard tests
+
+## Phase 7 — Receiver management and offline-first behavior
+
+- [ ] Add receiver identity and pairing flow
+- [ ] Add LAN communication client with reconnect/backoff
+- [ ] Add heartbeat and playback/health reporting
+- [ ] Apply remote configuration safely and atomically
+- [ ] Implement local media cache with integrity checks
+- [ ] Implement per-device cached fallback playlists
+- [ ] Switch to fallback when the assigned NDI source is unavailable
+- [ ] Continue playback when the local server is unavailable
+- [ ] Resume NDI playback when the source returns
+- [ ] Resynchronize state after server connectivity returns
+- [ ] Test partial downloads, interrupted updates, stale commands, and version mismatches
+
+## Phase 8 — Integration and deployment
+
+- [ ] Build a repeatable local development environment
+- [ ] Package the server and dashboard for local-network deployment
+- [ ] Package and install the receiver as a managed service
+- [ ] Provide backup and restore for server configuration and media
+- [ ] Test multiple receivers on one LAN
+- [ ] Test server outage while receivers are playing
+- [ ] Test NDI source outage with per-device fallback
+- [ ] Test simultaneous server and source outages
+- [ ] Test recovery and synchronization after outages
+- [ ] Measure CPU, memory, network usage, dropped frames, and latency
+- [ ] Test on the target Mac mini and run a 24-hour stability test
+- [ ] Document installation, updates, backup, and recovery
 
 ## Engineering rules
 
-1. Keep the receiver independent of internet access and remote services.
-2. Keep the first version focused: receive, display, reconnect.
-3. Never claim target-hardware performance until it has been measured on the actual Mac mini.
-4. Keep NDI SDK acquisition separate from the source tree unless redistribution is explicitly permitted.
-5. Prefer observable state transitions and bounded buffering over hidden retries and unbounded queues.
-6. Review every code change and run the available checks before moving to the next task.
+1. The local server is the management authority; the receiver is the playback authority for its own display.
+2. Normal playback must not depend on the dashboard, local server availability, or internet access.
+3. Keep the receiver independent of server request latency and dashboard implementation details.
+4. Treat NDI video transport and Veyra management traffic as separate concerns.
+5. Keep fallback assets and the last valid configuration local to each receiver.
+6. Version API messages, configuration, and media manifests; reject incompatible data safely.
+7. Use bounded queues, explicit timeouts, retries, and observable state transitions.
+8. Never claim target-hardware performance or end-to-end reliability until it has been measured.
+9. Keep NDI SDK acquisition separate from the source tree unless redistribution is explicitly permitted.
+10. Review every change and run all available checks before moving to the next phase.
