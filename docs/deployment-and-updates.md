@@ -20,11 +20,11 @@ Target OS: Debian 13 x86_64, subject to a hardware validation pass on the exact 
 Install the native NDIView receiver, its runtime dependencies, the official NDI SDK runtime/library, Avahi, and a dedicated non-admin kiosk account.
 
 Keep mutable state outside the release directory:
-- Application releases: `/opt/veyra/releases/<version>/`
-- Active release pointer: `/opt/veyra/current` (symlink)
-- Machine configuration: `/etc/veyra/config.json`
-- Credentials and device identity: `/var/lib/veyra/identity/`
-- Download/cache/fallback media: `/var/cache/veyra/` or a dedicated persistent cache directory
+- Application releases: `/opt/ndiview/releases/<version>/`
+- Active release pointer: `/opt/ndiview/current` (symlink)
+- Machine configuration: `/etc/ndiview/config.json`
+- Credentials and device identity: `/var/lib/ndiview/identity/`
+- Download/cache/fallback media: `/var/cache/ndiview/` or a dedicated persistent cache directory
 
 The current example config defaults to `~/.local/state/veyra/device-token` for the credential and `~/.local/state/veyra/cache` for cached state/media. The kiosk installer preserves this behavior under the dedicated `veyra-kiosk` account. Do not move or overwrite existing state until a migration is tested.
 
@@ -36,6 +36,21 @@ The server must be configured with TLS before listening on a LAN interface. Do n
 
 The central server currently serves the production dashboard and supports signed, staged server/dashboard releases with health-check rollback. It does not yet coordinate native receiver artifact downloads; that is the remaining update-system stage.
 
+### Signed receiver artifact packaging
+
+The repository now includes `scripts/package-receiver-release.sh`. After building the official-SDK receiver binary as `build/ndiview`, package a Linux x86_64 development or stable artifact with:
+
+```bash
+NDIVIEW_BINARY=build/ndiview \
+NDIVIEW_RELEASE_SIGNING_KEY=/secure/offline/ndiview-release-private.pem \
+NDIVIEW_RELEASE_VERIFY_KEY=/secure/offline/ndiview-release-public.pem \
+bash scripts/package-receiver-release.sh 0.1.0 dist/receiver-releases stable
+```
+
+The script produces an immutable-by-convention tarball, a JSON manifest containing the SHA-256 digest and compatibility metadata, and an Ed25519 signature over that manifest. The private signing key must remain offline; install only the corresponding public key on trusted receivers and the server. CI generates a temporary test key and verifies the package signature and digest.
+
+This is only the artifact-building stage. Central release publishing, authenticated artifact distribution, per-device rollout, receiver-side signature verification and installation, health confirmation, and rollback are still outstanding. Do not deploy these packages to receivers yet.
+ 
 ## Update channels and release model
 
 ### Development channel (early testing)
