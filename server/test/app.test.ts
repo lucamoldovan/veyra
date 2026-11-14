@@ -559,7 +559,7 @@ test("backup command creates a consistent database and pairing-secret backup", (
 
     const backupDatabase = openDatabase(join(backupDirectory, manifest.databaseFile));
     try {
-      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 6);
+      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 7);
     } finally {
       backupDatabase.close();
     }
@@ -656,13 +656,13 @@ test("database initializes a versioned schema", () => {
   const database = openDatabase(":memory:");
 
   try {
-    assert.equal(database.pragma("user_version", { simple: true }), 6);
+    assert.equal(database.pragma("user_version", { simple: true }), 7);
     const tables = database.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     ).all() as Array<{ name: string }>;
     assert.deepEqual(
       tables.map((table) => table.name),
-      ["devices", "media_assets", "operators", "pairing_codes", "playlist_items", "playlists", "sessions"],
+      ["device_commands", "devices", "media_assets", "operators", "pairing_codes", "playlist_items", "playlists", "sessions"],
     );
   } finally {
     database.close();
@@ -715,7 +715,7 @@ test("database upgrades a populated version-one schema without losing devices", 
 
     const migrated = openDatabase(databasePath);
     try {
-      assert.equal(migrated.pragma("user_version", { simple: true }), 6);
+      assert.equal(migrated.pragma("user_version", { simple: true }), 7);
       const device = migrated.prepare(
         "SELECT id, name, credential_revoked_at, discovered_sources_json FROM devices WHERE id = ?",
       ).get("device-1") as { id: string; name: string; credential_revoked_at: string | null; discovered_sources_json: string };
@@ -764,6 +764,39 @@ test("secure cookie policy can be enforced by the HTTPS deployment", async () =>
     });
     assert.equal(login.statusCode, 200);
     assert.match(String(login.headers["set-cookie"]), /; Secure/i);
+  } finally {
+    await app.close();
+  }
+});
+
+test("operator can queue a receiver restart and the receiver reports completion after reconnecting", async () => {
+  const app = createTestApp();
+  try {
+    const setup = await app.inject({ method: "POST", url: "/api/v1/setup", payload: { setupKey: "test-setup-key", username: "admin", password: "a-very-long-test-password" } });
+    const cookie = String(setup.headers["set-cookie"]).split(";")[0];
+    const code = await app.inject({ method: "POST", url: "/api/v1/devices/pairing-codes", headers: { cookie } });
+    const paired = await app.inject({ method: "POST", url: "/api/v1/receiver/pair", payload: { code: code.json().code, deviceName: "Restart test", platform: "linux-x86_64", version: "0.1.0" } });
+    const credentials = paired.json() as { deviceId: string; deviceToken: string };
+    const auth = { authorization: "Bearer " + credentials.deviceToken };
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 10, playbackMode: "ndi" } });
+    const unauthorized = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart" });
+    assert.equal(unauthorized.statusCode, 401);
+    const requested = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart", headers: { cookie } });
+    assert.equal(requested.statusCode, 201);
+    assert.equal(requested.json().status, "queued");
+    const poll = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/poll", headers: auth, payload: {} });
+    assert.equal(poll.statusCode, 200);
+    assert.equal(poll.json().command.type, "restart");
+    const duplicatePoll = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/poll", headers: auth, payload: {} });
+    assert.equal(duplicatePoll.json().command, null);
+    const commandId = poll.json().command.id as string;
+    const status = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/" + commandId + "/status", headers: auth, payload: { status: "restarting" } });
+    assert.equal(status.statusCode, 200);
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 2, playbackMode: "ndi" } });
+    const devices = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
+    assert.equal(devices.json().devices[0].restartCommand.status, "completed");
+    const cooldown = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart", headers: { cookie } });
+    assert.equal(cooldown.statusCode, 429);
   } finally {
     await app.close();
   }

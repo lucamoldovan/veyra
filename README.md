@@ -55,6 +55,10 @@ npm run dev
 
 Open http://127.0.0.1:5173. During development, Vite proxies API requests to the local server at http://127.0.0.1:8787. See [dashboard/README.md](dashboard/README.md) for details.
 
+## Receiver kiosk deployment
+
+See [the Debian 13 kiosk installation guide](docs/kiosk-installation.md) for automatic fullscreen startup, recovery behavior, maintenance access and physical validation.
+
 ## Architecture
 
 See [docs/architecture.md](docs/architecture.md) for the system topology, component responsibilities, offline behavior, security boundaries, and implementation proposals.
