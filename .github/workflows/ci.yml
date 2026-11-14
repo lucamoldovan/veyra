@@ -99,8 +99,8 @@ jobs:
         run: |
           bash -n scripts/install-kiosk-debian.sh
           bash -n scripts/uninstall-kiosk-debian.sh
-          bash -n scripts/veyra-kiosk-session
-          bash -n scripts/veyra-reboot
-          bash -n scripts/package-server-release.sh
+          bash -n scripts/ndiview-kiosk-session
+          bash -n scripts/ndiview-action
+                    bash -n scripts/package-server-release.sh
           bash -n scripts/install-server-release.sh
           bash -n scripts/rollback-server-release.sh

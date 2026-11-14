@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 export type VeyraDatabase = Database.Database;
 
-const CURRENT_SCHEMA_VERSION = 7;
+const CURRENT_SCHEMA_VERSION = 8;
 
 export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite"): VeyraDatabase {
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
@@ -53,7 +53,7 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
   if (currentVersion > CURRENT_SCHEMA_VERSION) {
     database.close();
     throw new Error(
-      `Database schema version ${currentVersion} is newer than this Veyra server supports (${CURRENT_SCHEMA_VERSION})`,
+      `Database schema version ${currentVersion} is newer than this NDIView server supports (${CURRENT_SCHEMA_VERSION})`,
     );
   }
 
