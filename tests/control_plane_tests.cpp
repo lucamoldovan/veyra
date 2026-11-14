@@ -111,7 +111,7 @@ int main() {
     std::atomic_int manifestRequestCount{0};
     std::atomic_bool failedMediaRequestSeen{false};
     std::thread mockServer([&] {
-        for (int index = 0; index < 10; ++index) {
+        for (int index = 0; index < 12; ++index) {
             pollfd descriptor{listener, POLLIN, 0};
             if (::poll(&descriptor, 1, 7000) <= 0) {
                 serverFailed = true;
@@ -130,8 +130,10 @@ int main() {
             }
             requestsChanged.notify_all();
 
-            const std::string asset = "veyra-cache-test";
-            const std::string assetHash = "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
+            const std::string asset1 = "veyra-cache-test";
+            const std::string asset2 = "veyra-cache-test-2";
+            const std::string hash1 = "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
+            const std::string hash2 = "ce77149707044eb10bb49e818060c08acfd34609f9469edf17927156929d349f";
             std::string responseBody;
             std::string contentType = "application/json";
             int status = 200;
@@ -145,29 +147,39 @@ int main() {
             } else if (request.find("POST /api/v1/receiver/heartbeat ") != std::string::npos) {
                 responseBody = "{}";
             } else if (request.find("GET /api/v1/receiver/config ") != std::string::npos) {
-                const int version = ++configRequestCount == 1 ? 2 : 3;
-                const std::string sourceName = version == 2 ? "Camera 1" : "Camera 2";
-                const std::string sourceAddress = version == 2
-                    ? "ndi://camera-1.local" : "ndi://camera-2.local";
+                const int requestNumber = ++configRequestCount;
+                const int version = requestNumber == 1 ? 2 : requestNumber == 2 ? 3 : 4;
+                const std::string sourceName = "Camera " + std::to_string(version - 1);
+                const std::string sourceAddress = "ndi://camera-" + std::to_string(version - 1) + ".local";
                 responseBody = "{\"schemaVersion\":1,\"configVersion\":" +
                     std::to_string(version) + ",\"ndi\":{\"sourceName\":\"" +
                     sourceName + "\",\"sourceAddress\":\"" + sourceAddress +
                     "\"},\"fallbackPlaylistId\":\"fallback-1\"}";
             } else if (request.find("GET /api/v1/receiver/media-manifest ") != std::string::npos) {
-                const int revision = ++manifestRequestCount == 1 ? 3 : 4;
-                const int version = revision == 3 ? 2 : 3;
-                const std::string mediaId = revision == 3 ? "media-1" : "media-2";
-                const std::string mediaHash = revision == 3 ? assetHash
-                    : "360f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
+                const int requestNumber = ++manifestRequestCount;
+                const int revision = requestNumber == 1 ? 3 : requestNumber == 2 ? 4 : 5;
+                const int version = revision - 1;
+                const std::string mediaId = requestNumber == 1 ? "media-1"
+                    : requestNumber == 2 ? "media-2" : "media-3";
+                const std::string mediaHash = requestNumber == 1 ? hash1
+                    : requestNumber == 2 ? hash2
+                    : "803d6fc47dd865eed3bb18593778d6e752885e926a99075fc5c0c42eab7da017";
+                const int size = requestNumber == 1 ? 16 : 18;
+                const int duration = requestNumber == 1 ? 12 : requestNumber == 2 ? 20 : 30;
                 responseBody = "{\"schemaVersion\":1,\"configVersion\":" +
                     std::to_string(version) + ",\"playlistId\":\"fallback-1\",\"playlistRevision\":" +
                     std::to_string(revision) + ",\"items\":[{\"mediaId\":\"" + mediaId +
-                    "\",\"position\":0,\"durationSeconds\":12,\"mimeType\":\"image/png\",\"sizeBytes\":16,\"sha256\":\"" +
-                    mediaHash + "\",\"downloadPath\":\"/api/v1/receiver/media/" + mediaId + "\"}]}";
+                    "\",\"position\":0,\"durationSeconds\":" + std::to_string(duration) +
+                    ",\"mimeType\":\"image/png\",\"sizeBytes\":" + std::to_string(size) +
+                    ",\"sha256\":\"" + mediaHash +
+                    "\",\"downloadPath\":\"/api/v1/receiver/media/" + mediaId + "\"}]}";
             } else if (request.find("GET /api/v1/receiver/media/media-1 ") != std::string::npos) {
-                responseBody = asset;
+                responseBody = asset1;
                 contentType = "image/png";
             } else if (request.find("GET /api/v1/receiver/media/media-2 ") != std::string::npos) {
+                responseBody = asset2;
+                contentType = "image/png";
+            } else if (request.find("GET /api/v1/receiver/media/media-3 ") != std::string::npos) {
                 status = 404;
                 reason = "Not Found";
                 responseBody = "{\"error\":\"Assigned media item not found\"}";
@@ -249,26 +261,32 @@ int main() {
         const bool heartbeatRequestOk = hasRequest("POST /api/v1/receiver/heartbeat ") &&
             hasRequest("Authorization: Bearer " + token) &&
             hasRequest("Camera 1") && hasRequest("\"playbackMode\":\"ndi\"");
-        const bool configRequestOk = configRequestCount.load() >= 2;
-        const bool manifestRequestOk = manifestRequestCount.load() >= 2;
-        const bool assetRequestOk = hasRequest("GET /api/v1/receiver/media/media-1 ");
-        const bool failedUpdateAttempted = failedMediaRequestSeen.load() &&
+        const bool configRequestOk = configRequestCount.load() >= 3;
+        const bool manifestRequestOk = manifestRequestCount.load() >= 3;
+        const bool assetRequestOk =
+            hasRequest("GET /api/v1/receiver/media/media-1 ") &&
             hasRequest("GET /api/v1/receiver/media/media-2 ");
+        const bool failedUpdateAttempted = failedMediaRequestSeen.load() &&
+            hasRequest("GET /api/v1/receiver/media/media-3 ");
         const auto synced = client.syncSnapshot();
         std::ifstream stateInput(config.cachePath / "state.json");
         const std::string persistedState((std::istreambuf_iterator<char>(stateInput)), {});
-        const bool previousSnapshotPreserved = synced.configVersion == 2 &&
+        const bool previousSnapshotPreserved = synced.configVersion == 3 &&
             synced.fallbackItems.size() == 1 &&
-            persistedState.find("\"configVersion\": 2") != std::string::npos;
+            synced.fallbackItems[0].mediaId == "media-2" &&
+            persistedState.find("\"configVersion\": 3") != std::string::npos &&
+            persistedState.find("260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159.png") != std::string::npos &&
+            std::filesystem::exists(config.cachePath / "media" /
+                "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159.png");
         const auto reloaded = veyra::control_plane::ReceiverSync(config).loadCached();
         bool cachedAssetOk = false;
         bool cachePermissionsOk = false;
         if (synced.hasValidCachedState && synced.fallbackItems.size() == 1) {
             std::ifstream cached(synced.fallbackItems[0].path, std::ios::binary);
             const std::string bytes((std::istreambuf_iterator<char>(cached)), {});
-            cachedAssetOk = bytes == "veyra-cache-test" &&
-                synced.fallbackItems[0].durationSeconds == 12 &&
-                synced.ndiSourceName == "Camera 1" &&
+            cachedAssetOk = bytes == "veyra-cache-test-2" &&
+                synced.fallbackItems[0].durationSeconds == 20 &&
+                synced.ndiSourceName == "Camera 2" &&
                 reloaded.hasValidCachedState && reloaded.fallbackItems.size() == 1 &&
                 reloaded.fallbackItems[0].sha256 == synced.fallbackItems[0].sha256;
             struct stat cacheDirectoryInfo{};
