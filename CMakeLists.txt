@@ -50,6 +50,7 @@ endif()
 
 add_executable(veyra
     src/main.cpp
+    src/config/config.cpp
     src/ndi/discovery.cpp
     src/ndi/receiver.cpp
 )
