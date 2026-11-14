@@ -364,6 +364,7 @@ test("operator assigns a receiver source and fallback playlist; receiver sync is
     assert.equal(manifest.json().items[0].mediaId, media.id);
     assert.equal(manifest.json().items[0].sha256, media.sha256);
     assert.equal(manifest.json().items[0].durationSeconds, 12);
+    assert.equal(manifest.json().playlistRevision, 2);
 
     const mediaDownload = await app.inject({ method: "GET", url: `/api/v1/receiver/media/${media.id}`, headers: auth });
     assert.equal(mediaDownload.statusCode, 200);
@@ -374,6 +375,12 @@ test("operator assigns a receiver source and fallback playlist; receiver sync is
     const devices = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
     assert.equal(devices.json().devices[0].assignedNdiSourceName, "Camera 1");
     assert.equal(devices.json().devices[0].fallbackPlaylistId, playlistId);
+
+    const deletePlaylist = await app.inject({ method: "DELETE", url: `/api/v1/playlists/${playlistId}`, headers: { cookie } });
+    assert.equal(deletePlaylist.statusCode, 204);
+    const clearedConfig = await app.inject({ method: "GET", url: "/api/v1/receiver/config", headers: auth });
+    assert.equal(clearedConfig.json().fallbackPlaylistId, null);
+    assert.equal(clearedConfig.json().configVersion, 3);
   } finally {
     await app.close();
     rmSync(directory, { recursive: true, force: true });
@@ -553,7 +560,7 @@ test("backup command creates a consistent database and pairing-secret backup", (
 
     const backupDatabase = openDatabase(join(backupDirectory, manifest.databaseFile));
     try {
-      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 5);
+      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 6);
     } finally {
       backupDatabase.close();
     }
@@ -626,7 +633,7 @@ test("database initializes a versioned schema", () => {
   const database = openDatabase(":memory:");
 
   try {
-    assert.equal(database.pragma("user_version", { simple: true }), 5);
+    assert.equal(database.pragma("user_version", { simple: true }), 6);
     const tables = database.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     ).all() as Array<{ name: string }>;
@@ -664,7 +671,7 @@ test("database upgrades a populated version-one schema without losing devices", 
 
     const migrated = openDatabase(databasePath);
     try {
-      assert.equal(migrated.pragma("user_version", { simple: true }), 5);
+      assert.equal(migrated.pragma("user_version", { simple: true }), 6);
       const device = migrated.prepare(
         "SELECT id, name, credential_revoked_at, discovered_sources_json FROM devices WHERE id = ?",
       ).get("device-1") as { id: string; name: string; credential_revoked_at: string | null; discovered_sources_json: string };
