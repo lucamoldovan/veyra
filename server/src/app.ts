@@ -5,7 +5,7 @@ import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeE
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { openDatabase, type NDIViewDatabase } from "./database.js";
-import { createSession, hashPassword, SESSION_COOKIE, SESSION_TTL, hashSessionToken, verifyPassword } from "./security.js";
+import { createSession, hashPassword, SESSION_COOKIE, LEGACY_SESSION_COOKIE, SESSION_TTL, hashSessionToken, verifyPassword } from "./security.js";
 
 interface BuildAppOptions {
   databasePath?: string;
@@ -178,7 +178,7 @@ function getSessionOperator(database: NDIViewDatabase, token: string | undefined
 }
 
 function getAuthenticatedOperator(database: NDIViewDatabase, request: FastifyRequest, reply: FastifyReply): { id: string; username: string } | null {
-  const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE]);
+  const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE] ?? request.cookies[LEGACY_SESSION_COOKIE]);
   if (!operator) {
     reply.code(401).send({ error: "Authentication required" });
     return null;
@@ -339,6 +339,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const token = request.cookies[SESSION_COOKIE];
     if (token) database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashSessionToken(token));
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    reply.clearCookie(LEGACY_SESSION_COOKIE, { path: "/" });
     return { authenticated: false };
   });
 

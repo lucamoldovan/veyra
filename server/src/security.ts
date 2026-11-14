@@ -66,5 +66,6 @@ export function createSession(
   return { token, expiresAt };
 }
 
-export const SESSION_COOKIE = "veyra_session";
+export const SESSION_COOKIE = "ndiview_session";
+export const LEGACY_SESSION_COOKIE = "veyra_session";
 export const SESSION_TTL = SESSION_TTL_SECONDS;
