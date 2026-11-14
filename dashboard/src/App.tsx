@@ -28,7 +28,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, type ConnectionState, type Device, type Operator, type PairingCode, type ServerHealth } from "./api";
+import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, removeRevokedDevice, type ConnectionState, type Device, type Operator, type PairingCode, type ServerHealth } from "./api";
 
 type Page = "overview" | "devices" | "sources" | "media" | "playlists" | "system";
 type AuthState = "checking" | "setup" | "login" | "authenticated" | "unavailable";
@@ -643,6 +643,21 @@ function DevicesPage() {
     }
   };
 
+  const removeDevice = async (device: Device) => {
+    if (device.credentialStatus !== "revoked") return;
+    if (!window.confirm(`Remove "${device.name}" from this Veyra workspace? This cannot be undone.`)) return;
+    setRevokingDeviceId(device.id);
+    setError("");
+    try {
+      await removeRevokedDevice(device.id);
+      setRefreshTick((tick) => tick + 1);
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : "Could not remove receiver.");
+    } finally {
+      setRevokingDeviceId(null);
+    }
+  };
+
   return (
     <>
       <section className="page-heading">
@@ -708,7 +723,7 @@ function DevicesPage() {
                 </div>
                 <div><span className={`device-status device-status-${device.status}`}><span />{device.status}</span></div>
                 <div className="device-playback"><strong>{device.playbackMode}</strong><span>{device.ndiSourceName ?? "No NDI source reported"}</span></div>
-                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}{device.credentialStatus === "active" && <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void revokeCredential(device)}>{revokingDeviceId === device.id ? "Revoking…" : "Revoke access"}</button>}</div>
+                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}{device.credentialStatus === "active" ? <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void revokeCredential(device)}>{revokingDeviceId === device.id ? "Revoking…" : "Revoke access"}</button> : <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void removeDevice(device)}>{revokingDeviceId === device.id ? "Removing…" : "Remove device"}</button>}</div>
               </div>
             ))}
           </div>
