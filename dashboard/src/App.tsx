@@ -155,7 +155,7 @@ function App() {
         <div className="brand">
           <div className="brand-mark"><AudioWaveform size={21} strokeWidth={2.2} /></div>
           <div className="brand-copy">
-            <span className="brand-name">veyra</span>
+            <span className="brand-name">NDIView</span>
             <span className="brand-caption">NETWORK VIDEO</span>
           </div>
           <button className="icon-button sidebar-close" aria-label="Close menu" onClick={() => setMobileNavOpen(false)}>
@@ -305,7 +305,7 @@ function AuthScreen({
       <div className="auth-card">
         <div className="auth-brand">
           <div className="brand-mark"><AudioWaveform size={21} strokeWidth={2.2} /></div>
-          <div className="brand-copy"><span className="brand-name">veyra</span><span className="brand-caption">NETWORK VIDEO</span></div>
+          <div className="brand-copy"><span className="brand-name">NDIView</span><span className="brand-caption">NETWORK VIDEO</span></div>
         </div>
 
         {mode === "checking" && (
@@ -401,7 +401,7 @@ function AuthScreen({
           </>
         )}
       </div>
-      <div className="auth-background-mark">VEYRA</div>
+      <div className="auth-background-mark">NDIVIEW</div>
     </main>
   );
 }
@@ -504,7 +504,7 @@ function Overview({
           <div className="setup-topline"><span className="setup-kicker">GETTING STARTED</span><span className="setup-step">01 / 04</span></div>
           <div className="setup-icon"><Network size={22} /></div>
           <h2>{deviceCount === null ? "Checking your network." : deviceCount === 0 ? "Let's get your network connected." : "Your receivers are registered."}</h2>
-          <p>{deviceCount === null ? "Device inventory is temporarily unavailable. Check the server connection and try again." : deviceCount === 0 ? "NDIView is ready for its first receiver. Generate a pairing code to begin enrollment." : "Your devices are registered. Receiver-side enrollment and playback reporting are the next integration steps."}</p>
+          <p>{deviceCount === null ? "Device inventory is temporarily unavailable. Check the server connection and try again." : deviceCount === 0 ? "NDIView is ready for its first receiver. Generate a pairing code to begin enrollment." : "Your devices are registered. NDI source discovery, playback status and remote device controls are available."}</p>
           <div className="setup-progress"><span /></div>
           <div className="setup-progress-label"><span>Platform setup</span><strong>Just getting started</strong></div>
           <button className="button button-dark button-full" onClick={() => onNavigate("devices")}>
