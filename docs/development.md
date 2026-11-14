@@ -49,19 +49,21 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Specify media storage, upload limits, and asset validation
 - [ ] Specify playlist schema, ordering, durations, and per-device assignment
 - [ ] Specify command acknowledgement, timeout, and retry behavior
-- [ ] Define database schema and migrations
+- [x] Define initial database schema version and transactional migration mechanism
+- [ ] Add forward migration and legacy-database upgrade tests
 
 ## Phase 5 — Local server
 
 - [x] Create the initial TypeScript/Fastify server workspace and development scripts
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
-- [x] Add SQLite database initialization with WAL and foreign keys
+- [x] Add SQLite database initialization with WAL, foreign keys, and schema version 1 migrations
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
 - [x] Add setup, login, session inspection, and logout tests
 - [x] Implement one-time pairing-code generation and single-use receiver enrollment API
+- [x] Require TLS before binding the server to non-loopback interfaces
 - [x] Issue per-device credentials and store only credential hashes
 - [x] Implement bearer-authenticated heartbeat ingestion and online/stale/offline state
 - [ ] Implement source inventory and per-device source assignment
