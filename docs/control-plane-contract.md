@@ -164,7 +164,7 @@ The current server records last-seen time and derives online at 45 seconds or le
 - Media deletion is blocked while an asset is referenced by a playlist or assigned fallback, unless the operator first changes those references.
 - The receiver reports which manifest version and assets it has successfully applied.
 
-The planned initial fallback player will support image items with explicit order and display duration. Each receiver will cache only the assets it needs for its assigned playlists and fallback.
+The initial fallback player supports PNG, JPEG, and WebP image items with explicit order and display duration. Each receiver caches only the assets in its assigned fallback playlist.
 
 ## Command lifecycle
 
@@ -204,4 +204,4 @@ The following still need a technical decision record or implementation:
 5. Playlist behavior when an item is missing, corrupted, or cannot be decoded.
 6. Production CA provisioning and certificate renewal for multi-receiver deployments.
 
-The SQLite migration mechanism (schema v6), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, and database/media backup utility are implemented. The native receiver does not yet poll these new endpoints or cache/play the assigned media. Remote commands, WebSocket events, and fallback behavior remain in progress.
+The SQLite migration mechanism (schema v6), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, verified local cache, and timed image fallback are implemented. Remote commands and WebSocket events remain in progress. The complete player still needs an official NDI SDK build and target-hardware validation.
