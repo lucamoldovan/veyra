@@ -51,6 +51,7 @@ endif()
 add_executable(veyra
     src/main.cpp
     src/ndi/discovery.cpp
+    src/ndi/receiver.cpp
 )
 
 target_include_directories(veyra PRIVATE
