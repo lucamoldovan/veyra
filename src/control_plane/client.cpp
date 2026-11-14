@@ -419,6 +419,7 @@ void Client::storeCredential(const std::string& token) const {
             content.data() + written,
             content.size() - written
         );
+        if (count < 0 && errno == EINTR) continue;
         if (count <= 0) {
             success = false;
             break;
