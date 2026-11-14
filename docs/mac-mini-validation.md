@@ -29,7 +29,7 @@ Confirm that the Intel graphics driver is loaded and that the display exposes 19
 sudo apt update
 sudo apt install --yes \
   build-essential cmake ninja-build pkg-config git \
-  libsdl2-dev libspdlog-dev nlohmann-json3-dev \
+  libsdl2-dev libcurl4-openssl-dev libspdlog-dev nlohmann-json3-dev \
   avahi-daemon curl ca-certificates
 sudo systemctl enable --now avahi-daemon
 ```
