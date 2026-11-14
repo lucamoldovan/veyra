@@ -281,6 +281,137 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
 
 
 
+
+test("media library validates image signatures and protects playlist references", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "veyra-media-test-"));
+  const app = buildApp({
+    databasePath: ":memory:",
+    setupKey: "test-setup-key",
+    pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
+    mediaDirectory: join(directory, "media"),
+  });
+
+  try {
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/setup",
+      payload: { setupKey: "test-setup-key", username: "admin", password: "a-very-long-test-password" },
+    });
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/session",
+      payload: { username: "admin", password: "a-very-long-test-password" },
+    });
+    const cookie = String(login.headers["set-cookie"]).split(";")[0];
+
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+    const invalidImage = await app.inject({
+      method: "POST",
+      url: "/api/v1/media",
+      headers: { cookie, "content-type": "image/png" },
+      payload: Buffer.from("not an image"),
+    });
+    assert.equal(invalidImage.statusCode, 415);
+
+    const upload = await app.inject({
+      method: "POST",
+      url: "/api/v1/media",
+      headers: {
+        cookie,
+        "content-type": "image/png",
+        "x-veyra-filename": encodeURIComponent("../Lobby screen.png"),
+      },
+      payload: png,
+    });
+    assert.equal(upload.statusCode, 201);
+    const media = upload.json() as { id: string; name: string; contentUrl: string; sizeBytes: number };
+    assert.equal(media.name, ".._Lobby screen.png");
+    assert.equal(media.sizeBytes, png.length);
+
+    const content = await app.inject({
+      method: "GET",
+      url: media.contentUrl,
+      headers: { cookie },
+    });
+    assert.equal(content.statusCode, 200);
+    assert.equal(content.headers["content-type"], "image/png");
+    assert.deepEqual(content.rawPayload, png);
+
+    const createPlaylist = await app.inject({
+      method: "POST",
+      url: "/api/v1/playlists",
+      headers: { cookie },
+      payload: { name: "Lobby rotation", description: "Welcome screen sequence" },
+    });
+    assert.equal(createPlaylist.statusCode, 201);
+    const playlistId = createPlaylist.json().id as string;
+
+    const invalidPlaylist = await app.inject({
+      method: "PUT",
+      url: `/api/v1/playlists/${playlistId}`,
+      headers: { cookie },
+      payload: {
+        name: "Lobby rotation",
+        description: "",
+        items: [{ mediaId: media.id, durationSeconds: 0 }],
+      },
+    });
+    assert.equal(invalidPlaylist.statusCode, 400);
+
+    const updatePlaylist = await app.inject({
+      method: "PUT",
+      url: `/api/v1/playlists/${playlistId}`,
+      headers: { cookie },
+      payload: {
+        name: "Lobby rotation",
+        description: "Welcome screen sequence",
+        items: [{ mediaId: media.id, durationSeconds: 15 }],
+      },
+    });
+    assert.equal(updatePlaylist.statusCode, 200);
+    assert.equal(updatePlaylist.json().itemCount, 1);
+
+    const playlist = await app.inject({
+      method: "GET",
+      url: `/api/v1/playlists/${playlistId}`,
+      headers: { cookie },
+    });
+    assert.equal(playlist.json().items[0].durationSeconds, 15);
+    assert.equal(playlist.json().items[0].mediaName, ".._Lobby screen.png");
+
+    const blockedDelete = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/media/${media.id}`,
+      headers: { cookie },
+    });
+    assert.equal(blockedDelete.statusCode, 409);
+
+    const deletePlaylist = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/playlists/${playlistId}`,
+      headers: { cookie },
+    });
+    assert.equal(deletePlaylist.statusCode, 204);
+
+    const deleteMedia = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/media/${media.id}`,
+      headers: { cookie },
+    });
+    assert.equal(deleteMedia.statusCode, 204);
+
+    const mediaList = await app.inject({
+      method: "GET",
+      url: "/api/v1/media",
+      headers: { cookie },
+    });
+    assert.equal(mediaList.json().media.length, 0);
+  } finally {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("backup command creates a consistent database and pairing-secret backup", () => {
   const directory = mkdtempSync(join(tmpdir(), "veyra-backup-test-"));
   const databasePath = join(directory, "source.sqlite");
@@ -317,7 +448,7 @@ test("backup command creates a consistent database and pairing-secret backup", (
 
     const backupDatabase = openDatabase(join(backupDirectory, manifest.databaseFile));
     try {
-      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 2);
+      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 3);
     } finally {
       backupDatabase.close();
     }
@@ -384,13 +515,13 @@ test("database initializes a versioned schema", () => {
   const database = openDatabase(":memory:");
 
   try {
-    assert.equal(database.pragma("user_version", { simple: true }), 2);
+    assert.equal(database.pragma("user_version", { simple: true }), 3);
     const tables = database.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     ).all() as Array<{ name: string }>;
     assert.deepEqual(
       tables.map((table) => table.name),
-      ["devices", "operators", "pairing_codes", "sessions"],
+      ["devices", "media_assets", "operators", "pairing_codes", "playlist_items", "playlists", "sessions"],
     );
   } finally {
     database.close();
@@ -415,12 +546,13 @@ test("database upgrades a populated version-one schema without losing devices", 
       "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
     legacy.exec("DROP INDEX devices_credential_revoked_at_idx");
     legacy.exec("ALTER TABLE devices DROP COLUMN credential_revoked_at");
+    legacy.exec("DROP TABLE playlist_items; DROP TABLE playlists; DROP TABLE media_assets;");
     legacy.pragma("user_version = 1");
     legacy.close();
 
     const migrated = openDatabase(databasePath);
     try {
-      assert.equal(migrated.pragma("user_version", { simple: true }), 2);
+      assert.equal(migrated.pragma("user_version", { simple: true }), 3);
       const device = migrated.prepare(
         "SELECT id, name, credential_revoked_at FROM devices WHERE id = ?",
       ).get("device-1") as { id: string; name: string; credential_revoked_at: string | null };
