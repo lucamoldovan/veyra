@@ -11,6 +11,8 @@ interface BuildAppOptions {
   databasePath?: string;
   setupKeyPath?: string;
   setupKey?: string;
+  https?: { key: Buffer; cert: Buffer; minVersion: "TLSv1.2" };
+  secureCookies?: boolean;
 }
 
 interface SetupBody {
@@ -83,7 +85,7 @@ function getAuthenticatedOperator(database: VeyraDatabase, request: FastifyReque
 function setSessionCookie(reply: FastifyReply, token: string): void {
   reply.setCookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.VEYRA_COOKIE_SECURE === "true",
+    secure: options.secureCookies ?? process.env.VEYRA_COOKIE_SECURE === "true",
     sameSite: "strict",
     path: "/",
     maxAge: SESSION_TTL,
@@ -97,6 +99,15 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
     },
+    ...(options.https ? { https: options.https } : {}),
+  });
+
+  app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("Referrer-Policy", "no-referrer");
+    reply.header("Cache-Control", "no-store");
+    if (options.https) reply.header("Strict-Transport-Security", "max-age=31536000");
+    return payload;
   });
 
   if (setup.generated && setup.key) {
