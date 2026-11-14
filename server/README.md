@@ -56,7 +56,10 @@ Implemented:
 - First-run administrator setup protected by a random one-time key printed to server logs.
 - Scrypt password hashing, opaque random session tokens stored as SHA-256 hashes, HttpOnly/SameSite=Strict cookies, and 30-day session expiry.
 - Rate-limited setup and login endpoints, plus session inspection and logout.
+- Authenticated device inventory and one-time, 8-digit pairing codes (10-minute expiry).
+- Single-use receiver pairing that returns a device ID and one-time device credential; only a hash of the credential is stored.
+- Bearer-authenticated receiver heartbeats and derived online/stale/offline state.
 - Configurable bind address and port, health endpoint, and graceful shutdown.
 - Automated server build and API tests in GitHub Actions.
 
-Not implemented yet: receiver pairing/authentication, device registry and heartbeats, receiver API, WebSocket events, media storage, playlists, remote commands, and production dashboard serving.
+Not implemented yet: the native receiver enrollment/heartbeat client, source inventory, WebSocket events, media storage, playlists, remote commands, device credential revocation, and production dashboard serving.
