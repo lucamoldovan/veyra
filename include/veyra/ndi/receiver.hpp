@@ -2,8 +2,6 @@
 
 #include "veyra/ndi/discovery.hpp"
 
-#include <Processing.NDI.Lib.h>
-
 #include <cstdint>
 #include <optional>
 #include <vector>
