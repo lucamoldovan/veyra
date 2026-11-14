@@ -207,6 +207,24 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
       `);
       database.pragma("user_version = 7");
     }
+    if (currentVersion < 8) {
+      database.exec(`
+        ALTER TABLE device_commands RENAME TO device_commands_v7;
+        CREATE TABLE device_commands (
+          id TEXT PRIMARY KEY,
+          device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+          command_type TEXT NOT NULL CHECK (command_type IN ('restart', 'reboot')),
+          status TEXT NOT NULL CHECK (status IN ('queued', 'claimed', 'restarting', 'completed', 'failed', 'timed_out')),
+          requested_by TEXT NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+          created_at TEXT NOT NULL, expires_at TEXT NOT NULL, claimed_at TEXT, completed_at TEXT, result_message TEXT
+        );
+        INSERT INTO device_commands SELECT * FROM device_commands_v7;
+        DROP TABLE device_commands_v7;
+        CREATE INDEX device_commands_device_created_idx ON device_commands(device_id, created_at DESC);
+        CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
+      `);
+      database.pragma("user_version = 8");
+    }
   });
 
   try {

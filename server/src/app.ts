@@ -818,19 +818,21 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
 
-  app.post<{ Params: { deviceId: string } }>("/api/v1/devices/:deviceId/restart", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+  app.post<{ Params: { deviceId: string; action: string } }>("/api/v1/devices/:deviceId/:action", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
     const operator = getAuthenticatedOperator(database, request, reply); if (!operator) return;
+    const action = request.params.action;
+    if (action !== "restart" && action !== "reboot") return reply.code(404).send({ error: "Unknown device action" });
     const now = new Date(); const nowIso = now.toISOString();
     const device = database.prepare("SELECT id, last_seen_at FROM devices WHERE id = ? AND credential_revoked_at IS NULL").get(request.params.deviceId) as { id: string; last_seen_at: string | null } | undefined;
     if (!device) return reply.code(404).send({ error: "Active receiver not found" });
-    if (!device.last_seen_at || now.getTime() - Date.parse(device.last_seen_at) > 45_000) return reply.code(409).send({ error: "Receiver must be online before it can be restarted" });
-    const active = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type='restart' AND status IN ('queued','claimed','restarting') AND expires_at>? LIMIT 1").get(device.id, nowIso) as { id: string } | undefined;
-    if (active) return reply.code(409).send({ error: "A restart request is already active for this receiver" });
-    const recent = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type='restart' AND created_at>? LIMIT 1").get(device.id, new Date(now.getTime()-120_000).toISOString()) as { id: string } | undefined;
-    if (recent) return reply.code(429).send({ error: "Please wait two minutes between restart requests" });
+    if (!device.last_seen_at || now.getTime() - Date.parse(device.last_seen_at) > 45_000) return reply.code(409).send({ error: "Receiver must be online before it can receive an action" });
+    const active = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type=? AND status IN ('queued','claimed','restarting') AND expires_at>? LIMIT 1").get(device.id, action, nowIso) as { id: string } | undefined;
+    if (active) return reply.code(409).send({ error: `A ${action} request is already active for this receiver` });
+    const recent = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type=? AND created_at>? LIMIT 1").get(device.id, action, new Date(now.getTime()-120_000).toISOString()) as { id: string } | undefined;
+    if (recent) return reply.code(429).send({ error: "Please wait two minutes before repeating this action" });
     const id = randomUUID(); const expiresAt = new Date(now.getTime()+90_000).toISOString();
-    database.prepare("INSERT INTO device_commands (id,device_id,command_type,status,requested_by,created_at,expires_at) VALUES (?, ?, 'restart', 'queued', ?, ?, ?)").run(id,device.id,operator.id,nowIso,expiresAt);
-    request.log.info({commandId:id,deviceId:device.id,operatorId:operator.id},"Receiver restart requested");
+    database.prepare("INSERT INTO device_commands (id,device_id,command_type,status,requested_by,created_at,expires_at) VALUES (?, ?, ?, 'queued', ?, ?, ?)").run(id,device.id,action,operator.id,nowIso,expiresAt);
+    request.log.info({commandId:id,deviceId:device.id,operatorId:operator.id,action},`Receiver ${action} requested`);
     return reply.code(201).send({id,status:"queued",createdAt:nowIso,expiresAt});
   });
   app.put<{ Params: { deviceId: string }; Body: { ndiSourceName?: unknown; ndiSourceAddress?: unknown; fallbackPlaylistId?: unknown } }>(
