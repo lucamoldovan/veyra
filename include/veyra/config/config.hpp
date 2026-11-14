@@ -24,6 +24,8 @@ struct ControlPlaneConfig {
     std::string pairingCode;
     std::filesystem::path caCertificatePath;
     std::filesystem::path credentialPath;
+    std::filesystem::path cachePath;
+    int syncIntervalSeconds{10};
     int heartbeatIntervalSeconds{15};
 };
 
