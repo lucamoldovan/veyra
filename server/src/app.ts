@@ -222,7 +222,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
 
     const session = createSession(database, operator.id);
-    setSessionCookie(reply, session.token, options.secureCookies ?? process.env.VEYRA_COOKIE_SECURE === "true");
+    setSessionCookie(reply, session.token, secureCookies);
     return { authenticated: true, operator: { id: operator.id, username: operator.username } };
   });
 
