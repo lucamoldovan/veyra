@@ -1,7 +1,7 @@
 #pragma once
 
-#include "veyra/config/config.hpp"
-#include "veyra/video/frame.hpp"
+#include "ndiview/config/config.hpp"
+#include "ndiview/video/frame.hpp"
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -10,7 +10,7 @@
 #include <filesystem>
 #include <vector>
 
-namespace veyra::video {
+namespace ndiview::video {
 
 class Renderer {
 public:
@@ -60,4 +60,4 @@ private:
     std::vector<std::uint8_t> conversionBuffer_;
 };
 
-}  // namespace veyra::video
+}  // namespace ndiview::video

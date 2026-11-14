@@ -1,4 +1,4 @@
-#include "veyra/control_plane/client.hpp"
+#include "ndiview/control_plane/client.hpp"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -130,10 +130,10 @@ int main() {
             }
             requestsChanged.notify_all();
 
-            const std::string asset1 = "veyra-cache-test";
-            const std::string asset2 = "veyra-cache-test-2";
-            const std::string hash1 = "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
-            const std::string hash2 = "ce77149707044eb10bb49e818060c08acfd34609f9469edf17927156929d349f";
+            const std::string asset1 = "ndiview-cache-test";
+            const std::string asset2 = "ndiview-cache-test-2";
+            const std::string hash1 = "68f6da47211e0732eca673fe1644112768331b196d08dc924ce5ec8b2d308237";
+            const std::string hash2 = "e32da527f76837564dbbe9e69d008dc844e1e589a28d04297fcc05fdbd25612a";
             std::string responseBody;
             std::string contentType = "application/json";
             int status = 200;
@@ -144,6 +144,8 @@ int main() {
                 reason = "Created";
                 responseBody = "{\"deviceId\":\"device-test\",\"deviceToken\":\"" + token +
                     "\",\"heartbeatIntervalSeconds\":120}";
+            } else if (request.find("POST /api/v1/receiver/commands/poll ") != std::string::npos) {
+                responseBody = "{\"command\":null}";
             } else if (request.find("POST /api/v1/receiver/heartbeat ") != std::string::npos) {
                 responseBody = "{}";
             } else if (request.find("GET /api/v1/receiver/config ") != std::string::npos) {
@@ -164,7 +166,7 @@ int main() {
                 const std::string mediaHash = requestNumber == 1 ? hash1
                     : requestNumber == 2 ? hash2
                     : "803d6fc47dd865eed3bb18593778d6e752885e926a99075fc5c0c42eab7da017";
-                const int size = requestNumber == 1 ? 16 : 18;
+                const int size = requestNumber == 1 ? 18 : 20;
                 const int duration = requestNumber == 1 ? 12 : requestNumber == 2 ? 20 : 30;
                 responseBody = "{\"schemaVersion\":1,\"configVersion\":" +
                     std::to_string(version) + ",\"playlistId\":\"fallback-1\",\"playlistRevision\":" +
@@ -205,13 +207,13 @@ int main() {
     });
 
     const auto temporaryRoot = std::filesystem::temp_directory_path() /
-        ("veyra-control-plane-test-" + std::to_string(static_cast<long long>(::getpid())));
-    const auto credentialPath = temporaryRoot / "state" / "veyra" / "device-token";
+        ("ndiview-control-plane-test-" + std::to_string(static_cast<long long>(::getpid())));
+    const auto credentialPath = temporaryRoot / "state" / "ndiview" / "device-token";
     std::filesystem::remove_all(temporaryRoot);
 
     bool success = false;
     {
-        veyra::config::ControlPlaneConfig config;
+        ndiview::config::ControlPlaneConfig config;
         config.serverUrl = "http://127.0.0.1:" + std::to_string(ntohs(address.sin_port));
         config.deviceName = "Test Display";
         config.pairingCode = "123456789012";
@@ -220,8 +222,8 @@ int main() {
         config.syncIntervalSeconds = 5;
         config.cachePath = temporaryRoot / "cache";
 
-        veyra::control_plane::Client client(config);
-        veyra::control_plane::PlaybackSnapshot snapshot;
+        ndiview::control_plane::Client client(config);
+        ndiview::control_plane::PlaybackSnapshot snapshot;
         snapshot.mode = "ndi";
         snapshot.ndiSourceName = "Camera 1";
         snapshot.uptimeSeconds = 42;
@@ -277,16 +279,16 @@ int main() {
             synced.fallbackItems.size() == 1 &&
             synced.fallbackItems[0].mediaId == "media-2" &&
             persistedState.find("\"configVersion\": 3") != std::string::npos &&
-            persistedState.find("260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159.png") != std::string::npos &&
+            persistedState.find("68f6da47211e0732eca673fe1644112768331b196d08dc924ce5ec8b2d308237.png") != std::string::npos &&
             std::filesystem::exists(config.cachePath / "media" /
-                "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159.png");
-        const auto reloaded = veyra::control_plane::ReceiverSync(config).loadCached();
+                "68f6da47211e0732eca673fe1644112768331b196d08dc924ce5ec8b2d308237.png");
+        const auto reloaded = ndiview::control_plane::ReceiverSync(config).loadCached();
         bool cachedAssetOk = false;
         bool cachePermissionsOk = false;
         if (synced.hasValidCachedState && synced.fallbackItems.size() == 1) {
             std::ifstream cached(synced.fallbackItems[0].path, std::ios::binary);
             const std::string bytes((std::istreambuf_iterator<char>(cached)), {});
-            cachedAssetOk = bytes == "veyra-cache-test-2" &&
+            cachedAssetOk = bytes == "ndiview-cache-test-2" &&
                 synced.fallbackItems[0].durationSeconds == 20 &&
                 synced.ndiSourceName == "Camera 2" &&
                 reloaded.hasValidCachedState && reloaded.fallbackItems.size() == 1 &&
@@ -309,7 +311,7 @@ int main() {
             std::ofstream corrupt(synced.fallbackItems[0].path, std::ios::binary | std::ios::trunc);
             corrupt << "tampered-cache-data";
             corrupt.close();
-            const auto damaged = veyra::control_plane::ReceiverSync(config).loadCached();
+            const auto damaged = ndiview::control_plane::ReceiverSync(config).loadCached();
             corruptCacheRejected = damaged.hasValidCachedState && damaged.fallbackItems.empty();
         }
 

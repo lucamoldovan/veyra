@@ -1,4 +1,4 @@
-#include "veyra/control_plane/client.hpp"
+#include "ndiview/control_plane/client.hpp"
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -16,9 +16,11 @@
 #include <stdexcept>
 #include <string_view>
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
-namespace veyra::control_plane {
+namespace ndiview::control_plane {
 namespace {
 
 using Json = nlohmann::json;
@@ -152,12 +154,12 @@ void Client::run(const std::stop_token stopToken) {
     try {
         deviceToken_ = loadCredential();
     } catch (const std::exception& error) {
-        std::cerr << "Veyra device credential could not be loaded: " << error.what() << '\n';
+        std::cerr << "NDIView device credential could not be loaded: " << error.what() << '\n';
         return;
     }
 
     if (deviceToken_.empty() && config_.pairingCode.empty()) {
-        std::clog << "Veyra control plane is configured but no pairing code or device credential is available\n";
+        std::clog << "NDIView control plane is configured but no pairing code or device credential is available\n";
         return;
     }
 
@@ -173,6 +175,7 @@ void Client::run(const std::stop_token stopToken) {
         }
 
         if (sendHeartbeat()) {
+            processPendingCommand();
             retryDelay = std::chrono::seconds{5};
             if (!syncWorker_.joinable()) {
                 syncWorker_ = std::jthread([this, token = deviceToken_](const std::stop_token syncStopToken) {
@@ -197,10 +200,10 @@ void Client::runSync(const std::stop_token stopToken, std::string deviceToken) {
                 std::lock_guard lock(syncMutex_);
                 syncSnapshot_ = std::move(synced);
             }
-            std::clog << "Veyra receiver configuration and fallback cache synchronized" << '\n';
+            std::clog << "NDIView receiver configuration and fallback cache synchronized" << '\n';
         } catch (const std::exception& error) {
             if (!stopToken.stop_requested()) {
-                std::clog << "Veyra receiver sync deferred: " << error.what() << '\n';
+                std::clog << "NDIView receiver sync deferred: " << error.what() << '\n';
             }
         }
         waitFor(stopToken, std::chrono::seconds{config_.syncIntervalSeconds});
@@ -217,9 +220,9 @@ bool Client::pair() {
     const auto response = postJson("/api/v1/receiver/pair", body.dump());
     if (response.status != 201) {
         if (!response.error.empty()) {
-            std::clog << "Veyra receiver pairing request failed: " << response.error << '\n';
+            std::clog << "NDIView receiver pairing request failed: " << response.error << '\n';
         } else {
-            std::clog << "Veyra receiver pairing was rejected (HTTP " << response.status << ")\n";
+            std::clog << "NDIView receiver pairing was rejected (HTTP " << response.status << ")\n";
         }
         return false;
     }
@@ -233,7 +236,7 @@ bool Client::pair() {
                 return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
                        (c >= '0' && c <= '9') || c == '-' || c == '_';
             }) || id.empty()) {
-            std::cerr << "Veyra server returned an invalid receiver credential\n";
+            std::cerr << "NDIView server returned an invalid receiver credential\n";
             return false;
         }
 
@@ -247,10 +250,10 @@ bool Client::pair() {
                 heartbeatIntervalSeconds_ = interval;
             }
         }
-        std::clog << "Veyra receiver paired successfully (device ID " << deviceId_ << ")\n";
+        std::clog << "NDIView receiver paired successfully (device ID " << deviceId_ << ")\n";
         return true;
     } catch (const std::exception& error) {
-        std::cerr << "Veyra pairing response was invalid: " << error.what() << '\n';
+        std::cerr << "NDIView pairing response was invalid: " << error.what() << '\n';
         return false;
     }
 }
@@ -275,11 +278,16 @@ bool Client::sendHeartbeat() {
     const auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::steady_clock::now() - startedAt_
     ).count();
+    struct sysinfo systemInfo {};
+    const Json deviceUptime = ::sysinfo(&systemInfo) == 0 && systemInfo.uptime >= 0
+        ? Json(static_cast<std::uint64_t>(systemInfo.uptime))
+        : Json(nullptr);
 
     Json body = {
         {"version", "0.1.0"},
         {"platform", platformName()},
         {"uptimeSeconds", std::max<std::int64_t>(0, uptime)},
+        {"deviceUptimeSeconds", deviceUptime},
         {"playbackMode", snapshot.mode},
         {"ndiSourceName", snapshot.ndiSourceName.empty()
             ? Json(nullptr)
@@ -296,13 +304,63 @@ bool Client::sendHeartbeat() {
         return true;
     }
     if (response.status == 401) {
-        std::cerr << "Veyra receiver credential was rejected. Revoke/remove this device, then clear the local credential and pair it again.\n";
+        std::cerr << "NDIView receiver credential was rejected. Revoke/remove this device, then clear the local credential and pair it again.\n";
     } else if (!response.error.empty()) {
-        std::clog << "Veyra heartbeat failed: " << response.error << '\n';
+        std::clog << "NDIView heartbeat failed: " << response.error << '\n';
     } else {
-        std::clog << "Veyra heartbeat was rejected (HTTP " << response.status << ")\n";
+        std::clog << "NDIView heartbeat was rejected (HTTP " << response.status << ")\n";
     }
     return false;
+}
+
+void Client::processPendingCommand() {
+    const auto response = postJson("/api/v1/receiver/commands/poll", "{}", deviceToken_);
+    if (response.status != 200) {
+        if (response.status != 0) std::clog << "NDIView command poll returned HTTP " << response.status << '\n';
+        return;
+    }
+    try {
+        const Json payload = Json::parse(response.body);
+        if (!payload.contains("command") || payload.at("command").is_null()) return;
+        const auto command = payload.at("command");
+        const std::string id = command.at("id").get<std::string>();
+        const std::string type = command.at("type").get<std::string>();
+        if (id.empty() || (type != "restart" && type != "reboot")) {
+            if (!id.empty()) (void)reportCommandStatus(id, "failed", "Unsupported command type");
+            return;
+        }
+        if (!reportCommandStatus(id, "restarting")) return;
+        if (!requestSystemAction(type)) {
+            (void)reportCommandStatus(id, "failed", "Restricted NDIView action helper failed");
+            std::cerr << "NDIView could not execute the requested device action\n";
+        }
+    } catch (const std::exception& error) {
+        std::clog << "NDIView command response was invalid: " << error.what() << '\n';
+    }
+}
+
+bool Client::reportCommandStatus(const std::string& commandId, const std::string& status, const std::string& message) {
+    if (commandId.empty()) return false;
+    Json body = {{"status", status}};
+    if (!message.empty()) body["message"] = message;
+    const auto response = postJson("/api/v1/receiver/commands/" + commandId + "/status", body.dump(), deviceToken_);
+    return response.status == 200;
+}
+
+bool Client::requestSystemAction(const std::string& action) {
+    if (action != "restart" && action != "reboot") return false;
+    const pid_t child = ::fork();
+    if (child < 0) return false;
+    if (child == 0) {
+        ::execl("/usr/bin/sudo", "sudo", "-n", "/usr/local/libexec/ndiview-action", action.c_str(), static_cast<char*>(nullptr));
+        ::_exit(127);
+    }
+    int status = 0;
+    while (::waitpid(child, &status, 0) < 0) {
+        if (errno == EINTR) continue;
+        return false;
+    }
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
 Client::HttpResponse Client::postJson(
@@ -343,7 +401,7 @@ Client::HttpResponse Client::postJson(
     curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 2L);
-    curl_easy_setopt(handle, CURLOPT_USERAGENT, "Veyra/0.1.0");
+    curl_easy_setopt(handle, CURLOPT_USERAGENT, "NDIView/0.1.0");
     const std::string caCertificatePath = config_.caCertificatePath.string();
     if (!caCertificatePath.empty()) {
         curl_easy_setopt(handle, CURLOPT_CAINFO, caCertificatePath.c_str());
@@ -461,4 +519,4 @@ void Client::waitFor(
     }
 }
 
-}  // namespace veyra::control_plane
+}  // namespace ndiview::control_plane

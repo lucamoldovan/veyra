@@ -1,6 +1,6 @@
 #pragma once
 
-#include "veyra/config/config.hpp"
+#include "ndiview/config/config.hpp"
 
 #include <filesystem>
 #include <string>
@@ -8,7 +8,7 @@
 #include <stop_token>
 #include <vector>
 
-namespace veyra::control_plane {
+namespace ndiview::control_plane {
 
 struct CachedMediaItem {
     std::string mediaId;
@@ -40,4 +40,4 @@ private:
     config::ControlPlaneConfig config_;
 };
 
-}  // namespace veyra::control_plane
+}  // namespace ndiview::control_plane

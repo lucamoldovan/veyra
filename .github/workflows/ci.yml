@@ -23,8 +23,8 @@ jobs:
       - name: Configure
         run: >
           cmake -S . -B build -G Ninja
-          -DVEYRA_BUILD_PLAYER=OFF
-          -DVEYRA_BUILD_TESTS=ON
+          -DNDIVIEW_BUILD_PLAYER=OFF
+          -DNDIVIEW_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build --parallel
@@ -86,3 +86,25 @@ jobs:
 
       - name: Type-check and build
         run: npm run build
+
+  deployment-script-checks:
+    name: Deployment script syntax
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate shell scripts
+        run: |
+          bash -n scripts/install-kiosk-debian.sh
+          bash -n scripts/uninstall-kiosk-debian.sh
+          bash -n scripts/ndiview-kiosk-session
+          bash -n scripts/ndiview-action
+          bash -n scripts/package-receiver-release.sh
+          bash -n scripts/publish-receiver-release.sh
+          bash -n tests/test_receiver_release_package.sh
+          bash tests/test_receiver_release_package.sh
+          bash -n scripts/package-server-release.sh
+          bash -n scripts/install-server-release.sh
+          bash -n scripts/rollback-server-release.sh

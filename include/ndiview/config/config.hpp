@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-namespace veyra::config {
+namespace ndiview::config {
 
 struct NdiConfig {
     std::string sourceName;
@@ -20,7 +20,7 @@ struct DisplayConfig {
 
 struct ControlPlaneConfig {
     std::string serverUrl;
-    std::string deviceName{"Veyra Receiver"};
+    std::string deviceName{"NDIView Receiver"};
     std::string pairingCode;
     std::filesystem::path caCertificatePath;
     std::filesystem::path credentialPath;
@@ -37,4 +37,4 @@ struct AppConfig {
 
 [[nodiscard]] AppConfig load(const std::filesystem::path& path);
 
-}  // namespace veyra::config
+}  // namespace ndiview::config

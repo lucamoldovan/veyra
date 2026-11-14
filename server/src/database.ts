@@ -2,11 +2,11 @@ import Database from "better-sqlite3";
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-export type VeyraDatabase = Database.Database;
+export type NDIViewDatabase = Database.Database;
 
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 9;
 
-export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite"): VeyraDatabase {
+export function openDatabase(databasePath = process.env.NDIVIEW_DATABASE_PATH ?? process.env.VEYRA_DATABASE_PATH ?? "data/ndiview.sqlite"): NDIViewDatabase {
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
 
   if (resolvedPath !== ":memory:") {
@@ -14,7 +14,7 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
     const absoluteDirectory = resolve(directory);
     const homeDirectory = process.env.HOME ? resolve(process.env.HOME) : "";
     if (absoluteDirectory === process.cwd() || (homeDirectory && absoluteDirectory === homeDirectory)) {
-      throw new Error("Veyra database must live in a dedicated private subdirectory");
+      throw new Error("NDIView database must live in a dedicated private subdirectory");
     }
     const unsafeTargets = new Set([
       "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
@@ -22,19 +22,19 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
       "/sys", "/boot",
     ]);
     if (unsafeTargets.has(absoluteDirectory)) {
-      throw new Error("Veyra database must live in a dedicated private directory");
+      throw new Error("NDIView database must live in a dedicated private directory");
     }
     mkdirSync(absoluteDirectory, { recursive: true, mode: 0o700 });
     const directoryInfo = lstatSync(absoluteDirectory);
     if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
-      throw new Error("Veyra database directory must be a real directory, not a symlink");
+      throw new Error("NDIView database directory must be a real directory, not a symlink");
     }
     chmodSync(absoluteDirectory, 0o700);
 
     if (existsSync(resolvedPath)) {
       const databaseInfo = lstatSync(resolvedPath);
       if (!databaseInfo.isFile() || databaseInfo.isSymbolicLink()) {
-        throw new Error("Veyra database path must be a regular file, not a symlink");
+        throw new Error("NDIView database path must be a regular file, not a symlink");
       }
       chmodSync(resolvedPath, 0o600);
     } else {
@@ -53,7 +53,7 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
   if (currentVersion > CURRENT_SCHEMA_VERSION) {
     database.close();
     throw new Error(
-      `Database schema version ${currentVersion} is newer than this Veyra server supports (${CURRENT_SCHEMA_VERSION})`,
+      `Database schema version ${currentVersion} is newer than this NDIView server supports (${CURRENT_SCHEMA_VERSION})`,
     );
   }
 
@@ -191,6 +191,45 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
         END;
       `);
       database.pragma("user_version = 6");
+    }
+    if (currentVersion < 7) {
+      database.exec(`
+        CREATE TABLE device_commands (
+          id TEXT PRIMARY KEY,
+          device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+          command_type TEXT NOT NULL CHECK (command_type IN ('restart')),
+          status TEXT NOT NULL CHECK (status IN ('queued', 'claimed', 'restarting', 'completed', 'failed', 'timed_out')),
+          requested_by TEXT NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+          created_at TEXT NOT NULL, expires_at TEXT NOT NULL, claimed_at TEXT, completed_at TEXT, result_message TEXT
+        );
+        CREATE INDEX device_commands_device_created_idx ON device_commands(device_id, created_at DESC);
+        CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
+      `);
+      database.pragma("user_version = 7");
+    }
+    if (currentVersion < 8) {
+      database.exec(`
+        ALTER TABLE device_commands RENAME TO device_commands_v7;
+        DROP INDEX IF EXISTS device_commands_device_created_idx;
+        DROP INDEX IF EXISTS device_commands_pending_idx;
+        CREATE TABLE device_commands (
+          id TEXT PRIMARY KEY,
+          device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+          command_type TEXT NOT NULL CHECK (command_type IN ('restart', 'reboot')),
+          status TEXT NOT NULL CHECK (status IN ('queued', 'claimed', 'restarting', 'completed', 'failed', 'timed_out')),
+          requested_by TEXT NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+          created_at TEXT NOT NULL, expires_at TEXT NOT NULL, claimed_at TEXT, completed_at TEXT, result_message TEXT
+        );
+        INSERT INTO device_commands SELECT * FROM device_commands_v7;
+        DROP TABLE device_commands_v7;
+        CREATE INDEX device_commands_device_created_idx ON device_commands(device_id, created_at DESC);
+        CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
+      `);
+      database.pragma("user_version = 8");
+    }
+    if (currentVersion < 9) {
+      database.exec("ALTER TABLE devices ADD COLUMN device_uptime_seconds INTEGER");
+      database.pragma("user_version = 9");
     }
   });
 

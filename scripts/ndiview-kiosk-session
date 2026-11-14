@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+export SDL_VIDEODRIVER=x11
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-${HOME}/.Xauthority}"
+if command -v xset >/dev/null 2>&1; then
+  xset s off || true
+  xset s noblank || true
+  xset -dpms || true
+fi
+if command -v unclutter >/dev/null 2>&1; then unclutter --timeout 1 --jitter 5 --start-hidden & fi
+systemctl --user import-environment DISPLAY XAUTHORITY XDG_SESSION_TYPE XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS
+# Keep the LightDM session alive for as long as the user service needs its X11 session.
+# The systemd start job completes when a Type=simple service is launched, not when it exits.
+systemctl --user start ndiview.service
+exec /usr/bin/sleep infinity

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "veyra/config/config.hpp"
-#include "veyra/control_plane/sync.hpp"
+#include "ndiview/config/config.hpp"
+#include "ndiview/control_plane/sync.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -11,7 +11,7 @@
 #include <thread>
 #include <vector>
 
-namespace veyra::control_plane {
+namespace ndiview::control_plane {
 
 struct ReportedSource {
     std::string name;
@@ -49,6 +49,9 @@ private:
     void runSync(std::stop_token stopToken, std::string deviceToken);
     [[nodiscard]] bool pair();
     [[nodiscard]] bool sendHeartbeat();
+    void processPendingCommand();
+    [[nodiscard]] bool reportCommandStatus(const std::string& commandId, const std::string& status, const std::string& message = {});
+    [[nodiscard]] bool requestSystemAction(const std::string& action);
     [[nodiscard]] HttpResponse postJson(
         const std::string& path,
         const std::string& body,
@@ -74,4 +77,4 @@ private:
     std::atomic_bool started_{false};
 };
 
-}  // namespace veyra::control_plane
+}  // namespace ndiview::control_plane

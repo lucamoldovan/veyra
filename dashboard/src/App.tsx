@@ -27,7 +27,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getPlaylists, getSources, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, removeRevokedDevice, updateDeviceConfig, type ConnectionState, type Device, type NdiSource, type PlaylistSummary, type Operator, type PairingCode, type ServerHealth } from "./api";
+import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getPlaylists, getSources, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, removeRevokedDevice, requestDeviceAction, updateDeviceConfig, type ConnectionState, type Device, type NdiSource, type PlaylistSummary, type Operator, type PairingCode, type ServerHealth } from "./api";
 import { MediaPage, PlaylistsPage, SourcesPage } from "./MediaPages";
 
 type Page = "overview" | "devices" | "sources" | "media" | "playlists" | "system";
@@ -155,7 +155,7 @@ function App() {
         <div className="brand">
           <div className="brand-mark"><AudioWaveform size={21} strokeWidth={2.2} /></div>
           <div className="brand-copy">
-            <span className="brand-name">veyra</span>
+            <span className="brand-name">NDIView</span>
             <span className="brand-caption">NETWORK VIDEO</span>
           </div>
           <button className="icon-button sidebar-close" aria-label="Close menu" onClick={() => setMobileNavOpen(false)}>
@@ -164,7 +164,7 @@ function App() {
         </div>
 
         <div className="workspace-switcher">
-          <div className="workspace-avatar">V</div>
+          <div className="workspace-avatar">N</div>
           <div className="workspace-copy">
             <strong>Local workspace</strong>
             <span>Private network</span>
@@ -305,13 +305,13 @@ function AuthScreen({
       <div className="auth-card">
         <div className="auth-brand">
           <div className="brand-mark"><AudioWaveform size={21} strokeWidth={2.2} /></div>
-          <div className="brand-copy"><span className="brand-name">veyra</span><span className="brand-caption">NETWORK VIDEO</span></div>
+          <div className="brand-copy"><span className="brand-name">NDIView</span><span className="brand-caption">NETWORK VIDEO</span></div>
         </div>
 
         {mode === "checking" && (
           <div className="auth-message">
             <LoaderCircle className="auth-spinner" size={25} />
-            <h1>Connecting to Veyra</h1>
+            <h1>Connecting to NDIView</h1>
             <p>Checking your local workspace…</p>
           </div>
         )}
@@ -320,7 +320,7 @@ function AuthScreen({
           <div className="auth-message">
             <div className="auth-symbol auth-symbol-error"><Server size={23} /></div>
             <h1>Server unavailable</h1>
-            <p>Start the Veyra server, then try connecting again. Your dashboard and data stay on your local network.</p>
+            <p>Start the NDIView server, then try connecting again. Your dashboard and data stay on your local network.</p>
             <button className="button button-dark button-full" onClick={onRetry}>Try again <ArrowRight size={15} /></button>
           </div>
         )}
@@ -331,7 +331,7 @@ function AuthScreen({
               <div className="auth-symbol"><LockKeyhole size={21} /></div>
               <div className="eyebrow">{isSetup ? "FIRST-TIME SETUP" : "LOCAL WORKSPACE"}</div>
               <h1>{isSetup ? "Create your workspace." : "Welcome back."}</h1>
-              <p>{isSetup ? "Create the administrator account for this Veyra installation." : "Sign in to manage your network video system."}</p>
+              <p>{isSetup ? "Create the administrator account for this NDIView installation." : "Sign in to manage your network video system."}</p>
             </div>
 
             <form className="auth-form" onSubmit={(event) => void submit(event)}>
@@ -346,7 +346,7 @@ function AuthScreen({
                     onChange={(event) => setSetupKey(event.target.value)}
                     placeholder="Paste the key from the server terminal"
                   />
-                  <span className="field-hint">The first-run key is printed once in the Veyra server logs.</span>
+                  <span className="field-hint">The first-run key is printed once in the NDIView server logs.</span>
                 </label>
               )}
               <label className="field-label">
@@ -401,7 +401,7 @@ function AuthScreen({
           </>
         )}
       </div>
-      <div className="auth-background-mark">VEYRA</div>
+      <div className="auth-background-mark">NDIVIEW</div>
     </main>
   );
 }
@@ -453,7 +453,7 @@ function Overview({
         <div>
           <div className="eyebrow">YOUR NETWORK AT A GLANCE</div>
           <h1>Your network.</h1>
-          <p>Here's what's happening across your Veyra network.</p>
+          <p>Here's what's happening across your NDIView network.</p>
         </div>
         <button className="button button-secondary" onClick={() => onNavigate("devices")}>
           <Monitor size={16} /> View devices
@@ -472,7 +472,7 @@ function Overview({
           <div className="panel-heading">
             <div>
               <h2>Network status</h2>
-              <p>Live connection to your local Veyra server</p>
+              <p>Live connection to your local NDIView server</p>
             </div>
             <span className={`pill ${connection === "online" ? "pill-success" : connection === "offline" ? "pill-danger" : "pill-neutral"}`}>
               <span className="status-dot" />
@@ -483,7 +483,7 @@ function Overview({
           <div className="network-visual">
             <div className="network-node network-node-server">
               <div className="network-node-icon"><Server size={22} /></div>
-              <div><strong>Veyra server</strong><span>{connection === "online" ? "Responding normally" : connection === "offline" ? "Cannot be reached" : "Checking connection"}</span></div>
+              <div><strong>NDIView server</strong><span>{connection === "online" ? "Responding normally" : connection === "offline" ? "Cannot be reached" : "Checking connection"}</span></div>
               <span className={`node-dot ${connection}`} />
             </div>
             <div className="network-connector"><span /></div>
@@ -504,7 +504,7 @@ function Overview({
           <div className="setup-topline"><span className="setup-kicker">GETTING STARTED</span><span className="setup-step">01 / 04</span></div>
           <div className="setup-icon"><Network size={22} /></div>
           <h2>{deviceCount === null ? "Checking your network." : deviceCount === 0 ? "Let's get your network connected." : "Your receivers are registered."}</h2>
-          <p>{deviceCount === null ? "Device inventory is temporarily unavailable. Check the server connection and try again." : deviceCount === 0 ? "Veyra is ready for its first receiver. Generate a pairing code to begin enrollment." : "Your devices are registered. Receiver-side enrollment and playback reporting are the next integration steps."}</p>
+          <p>{deviceCount === null ? "Device inventory is temporarily unavailable. Check the server connection and try again." : deviceCount === 0 ? "NDIView is ready for its first receiver. Generate a pairing code to begin enrollment." : "Your devices are registered. NDI source discovery, playback status and remote device controls are available."}</p>
           <div className="setup-progress"><span /></div>
           <div className="setup-progress-label"><span>Platform setup</span><strong>Just getting started</strong></div>
           <button className="button button-dark button-full" onClick={() => onNavigate("devices")}>
@@ -536,7 +536,7 @@ function Overview({
         </div>
       </section>
 
-      <footer className="page-footer"><span>VEYRA <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Local-first by design <ShieldCheck size={13} /></span></footer>
+      <footer className="page-footer"><span>NDIVIEW <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Local-first by design <ShieldCheck size={13} /></span></footer>
     </>
   );
 }
@@ -571,6 +571,7 @@ function DevicesPage() {
   const [copied, setCopied] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
+  const [pendingDeviceAction, setPendingDeviceAction] = useState<string | null>(null);
   const [sources, setSources] = useState<NdiSource[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [drafts, setDrafts] = useState<Record<string, { sourceAddress: string; fallbackPlaylistId: string }>>({});
@@ -662,6 +663,24 @@ function DevicesPage() {
   };
 
 
+  const requestDeviceActionFromDashboard = async (device: Device, action: "restart" | "reboot") => {
+    if (device.credentialStatus !== "active" || device.status !== "online") return;
+    const label = action === "restart" ? "Restart NDIView receiver" : "Reboot entire Mac mini";
+    const detail = action === "restart"
+      ? "The NDIView application will restart. Debian will keep running."
+      : "The entire Mac mini will reboot and video output will be interrupted.";
+    if (!window.confirm(`${label} for "${device.name}"? ${detail}`)) return;
+    setPendingDeviceAction(`${device.id}:${action}`);
+    setError("");
+    try {
+      await requestDeviceAction(device.id, action);
+      setRefreshTick((tick) => tick + 1);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : `Could not request device ${action}.`);
+    } finally {
+      setPendingDeviceAction(null);
+    }
+  };
   const saveDeviceConfig = async (device: Device) => {
     const draft = drafts[device.id] ?? { sourceAddress: device.assignedNdiSourceAddress ?? "", fallbackPlaylistId: device.fallbackPlaylistId ?? "" };
     const selectedSource = sources.find((source) => source.address === draft.sourceAddress);
@@ -688,7 +707,7 @@ function DevicesPage() {
 
   const removeDevice = async (device: Device) => {
     if (device.credentialStatus !== "revoked") return;
-    if (!window.confirm(`Remove "${device.name}" from this Veyra workspace? This cannot be undone.`)) return;
+    if (!window.confirm(`Remove "${device.name}" from this NDIView workspace? This cannot be undone.`)) return;
     setRevokingDeviceId(device.id);
     setError("");
     try {
@@ -707,7 +726,7 @@ function DevicesPage() {
         <div>
           <div className="eyebrow">RECEIVER MANAGEMENT</div>
           <h1>Devices</h1>
-          <p>Manage Veyra receivers, display assignments and playback state.</p>
+          <p>Manage NDIView receivers, display assignments and playback state.</p>
         </div>
         <button className="button button-dark" onClick={() => void createCode()} disabled={creatingCode}>
           {creatingCode ? <LoaderCircle size={15} className="auth-spinner" /> : <Plus size={16} />}
@@ -719,7 +738,7 @@ function DevicesPage() {
         <section className="panel pairing-panel">
           <div className="pairing-heading">
             <div className="pairing-icon"><Network size={19} /></div>
-            <div><h2>One-time pairing code</h2><p>Generated for a new Veyra receiver</p></div>
+            <div><h2>One-time pairing code</h2><p>Generated for a new NDIView receiver</p></div>
             <button className="icon-button" aria-label="Dismiss pairing code" onClick={() => setPairingCode(null)}><X size={17} /></button>
           </div>
           <div className="pairing-code-row">
@@ -766,7 +785,7 @@ function DevicesPage() {
                 </div>
                 <div><span className={`device-status device-status-${device.status}`}><span />{device.status}</span></div>
                 <div className="device-playback"><strong>{device.playbackMode}</strong><span>{device.ndiSourceName ?? "No NDI source reported"}</span></div>
-                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}{device.credentialStatus === "active" ? <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void revokeCredential(device)}>{revokingDeviceId === device.id ? "Revoking…" : "Revoke access"}</button> : <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void removeDevice(device)}>{revokingDeviceId === device.id ? "Removing…" : "Remove device"}</button>}</div>
+                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}{device.credentialStatus === "active" ? <><button className="button button-secondary device-revoke-button" disabled={pendingDeviceAction !== null || device.status !== "online" || ["queued","claimed","restarting"].includes(device.restartCommand?.status ?? "")} onClick={() => void requestDeviceActionFromDashboard(device, "restart")}>{pendingDeviceAction === `${device.id}:restart` ? "Requesting…" : "Restart receiver"}</button><button className="button button-secondary device-revoke-button" disabled={pendingDeviceAction !== null || device.status !== "online" || ["queued","claimed","restarting"].includes(device.rebootCommand?.status ?? "")} onClick={() => void requestDeviceActionFromDashboard(device, "reboot")}>{pendingDeviceAction === `${device.id}:reboot` ? "Requesting…" : "Reboot device"}</button><button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void revokeCredential(device)}>{revokingDeviceId === device.id ? "Revoking…" : "Revoke access"}</button></> : <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void removeDevice(device)}>{revokingDeviceId === device.id ? "Removing…" : "Remove device"}</button>}{device.restartCommand && <span className="device-command-status">Receiver restart: {device.restartCommand.status.replace("_", " ")}{device.restartCommand.message ? ` · ${device.restartCommand.message}` : ""}</span>}{device.rebootCommand && <span className="device-command-status">Device reboot: {device.rebootCommand.status.replace("_", " ")}{device.rebootCommand.message ? ` · ${device.rebootCommand.message}` : ""}</span>}</div>
                 <div className="device-assignment">
                   <label>NDI source
                     <select disabled={device.credentialStatus !== "active"} value={(drafts[device.id]?.sourceAddress ?? device.assignedNdiSourceAddress) ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { sourceAddress: event.target.value, fallbackPlaylistId: current[device.id]?.fallbackPlaylistId ?? device.fallbackPlaylistId ?? "" } }))}>
@@ -790,7 +809,7 @@ function DevicesPage() {
         )}
       </section>
 
-      <footer className="page-footer"><span>VEYRA <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Receiver status from local heartbeats <ShieldCheck size={13} /></span></footer>
+      <footer className="page-footer"><span>NDIVIEW <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Receiver status from local heartbeats <ShieldCheck size={13} /></span></footer>
     </>
   );
 }
@@ -807,7 +826,7 @@ function SystemPage({
   return (
     <>
       <section className="page-heading">
-        <div><div className="eyebrow">PLATFORM HEALTH</div><h1>System</h1><p>Health and diagnostics for your local Veyra installation.</p></div>
+        <div><div className="eyebrow">PLATFORM HEALTH</div><h1>System</h1><p>Health and diagnostics for your local NDIView installation.</p></div>
         <span className={`pill ${connection === "online" ? "pill-success" : connection === "offline" ? "pill-danger" : "pill-neutral"}`}><span className="status-dot" />{connection === "online" ? "Operational" : connection === "offline" ? "Disconnected" : "Checking"}</span>
       </section>
       <section className="system-grid">
@@ -822,7 +841,7 @@ function SystemPage({
           <div className="system-card-icon"><HardDrive size={19} /></div>
           <div className="system-card-label">DATABASE</div>
           <h2>SQLite · WAL enabled</h2>
-          <p>Persistent local storage is initialized by the Veyra server.</p>
+          <p>Persistent local storage is initialized by the NDIView server.</p>
           <div className="system-card-foot"><span className="status-dot dot-online" />Database ready</div>
         </div>
         <div className="panel system-card">
@@ -841,12 +860,12 @@ function SystemPage({
         </div>
       </section>
       <section className="panel system-info">
-        <div className="panel-heading"><div><h2>Platform components</h2><p>Implementation status of the Veyra stack</p></div><Command size={18} className="muted-icon" /></div>
-        <div className="component-row"><div className="component-icon"><MonitorPlay size={17} /></div><div className="component-copy"><strong>Veyra Receiver</strong><span>Native C++ / NDI / SDL2</span></div><span className="component-status status-foundation">Foundation</span></div>
-        <div className="component-row"><div className="component-icon"><Server size={17} /></div><div className="component-copy"><strong>Veyra Server</strong><span>TypeScript / Fastify</span></div><span className="component-status status-foundation">Foundation</span></div>
-        <div className="component-row"><div className="component-icon"><LayoutDashboard size={17} /></div><div className="component-copy"><strong>Veyra Dashboard</strong><span>React / Vite</span></div><span className="component-status status-foundation">Foundation</span></div>
+        <div className="panel-heading"><div><h2>Platform components</h2><p>Implementation status of the NDIView stack</p></div><Command size={18} className="muted-icon" /></div>
+        <div className="component-row"><div className="component-icon"><MonitorPlay size={17} /></div><div className="component-copy"><strong>NDIView Receiver</strong><span>Native C++ / NDI / SDL2</span></div><span className="component-status status-foundation">Foundation</span></div>
+        <div className="component-row"><div className="component-icon"><Server size={17} /></div><div className="component-copy"><strong>NDIView Server</strong><span>TypeScript / Fastify</span></div><span className="component-status status-foundation">Foundation</span></div>
+        <div className="component-row"><div className="component-icon"><LayoutDashboard size={17} /></div><div className="component-copy"><strong>NDIView Dashboard</strong><span>React / Vite</span></div><span className="component-status status-foundation">Foundation</span></div>
       </section>
-      <footer className="page-footer"><span>VEYRA <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Local-first by design <ShieldCheck size={13} /></span></footer>
+      <footer className="page-footer"><span>NDIVIEW <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Local-first by design <ShieldCheck size={13} /></span></footer>
     </>
   );
 }

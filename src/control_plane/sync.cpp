@@ -1,4 +1,4 @@
-#include "veyra/control_plane/sync.hpp"
+#include "ndiview/control_plane/sync.hpp"
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
@@ -21,7 +21,7 @@
 #include <unordered_set>
 #include <utility>
 
-namespace veyra::control_plane {
+namespace ndiview::control_plane {
 namespace {
 using Json = nlohmann::json;
 constexpr std::size_t kMaxResponseBytes = 20U * 1024U * 1024U + 1024U * 1024U;
@@ -73,7 +73,7 @@ Response get(const std::string& base, const std::string& path,
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Veyra/0.1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "NDIView/0.1.0");
     const auto ca = caPath.string();
     if (!ca.empty()) curl_easy_setopt(curl, CURLOPT_CAINFO, ca.c_str());
     const auto result = curl_easy_perform(curl);
@@ -421,4 +421,4 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     return snapshot;
 }
 
-}  // namespace veyra::control_plane
+}  // namespace ndiview::control_plane

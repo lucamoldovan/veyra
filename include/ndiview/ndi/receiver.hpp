@@ -1,16 +1,16 @@
 #pragma once
 
-#include "veyra/ndi/discovery.hpp"
-#include "veyra/video/frame.hpp"
+#include "ndiview/ndi/discovery.hpp"
+#include "ndiview/video/frame.hpp"
 
 #include <cstdint>
 #include <optional>
 #include <vector>
 
-namespace veyra::ndi {
+namespace ndiview::ndi {
 
-using PixelFormat = veyra::video::PixelFormat;
-using VideoFrame = veyra::video::VideoFrame;
+using PixelFormat = ndiview::video::PixelFormat;
+using VideoFrame = ndiview::video::VideoFrame;
 
 class Receiver {
 public:
@@ -32,4 +32,4 @@ private:
     bool unsupportedFormatLogged_{false};
 };
 
-}  // namespace veyra::ndi
+}  // namespace ndiview::ndi

@@ -3,9 +3,9 @@ import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { openDatabase, type VeyraDatabase } from "./database.js";
-import { createSession, hashPassword, SESSION_COOKIE, SESSION_TTL, hashSessionToken, verifyPassword } from "./security.js";
+import { dirname, extname, join, resolve, sep } from "node:path";
+import { openDatabase, type NDIViewDatabase } from "./database.js";
+import { createSession, hashPassword, SESSION_COOKIE, LEGACY_SESSION_COOKIE, SESSION_TTL, hashSessionToken, verifyPassword } from "./security.js";
 
 interface BuildAppOptions {
   databasePath?: string;
@@ -16,6 +16,7 @@ interface BuildAppOptions {
   mediaDirectory?: string;
   https?: { key: Buffer; cert: Buffer; minVersion: "TLSv1.2" };
   secureCookies?: boolean;
+  dashboardDirectory?: string;
 }
 
 interface SetupBody {
@@ -29,9 +30,9 @@ interface LoginBody {
   password?: unknown;
 }
 
-function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key: string | null; path: string | null; generated: boolean } {
+function readSetupKey(database: NDIViewDatabase, options: BuildAppOptions): { key: string | null; path: string | null; generated: boolean } {
   const operatorCount = database.prepare("SELECT COUNT(*) AS count FROM operators").get() as { count: number };
-  const setupKeyPath = resolve(options.setupKeyPath ?? process.env.VEYRA_SETUP_KEY_PATH ?? "data/setup-key");
+  const setupKeyPath = resolve(options.setupKeyPath ?? (process.env.NDIVIEW_SETUP_KEY_PATH ?? process.env.VEYRA_SETUP_KEY_PATH) ?? "data/setup-key");
 
   if (operatorCount.count > 0) {
     if (!options.setupKey) rmSync(setupKeyPath, { force: true });
@@ -45,12 +46,12 @@ function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key:
   if (existsSync(setupKeyPath)) {
     const fileInfo = lstatSync(setupKeyPath);
     if (!fileInfo.isFile()) {
-      throw new Error("Veyra setup key path must be a regular file, not a symlink or special file");
+      throw new Error("NDIView setup key path must be a regular file, not a symlink or special file");
     }
     chmodSync(setupKeyPath, 0o600);
     const existingKey = readFileSync(setupKeyPath, "utf8").trim();
     if (existingKey.length < 32) {
-      throw new Error("Veyra setup key file is empty or invalid; remove it to generate a new key");
+      throw new Error("NDIView setup key file is empty or invalid; remove it to generate a new key");
     }
     return { key: existingKey, path: setupKeyPath, generated: false };
   }
@@ -63,20 +64,20 @@ function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key:
 function readPairingSecret(options: BuildAppOptions): Buffer {
   if (options.pairingSecret) {
     const secret = Buffer.from(options.pairingSecret, "utf8");
-    if (secret.length < 32) throw new Error("Veyra pairing secret must be at least 32 bytes");
+    if (secret.length < 32) throw new Error("NDIView pairing secret must be at least 32 bytes");
     return secret;
   }
 
-  const secretPath = resolve(options.pairingSecretPath ?? process.env.VEYRA_PAIRING_SECRET_PATH ?? "data/pairing-secret");
+  const secretPath = resolve(options.pairingSecretPath ?? (process.env.NDIVIEW_PAIRING_SECRET_PATH ?? process.env.VEYRA_PAIRING_SECRET_PATH) ?? "data/pairing-secret");
   mkdirSync(dirname(secretPath), { recursive: true });
 
   if (existsSync(secretPath)) {
     const fileInfo = lstatSync(secretPath);
-    if (!fileInfo.isFile()) throw new Error("Veyra pairing secret path must be a regular file");
+    if (!fileInfo.isFile()) throw new Error("NDIView pairing secret path must be a regular file");
     chmodSync(secretPath, 0o600);
     const value = readFileSync(secretPath, "utf8").trim();
     if (!/^[a-f0-9]{64}$/i.test(value)) {
-      throw new Error("Veyra pairing secret file is invalid; restore it from backup or remove it to rotate pairing verification");
+      throw new Error("NDIView pairing secret file is invalid; restore it from backup or remove it to rotate pairing verification");
     }
     return Buffer.from(value, "hex");
   }
@@ -129,7 +130,7 @@ function ensurePrivateDirectory(path: string): void {
   const absolutePath = resolve(path);
   const homeDirectory = process.env.HOME ? resolve(process.env.HOME) : "";
   if (absolutePath === process.cwd() || (homeDirectory && absolutePath === homeDirectory)) {
-    throw new Error("Veyra media storage must use a dedicated subdirectory");
+    throw new Error("NDIView media storage must use a dedicated subdirectory");
   }
   const unsafeTargets = new Set([
     "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
@@ -137,12 +138,12 @@ function ensurePrivateDirectory(path: string): void {
     "/sys", "/boot",
   ]);
   if (unsafeTargets.has(absolutePath)) {
-    throw new Error("Veyra media storage must use a dedicated private directory");
+    throw new Error("NDIView media storage must use a dedicated private directory");
   }
   mkdirSync(absolutePath, { recursive: true, mode: 0o700 });
   const info = lstatSync(absolutePath);
   if (!info.isDirectory() || info.isSymbolicLink()) {
-    throw new Error("Veyra media storage path must be a real directory, not a symlink");
+    throw new Error("NDIView media storage path must be a real directory, not a symlink");
   }
   chmodSync(absolutePath, 0o700);
 }
@@ -157,7 +158,7 @@ function safeEqual(left: string, right: string): boolean {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function getSessionOperator(database: VeyraDatabase, token: string | undefined): { id: string; username: string } | null {
+function getSessionOperator(database: NDIViewDatabase, token: string | undefined): { id: string; username: string } | null {
   if (!token) return null;
 
   const row = database.prepare(`
@@ -176,8 +177,8 @@ function getSessionOperator(database: VeyraDatabase, token: string | undefined):
   return { id: row.id, username: row.username };
 }
 
-function getAuthenticatedOperator(database: VeyraDatabase, request: FastifyRequest, reply: FastifyReply): { id: string; username: string } | null {
-  const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE]);
+function getAuthenticatedOperator(database: NDIViewDatabase, request: FastifyRequest, reply: FastifyReply): { id: string; username: string } | null {
+  const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE] ?? request.cookies[LEGACY_SESSION_COOKIE]);
   if (!operator) {
     reply.code(401).send({ error: "Authentication required" });
     return null;
@@ -207,30 +208,30 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     throw error;
   }
   const secureCookies = Boolean(options.https) || options.secureCookies === true ||
-    process.env.VEYRA_COOKIE_SECURE === "true";
+    (process.env.NDIVIEW_COOKIE_SECURE ?? process.env.VEYRA_COOKIE_SECURE) === "true";
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
     },
     ...(options.https ? { https: options.https } : {}),
   });
-  const mediaDirectory = resolve(options.mediaDirectory ?? process.env.VEYRA_MEDIA_DIRECTORY ?? "data/media");
+  const mediaDirectory = resolve(options.mediaDirectory ?? (process.env.NDIVIEW_MEDIA_DIRECTORY ?? process.env.VEYRA_MEDIA_DIRECTORY) ?? "data/media");
   app.addContentTypeParser(
     ["image/png", "image/jpeg", "image/webp"],
     { parseAs: "buffer", bodyLimit: MAX_MEDIA_BYTES },
     (_request, body, done) => done(null, body),
   );
 
-  app.addHook("onSend", async (_request, reply, payload) => {
+  app.addHook("onSend", async (request, reply, payload) => {
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "no-referrer");
-    reply.header("Cache-Control", "no-store");
+    if (request.url.startsWith("/api/")) reply.header("Cache-Control", "no-store");
     if (options.https) reply.header("Strict-Transport-Security", "max-age=31536000");
     return payload;
   });
 
   if (setup.generated && setup.key) {
-    app.log.warn({ setupKey: setup.key }, "Veyra first-run setup key — enter this in the dashboard");
+    app.log.warn({ setupKey: setup.key }, "NDIView first-run setup key — enter this in the dashboard");
   }
 
   app.register(cookie);
@@ -242,7 +243,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.get("/api/v1/health", async () => ({
     status: "ok",
-    service: "veyra-server",
+    service: "ndiview-server",
     version: "0.1.0",
   }));
 
@@ -290,7 +291,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       if (error instanceof Error && error.message === "SETUP_ALREADY_COMPLETED") {
         return reply.code(409).send({ error: "Initial setup has already been completed" });
       }
-      request.log.error(error, "Could not create initial Veyra operator");
+      request.log.error(error, "Could not create initial NDIView operator");
       return reply.code(409).send({ error: "Initial setup could not be completed" });
     }
 
@@ -306,7 +307,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.get("/api/v1/auth/session", async (request) => {
-    const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE]);
+    const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE] ?? request.cookies[LEGACY_SESSION_COOKIE]);
     return operator
       ? { authenticated: true, operator }
       : { authenticated: false, operator: null };
@@ -335,9 +336,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.delete("/api/v1/auth/session", async (request, reply) => {
-    const token = request.cookies[SESSION_COOKIE];
-    if (token) database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashSessionToken(token));
+    for (const token of [request.cookies[SESSION_COOKIE], request.cookies[LEGACY_SESSION_COOKIE]]) {
+      if (token) database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashSessionToken(token));
+    }
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    reply.clearCookie(LEGACY_SESSION_COOKIE, { path: "/" });
     return { authenticated: false };
   });
 
@@ -430,7 +433,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const extension = detectedMime === "image/png" ? "png" : detectedMime === "image/jpeg" ? "jpg" : "webp";
     const id = randomUUID();
     const storageKey = `${id}.${extension}`;
-    const filenameHeader = request.headers["x-veyra-filename"];
+    const filenameHeader = request.headers["x-ndiview-filename"] ?? request.headers["x-veyra-filename"];
     const displayName = safeDisplayName(typeof filenameHeader === "string" ? filenameHeader : undefined);
     const createdAt = new Date().toISOString();
     const sha256 = createHash("sha256").update(image).digest("hex");
@@ -447,7 +450,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       `).run(id, displayName, storageKey, detectedMime, image.length, sha256, createdAt);
     } catch (error) {
       if (fileCreated) rmSync(filePath, { force: true });
-      request.log.error(error, "Could not store uploaded Veyra media");
+      request.log.error(error, "Could not store uploaded NDIView media");
       return reply.code(500).send({ error: "Image could not be stored" });
     }
 
@@ -512,7 +515,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         .header("Content-Disposition", "inline")
         .send(content);
     } catch (error) {
-      request.log.error(error, "Stored Veyra media file is missing or unreadable");
+      request.log.error(error, "Stored NDIView media file is missing or unreadable");
       return reply.code(404).send({ error: "Media file is unavailable" });
     }
   });
@@ -541,7 +544,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       database.prepare("DELETE FROM media_assets WHERE id = ?").run(request.params.mediaId);
       return reply.code(204).send();
     } catch (error) {
-      request.log.error(error, "Could not delete Veyra media");
+      request.log.error(error, "Could not delete NDIView media");
       return reply.code(500).send({ error: "Image could not be deleted" });
     }
   });
@@ -751,13 +754,26 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const operator = getAuthenticatedOperator(database, request, reply);
     if (!operator) return;
 
+    const now = Date.now();
+    const isoNow = new Date(now).toISOString();
+    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Receiver did not confirm the requested action before timeout' WHERE status='restarting' AND claimed_at IS NOT NULL AND claimed_at <= ?").run(isoNow, new Date(now-180_000).toISOString());
+    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Command expired before delivery' WHERE status IN ('queued','claimed') AND expires_at <= ?").run(isoNow, isoNow);
+
     const rows = database.prepare(`
-      SELECT id, name, platform, software_version, last_seen_at, last_ip,
-             playback_mode, ndi_source_name, uptime_seconds, created_at,
-             credential_revoked_at, config_version, assigned_ndi_source_name,
-             assigned_ndi_source_address, fallback_playlist_id
-      FROM devices
-      ORDER BY name COLLATE NOCASE ASC
+      SELECT d.id, d.name, d.platform, d.software_version, d.last_seen_at, d.last_ip,
+             d.playback_mode, d.ndi_source_name, d.uptime_seconds, d.device_uptime_seconds, d.created_at,
+             d.credential_revoked_at, d.config_version, d.assigned_ndi_source_name,
+             d.assigned_ndi_source_address, d.fallback_playlist_id,
+             (SELECT c.id FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_id,
+             (SELECT c.status FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_status,
+             (SELECT c.created_at FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_created_at,
+             (SELECT c.result_message FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_message,
+             (SELECT c.id FROM device_commands c WHERE c.device_id=d.id AND c.command_type='reboot' ORDER BY c.created_at DESC LIMIT 1) AS reboot_command_id,
+             (SELECT c.status FROM device_commands c WHERE c.device_id=d.id AND c.command_type='reboot' ORDER BY c.created_at DESC LIMIT 1) AS reboot_command_status,
+             (SELECT c.created_at FROM device_commands c WHERE c.device_id=d.id AND c.command_type='reboot' ORDER BY c.created_at DESC LIMIT 1) AS reboot_command_created_at,
+             (SELECT c.result_message FROM device_commands c WHERE c.device_id=d.id AND c.command_type='reboot' ORDER BY c.created_at DESC LIMIT 1) AS reboot_command_message
+      FROM devices d
+      ORDER BY d.name COLLATE NOCASE ASC
     `).all() as Array<{
       id: string;
       name: string;
@@ -768,15 +784,23 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       playback_mode: string;
       ndi_source_name: string | null;
       uptime_seconds: number | null;
+      device_uptime_seconds: number | null;
       created_at: string;
       credential_revoked_at: string | null;
       config_version: number;
       assigned_ndi_source_name: string | null;
       assigned_ndi_source_address: string | null;
       fallback_playlist_id: string | null;
+      restart_command_id: string | null;
+      restart_command_status: string | null;
+      restart_command_created_at: string | null;
+      restart_command_message: string | null;
+      reboot_command_id: string | null;
+      reboot_command_status: string | null;
+      reboot_command_created_at: string | null;
+      reboot_command_message: string | null;
     }>;
 
-    const now = Date.now();
     return {
       devices: rows.map((device) => {
         const age = device.last_seen_at ? now - Date.parse(device.last_seen_at) : Number.POSITIVE_INFINITY;
@@ -792,6 +816,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           playbackMode: device.playback_mode,
           ndiSourceName: device.ndi_source_name,
           uptimeSeconds: device.uptime_seconds,
+          deviceUptimeSeconds: device.device_uptime_seconds,
           createdAt: device.created_at,
           credentialRevokedAt: device.credential_revoked_at,
           credentialStatus: device.credential_revoked_at ? "revoked" : "active",
@@ -799,12 +824,33 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           assignedNdiSourceName: device.assigned_ndi_source_name,
           assignedNdiSourceAddress: device.assigned_ndi_source_address,
           fallbackPlaylistId: device.fallback_playlist_id,
+          restartCommand: device.restart_command_id ? { id: device.restart_command_id, status: device.restart_command_status, createdAt: device.restart_command_created_at, message: device.restart_command_message } : null,
+          rebootCommand: device.reboot_command_id ? { id: device.reboot_command_id, status: device.reboot_command_status, createdAt: device.reboot_command_created_at, message: device.reboot_command_message } : null,
         };
       }),
     };
   });
 
 
+  app.post<{ Params: { deviceId: string; action: string } }>("/api/v1/devices/:deviceId/:action(restart|reboot)", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply); if (!operator) return;
+    const action = request.params.action;
+    if (action !== "restart" && action !== "reboot") return reply.code(404).send({ error: "Unknown device action" });
+    const now = new Date(); const nowIso = now.toISOString();
+    const device = database.prepare("SELECT id, last_seen_at FROM devices WHERE id = ? AND credential_revoked_at IS NULL").get(request.params.deviceId) as { id: string; last_seen_at: string | null } | undefined;
+    if (!device) return reply.code(404).send({ error: "Active receiver not found" });
+    if (!device.last_seen_at || now.getTime() - Date.parse(device.last_seen_at) > 45_000) return reply.code(409).send({ error: "Receiver must be online before it can receive an action" });
+    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Receiver did not confirm the requested action before timeout' WHERE device_id=? AND status='restarting' AND claimed_at IS NOT NULL AND claimed_at <= ?")
+      .run(nowIso, device.id, new Date(now.getTime() - 180_000).toISOString());
+    const active = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND (status='restarting' OR (status IN ('queued','claimed') AND expires_at>?)) LIMIT 1").get(device.id, nowIso) as { id: string } | undefined;
+    if (active) return reply.code(409).send({ error: `A ${action} request is already active for this receiver` });
+    const recent = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type=? AND created_at>? LIMIT 1").get(device.id, action, new Date(now.getTime()-120_000).toISOString()) as { id: string } | undefined;
+    if (recent) return reply.code(429).send({ error: "Please wait two minutes before repeating this action" });
+    const id = randomUUID(); const expiresAt = new Date(now.getTime()+90_000).toISOString();
+    database.prepare("INSERT INTO device_commands (id,device_id,command_type,status,requested_by,created_at,expires_at) VALUES (?, ?, ?, 'queued', ?, ?, ?)").run(id,device.id,action,operator.id,nowIso,expiresAt);
+    request.log.info({commandId:id,deviceId:device.id,operatorId:operator.id,action},`Receiver ${action} requested`);
+    return reply.code(201).send({id,status:"queued",createdAt:nowIso,expiresAt});
+  });
   app.put<{ Params: { deviceId: string }; Body: { ndiSourceName?: unknown; ndiSourceAddress?: unknown; fallbackPlaylistId?: unknown } }>(
     "/api/v1/devices/:deviceId/config",
     async (request, reply) => {
@@ -884,6 +930,27 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return device;
   }
 
+  app.post("/api/v1/receiver/commands/poll", async (request, reply) => {
+    const device = authenticateReceiver(request, reply); if (!device) return;
+    const now = new Date().toISOString();
+    const claim = database.transaction(() => {
+      const row = database.prepare("SELECT id,command_type FROM device_commands WHERE device_id=? AND status='queued' AND expires_at>? ORDER BY created_at ASC LIMIT 1").get(device.id,now) as {id:string;command_type:string}|undefined;
+      if (!row) return null;
+      const result = database.prepare("UPDATE device_commands SET status='claimed',claimed_at=? WHERE id=? AND device_id=? AND status='queued' AND expires_at>?").run(now,row.id,device.id,now);
+      return result.changes===1 ? {id:row.id,type:row.command_type} : null;
+    });
+    return {command:claim()};
+  });
+  app.post<{Params:{commandId:string};Body:{status?:unknown;message?:unknown}}>("/api/v1/receiver/commands/:commandId/status", async (request,reply) => {
+    const device=authenticateReceiver(request,reply); if(!device)return;
+    const status=request.body?.status;
+    const message=typeof request.body?.message==="string"?stripControlCharacters(request.body.message).slice(0,240):null;
+    if(status!=="restarting"&&status!=="failed")return reply.code(400).send({error:"Command status must be restarting or failed"});
+    const now=new Date().toISOString();
+    const result=database.prepare("UPDATE device_commands SET status=?,completed_at=?,result_message=? WHERE id=? AND device_id=? AND status IN ('claimed','restarting') AND expires_at>?").run(status,status==="failed"?now:null,message,request.params.commandId,device.id,now);
+    if(result.changes!==1)return reply.code(404).send({error:"Command is unavailable, expired, or does not belong to this receiver"});
+    return {accepted:true,status};
+  });
   app.get("/api/v1/receiver/config", async (request, reply) => {
     const device = authenticateReceiver(request, reply);
     if (!device) return;
@@ -956,7 +1023,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       if (dirname(filePath) !== mediaDirectory) return reply.code(404).send({ error: "Media item not found" });
       return reply.type(asset.mime_type).header("Cache-Control", "private, no-store").send(readFileSync(filePath));
     } catch (error) {
-      request.log.error(error, "Assigned Veyra media is missing or unreadable");
+      request.log.error(error, "Assigned NDIView media is missing or unreadable");
       return reply.code(404).send({ error: "Media file is unavailable" });
     }
   });
@@ -1044,7 +1111,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
   );
 
-  app.post<{ Body: { version?: unknown; platform?: unknown; uptimeSeconds?: unknown; playbackMode?: unknown; ndiSourceName?: unknown; ndiSources?: unknown } }>(
+  app.post<{ Body: { version?: unknown; platform?: unknown; uptimeSeconds?: unknown; deviceUptimeSeconds?: unknown; playbackMode?: unknown; ndiSourceName?: unknown; ndiSources?: unknown } }>(
     "/api/v1/receiver/heartbeat",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request, reply) => {
@@ -1057,6 +1124,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       const uptimeSeconds = typeof body.uptimeSeconds === "number" &&
         Number.isSafeInteger(body.uptimeSeconds) && body.uptimeSeconds >= 0
         ? body.uptimeSeconds
+        : null;
+      const deviceUptimeSeconds = typeof body.deviceUptimeSeconds === "number" &&
+        Number.isSafeInteger(body.deviceUptimeSeconds) && body.deviceUptimeSeconds >= 0
+        ? body.deviceUptimeSeconds
         : null;
       const allowedModes = new Set(["ndi", "fallback", "idle", "error", "unknown"]);
       const playbackMode = typeof body.playbackMode === "string" && allowedModes.has(body.playbackMode)
@@ -1094,18 +1165,57 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         discoveredSourcesJson = JSON.stringify(discoveredSources);
       }
       const now = new Date().toISOString();
+      const previous = database.prepare("SELECT uptime_seconds, device_uptime_seconds FROM devices WHERE id = ?").get(device.id) as { uptime_seconds: number | null; device_uptime_seconds: number | null } | undefined;
 
       database.prepare(`
         UPDATE devices
         SET last_seen_at = ?, last_ip = ?, software_version = ?, platform = ?,
-            playback_mode = ?, ndi_source_name = ?, uptime_seconds = ?,
+            playback_mode = ?, ndi_source_name = ?, uptime_seconds = ?, device_uptime_seconds = ?,
             discovered_sources_json = COALESCE(?, discovered_sources_json), updated_at = ?
         WHERE id = ?
-      `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, discoveredSourcesJson, now, device.id);
+      `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, deviceUptimeSeconds, discoveredSourcesJson, now, device.id);
+
+      // A heartbeat alone does not prove that a requested restart happened: the
+      // old process can still heartbeat after an asynchronous systemd request.
+      // The receiver's process-relative uptime must reset before we complete it.
+      if (previous?.uptime_seconds !== null && previous?.uptime_seconds !== undefined &&
+          uptimeSeconds !== null && uptimeSeconds < previous.uptime_seconds) {
+        database.prepare("UPDATE device_commands SET status='completed', completed_at=?, result_message='Receiver application restarted and reported a fresh process uptime' WHERE device_id=? AND command_type='restart' AND status='restarting'").run(now, device.id);
+      }
+      if (previous?.device_uptime_seconds !== null && previous?.device_uptime_seconds !== undefined &&
+          deviceUptimeSeconds !== null && deviceUptimeSeconds < previous.device_uptime_seconds) {
+        database.prepare("UPDATE device_commands SET status='completed', completed_at=?, result_message='Device reboot confirmed by reset system uptime' WHERE device_id=? AND command_type='reboot' AND status='restarting'").run(now, device.id);
+      }
 
       return { accepted: true, serverTime: now };
     },
   );
 
+  const dashboardDirectory = resolve(options.dashboardDirectory ?? (process.env.NDIVIEW_DASHBOARD_DIRECTORY ?? process.env.VEYRA_DASHBOARD_DIRECTORY) ?? "../dashboard/dist");
+  const dashboardIndex = resolve(dashboardDirectory, "index.html");
+  if (existsSync(dashboardIndex)) {
+    const serveDashboard = async (request: FastifyRequest, reply: FastifyReply) => {
+      let pathname: string;
+      try { pathname = decodeURIComponent(new URL(request.url, "http://ndiview.local").pathname); }
+      catch { return reply.code(400).send({ error: "Invalid dashboard path" }); }
+      if (pathname === "/api" || pathname.startsWith("/api/")) return reply.code(404).send({ error: "API route not found" });
+      const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+      let filePath = resolve(dashboardDirectory, relativePath);
+      if (filePath !== dashboardIndex && !filePath.startsWith(dashboardDirectory + sep)) return reply.code(404).send();
+      if (!existsSync(filePath) || !lstatSync(filePath).isFile()) filePath = dashboardIndex;
+      const extension = extname(filePath).toLowerCase();
+      const contentTypes: Record<string, string> = {
+        ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+        ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
+        ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".webp": "image/webp", ".ico": "image/x-icon", ".woff": "font/woff", ".woff2": "font/woff2",
+      };
+      const isHashedAsset = pathname.startsWith("/assets/") && filePath !== dashboardIndex;
+      reply.header("Cache-Control", filePath === dashboardIndex ? "no-cache" : isHashedAsset ? "public, max-age=31536000, immutable" : "no-cache");
+      return reply.type(contentTypes[extension] ?? "application/octet-stream").send(readFileSync(filePath));
+    };
+    app.get("/", serveDashboard);
+    app.get("/*", serveDashboard);
+  }
   return app;
 }

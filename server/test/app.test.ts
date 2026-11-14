@@ -30,7 +30,7 @@ test("health endpoint reports the local server status", async () => {
     assert.equal(response.headers["x-content-type-options"], "nosniff");
     assert.deepEqual(response.json(), {
       status: "ok",
-      service: "veyra-server",
+      service: "ndiview-server",
       version: "0.1.0",
     });
   } finally {
@@ -89,6 +89,26 @@ test("first-run setup creates an operator and a session", async () => {
     });
     assert.equal(session.json().authenticated, true);
     assert.equal(session.json().operator.username, "admin");
+
+    const legacyCookie = String(cookie).split(";")[0].replace(/^ndiview_session=/, "veyra_session=");
+    const legacySession = await app.inject({
+      method: "GET",
+      url: "/api/v1/auth/session",
+      headers: { cookie: legacyCookie },
+    });
+    assert.equal(legacySession.json().authenticated, true);
+    const legacyLogout = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/auth/session",
+      headers: { cookie: legacyCookie },
+    });
+    assert.deepEqual(legacyLogout.json(), { authenticated: false });
+    const expiredLegacySession = await app.inject({
+      method: "GET",
+      url: "/api/v1/auth/session",
+      headers: { cookie: legacyCookie },
+    });
+    assert.equal(expiredLegacySession.json().authenticated, false);
   } finally {
     await app.close();
   }
@@ -301,7 +321,7 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
 
 
 test("operator assigns a receiver source and fallback playlist; receiver sync is scoped to assigned media", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-assignment-test-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-assignment-test-"));
   const app = buildApp({
     databasePath: ":memory:",
     setupKey: "test-setup-key",
@@ -332,7 +352,7 @@ test("operator assigns a receiver source and fallback playlist; receiver sync is
 
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
     const upload = await app.inject({ method: "POST", url: "/api/v1/media", headers: {
-      cookie, "content-type": "image/png", "x-veyra-filename": "Fallback.png",
+      cookie, "content-type": "image/png", "x-ndiview-filename": "Fallback.png",
     }, payload: png });
     const media = upload.json() as { id: string; sha256: string };
     const playlistResponse = await app.inject({ method: "POST", url: "/api/v1/playlists", headers: { cookie }, payload: { name: "Fallback" } });
@@ -387,7 +407,7 @@ test("operator assigns a receiver source and fallback playlist; receiver sync is
 });
 
 test("media library validates image signatures and protects playlist references", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-media-test-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-media-test-"));
   const app = buildApp({
     databasePath: ":memory:",
     setupKey: "test-setup-key",
@@ -423,7 +443,7 @@ test("media library validates image signatures and protects playlist references"
       headers: {
         cookie,
         "content-type": "image/png",
-        "x-veyra-filename": encodeURIComponent("../Lobby screen.png"),
+        "x-ndiview-filename": encodeURIComponent("../Lobby screen.png"),
       },
       payload: png,
     });
@@ -517,7 +537,7 @@ test("media library validates image signatures and protects playlist references"
 });
 
 test("backup command creates a consistent database and pairing-secret backup", () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-backup-test-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-backup-test-"));
   const databasePath = join(directory, "source.sqlite");
   const pairingSecretPath = join(directory, "pairing-secret");
   const backupDirectory = join(directory, "backups");
@@ -559,7 +579,7 @@ test("backup command creates a consistent database and pairing-secret backup", (
 
     const backupDatabase = openDatabase(join(backupDirectory, manifest.databaseFile));
     try {
-      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 6);
+      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 9);
     } finally {
       backupDatabase.close();
     }
@@ -581,8 +601,8 @@ test("backup command creates a consistent database and pairing-secret backup", (
 });
 
 test("invalid pairing secret fails startup without leaking the database handle", () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-invalid-secret-"));
-  const databasePath = join(directory, "veyra.sqlite");
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-invalid-secret-"));
+  const databasePath = join(directory, "ndiview.sqlite");
   const pairingSecretPath = join(directory, "pairing-secret");
 
   try {
@@ -600,8 +620,8 @@ test("invalid pairing secret fails startup without leaking the database handle",
 });
 
 test("pairing secret is generated with restrictive permissions and remains stable", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-pairing-secret-"));
-  const databasePath = join(directory, "veyra.sqlite");
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-pairing-secret-"));
+  const databasePath = join(directory, "ndiview.sqlite");
   const pairingSecretPath = join(directory, "pairing-secret");
 
   try {
@@ -629,9 +649,9 @@ test("pairing secret is generated with restrictive permissions and remains stabl
 });
 
 test("database files and containing directory are private", () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-private-db-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-private-db-"));
   const databaseDirectory = join(directory, "private-data");
-  const databasePath = join(databaseDirectory, "veyra.sqlite");
+  const databasePath = join(databaseDirectory, "ndiview.sqlite");
 
   try {
     const database = openDatabase(databasePath);
@@ -648,7 +668,7 @@ test("database files and containing directory are private", () => {
 
 test("database refuses shared system directories", () => {
   const temporaryDirectoryMode = statSync(tmpdir()).mode & 0o777;
-  assert.throws(() => openDatabase(join(tmpdir(), "veyra-unsafe.sqlite")));
+  assert.throws(() => openDatabase(join(tmpdir(), "ndiview-unsafe.sqlite")));
   assert.equal(statSync(tmpdir()).mode & 0o777, temporaryDirectoryMode);
 });
 
@@ -656,13 +676,13 @@ test("database initializes a versioned schema", () => {
   const database = openDatabase(":memory:");
 
   try {
-    assert.equal(database.pragma("user_version", { simple: true }), 6);
+    assert.equal(database.pragma("user_version", { simple: true }), 9);
     const tables = database.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     ).all() as Array<{ name: string }>;
     assert.deepEqual(
       tables.map((table) => table.name),
-      ["devices", "media_assets", "operators", "pairing_codes", "playlist_items", "playlists", "sessions"],
+      ["device_commands", "devices", "media_assets", "operators", "pairing_codes", "playlist_items", "playlists", "sessions"],
     );
   } finally {
     database.close();
@@ -671,8 +691,8 @@ test("database initializes a versioned schema", () => {
 
 
 test("database upgrades a populated version-one schema without losing devices", () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-migration-"));
-  const databasePath = join(directory, "veyra.sqlite");
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-migration-"));
+  const databasePath = join(directory, "ndiview.sqlite");
 
   try {
     const legacy = openDatabase(databasePath);
@@ -709,13 +729,13 @@ test("database upgrades a populated version-one schema without losing devices", 
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run("device-1", "Lobby", "token-hash", "linux-x86_64", "0.1.0",
       "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
-    legacy.exec("DROP TABLE playlist_items; DROP TABLE playlists; DROP TABLE media_assets;");
+    legacy.exec("DROP TABLE playlist_items; DROP TABLE playlists; DROP TABLE media_assets; DROP TABLE IF EXISTS device_commands;");
     legacy.pragma("user_version = 1");
     legacy.close();
 
     const migrated = openDatabase(databasePath);
     try {
-      assert.equal(migrated.pragma("user_version", { simple: true }), 6);
+      assert.equal(migrated.pragma("user_version", { simple: true }), 9);
       const device = migrated.prepare(
         "SELECT id, name, credential_revoked_at, discovered_sources_json FROM devices WHERE id = ?",
       ).get("device-1") as { id: string; name: string; credential_revoked_at: string | null; discovered_sources_json: string };
@@ -727,6 +747,78 @@ test("database upgrades a populated version-one schema without losing devices", 
       });
       const operatorCount = migrated.prepare("SELECT COUNT(*) AS count FROM operators").get() as { count: number };
       assert.equal(operatorCount.count, 1);
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("database upgrades a version-seven command table while preserving its indexes", () => {
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-v7-migration-"));
+  const databasePath = join(directory, "ndiview.sqlite");
+  try {
+    const legacy = openDatabase(databasePath);
+    legacy.prepare(
+      "INSERT INTO operators (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+    ).run("migration-operator", "migration-admin", "test-hash", "2026-01-01T00:00:00.000Z");
+    legacy.prepare(`
+      INSERT INTO devices (id, name, device_token_hash, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run("migration-device", "Migration receiver", "migration-token",
+      "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
+    legacy.exec(`
+      DROP TABLE device_commands;
+      CREATE TABLE device_commands (
+        id TEXT PRIMARY KEY,
+        device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+        command_type TEXT NOT NULL CHECK (command_type IN ('restart')),
+        status TEXT NOT NULL CHECK (status IN ('queued', 'claimed', 'restarting', 'completed', 'failed', 'timed_out')),
+        requested_by TEXT NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+        created_at TEXT NOT NULL, expires_at TEXT NOT NULL, claimed_at TEXT, completed_at TEXT, result_message TEXT
+      );
+      CREATE INDEX device_commands_device_created_idx ON device_commands(device_id, created_at DESC);
+      CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
+    `);
+    legacy.prepare(`
+      INSERT INTO device_commands (
+        id, device_id, command_type, status, requested_by, created_at, expires_at
+      ) VALUES (?, ?, 'restart', 'completed', ?, ?, ?)
+    `).run("legacy-restart", "migration-device", "migration-operator",
+      "2026-01-01T00:00:00.000Z", "2026-01-01T00:01:00.000Z");
+    legacy.exec("ALTER TABLE devices DROP COLUMN device_uptime_seconds");
+    legacy.pragma("user_version = 7");
+    legacy.close();
+
+    const migrated = openDatabase(databasePath);
+    try {
+      assert.equal(migrated.pragma("user_version", { simple: true }), 9);
+      const indexes = migrated.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('device_commands_device_created_idx', 'device_commands_pending_idx') ORDER BY name",
+      ).all() as Array<{ name: string }>;
+      assert.deepEqual(indexes.map((item) => item.name), [
+        "device_commands_device_created_idx",
+        "device_commands_pending_idx",
+      ]);
+      const preserved = migrated.prepare(
+        "SELECT id, command_type, status FROM device_commands WHERE id = ?",
+      ).get("legacy-restart") as { id: string; command_type: string; status: string };
+      assert.deepEqual(preserved, {
+        id: "legacy-restart",
+        command_type: "restart",
+        status: "completed",
+      });
+      migrated.prepare(`
+        INSERT INTO device_commands (
+          id, device_id, command_type, status, requested_by, created_at, expires_at
+        ) VALUES ('new-reboot', 'migration-device', 'reboot', 'queued', 'migration-operator', 'now', 'later')
+      `).run();
+      assert.throws(() => migrated.prepare(`
+        INSERT INTO device_commands (
+          id, device_id, command_type, status, requested_by, created_at, expires_at
+        ) VALUES ('invalid', 'missing-device', 'invalid-action', 'queued', 'missing-operator', 'now', 'later')
+      `).run());
     } finally {
       migrated.close();
     }
@@ -766,5 +858,194 @@ test("secure cookie policy can be enforced by the HTTPS deployment", async () =>
     assert.match(String(login.headers["set-cookie"]), /; Secure/i);
   } finally {
     await app.close();
+  }
+});
+
+test("operator can queue receiver restart and full-device reboot separately", async () => {
+  const app = createTestApp();
+  try {
+    const setup = await app.inject({ method: "POST", url: "/api/v1/setup", payload: { setupKey: "test-setup-key", username: "admin", password: "a-very-long-test-password" } });
+    const cookie = String(setup.headers["set-cookie"]).split(";")[0];
+    const code = await app.inject({ method: "POST", url: "/api/v1/devices/pairing-codes", headers: { cookie } });
+    const paired = await app.inject({ method: "POST", url: "/api/v1/receiver/pair", payload: { code: code.json().code, deviceName: "Restart test", platform: "linux-x86_64", version: "0.1.0" } });
+    const credentials = paired.json() as { deviceId: string; deviceToken: string };
+    const auth = { authorization: "Bearer " + credentials.deviceToken };
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 10, deviceUptimeSeconds: 1000, playbackMode: "ndi" } });
+    const unauthorized = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart" });
+    assert.equal(unauthorized.statusCode, 401);
+    const requested = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart", headers: { cookie } });
+    assert.equal(requested.statusCode, 201);
+    assert.equal(requested.json().status, "queued");
+    const poll = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/poll", headers: auth, payload: {} });
+    assert.equal(poll.statusCode, 200);
+    assert.equal(poll.json().command.type, "restart");
+    const conflictingReboot = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/reboot", headers: { cookie } });
+    assert.equal(conflictingReboot.statusCode, 409);
+    const duplicatePoll = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/poll", headers: auth, payload: {} });
+    assert.equal(duplicatePoll.json().command, null);
+    const commandId = poll.json().command.id as string;
+    const status = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/" + commandId + "/status", headers: auth, payload: { status: "restarting" } });
+    assert.equal(status.statusCode, 200);
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 11, deviceUptimeSeconds: 1010, playbackMode: "ndi" } });
+    const beforeRestart = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
+    assert.equal(beforeRestart.json().devices[0].restartCommand.status, "restarting");
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 2, deviceUptimeSeconds: 1011, playbackMode: "ndi" } });
+    const afterRestart = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
+    assert.equal(afterRestart.json().devices[0].restartCommand.status, "completed");
+    assert.equal(afterRestart.json().devices[0].deviceUptimeSeconds, 1011);
+    const rebootRequested = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/reboot", headers: { cookie } });
+    assert.equal(rebootRequested.statusCode, 201);
+    const rebootPoll = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/poll", headers: auth, payload: {} });
+    assert.equal(rebootPoll.json().command.type, "reboot");
+    const rebootCommandId = rebootPoll.json().command.id as string;
+    const rebootStatus = await app.inject({ method: "POST", url: "/api/v1/receiver/commands/" + rebootCommandId + "/status", headers: auth, payload: { status: "restarting" } });
+    assert.equal(rebootStatus.statusCode, 200);
+    await app.inject({ method: "POST", url: "/api/v1/receiver/heartbeat", headers: auth, payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 1, deviceUptimeSeconds: 1, playbackMode: "ndi" } });
+    const devices = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
+    assert.equal(devices.json().devices[0].rebootCommand.status, "completed");
+    assert.equal(devices.json().devices[0].deviceUptimeSeconds, 1);
+    const cooldown = await app.inject({ method: "POST", url: "/api/v1/devices/" + credentials.deviceId + "/restart", headers: { cookie } });
+    assert.equal(cooldown.statusCode, 429);
+  } finally {
+    await app.close();
+  }
+});
+
+test("receiver action timeout uses claim time even when the receiver keeps heartbeating", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-command-timeout-"));
+  const databasePath = join(directory, "ndiview.sqlite");
+  let app = buildApp({
+    databasePath,
+    setupKey: "test-setup-key",
+    pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
+  });
+
+  try {
+    const setup = await app.inject({
+      method: "POST",
+      url: "/api/v1/setup",
+      payload: { setupKey: "test-setup-key", username: "admin", password: "a-very-long-test-password" },
+    });
+    const cookie = String(setup.headers["set-cookie"]).split(";")[0];
+    const pairing = await app.inject({
+      method: "POST",
+      url: "/api/v1/devices/pairing-codes",
+      headers: { cookie },
+    });
+    const paired = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/pair",
+      payload: {
+        code: pairing.json().code,
+        deviceName: "Timeout test receiver",
+        platform: "linux-x86_64",
+        version: "0.1.0",
+      },
+    });
+    const credentials = paired.json() as { deviceId: string; deviceToken: string };
+    const auth = { authorization: "Bearer " + credentials.deviceToken };
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/heartbeat",
+      headers: auth,
+      payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 10, deviceUptimeSeconds: 1000 },
+    });
+
+    const requested = await app.inject({
+      method: "POST",
+      url: "/api/v1/devices/" + credentials.deviceId + "/restart",
+      headers: { cookie },
+    });
+    assert.equal(requested.statusCode, 201);
+    const commandId = requested.json().id as string;
+    const claimed = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/commands/poll",
+      headers: auth,
+      payload: {},
+    });
+    assert.equal(claimed.json().command.id, commandId);
+    const restarting = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/commands/" + commandId + "/status",
+      headers: auth,
+      payload: { status: "restarting" },
+    });
+    assert.equal(restarting.statusCode, 200);
+
+    await app.close();
+    const database = openDatabase(databasePath);
+    try {
+      database.prepare("UPDATE device_commands SET expires_at = ? WHERE id = ?")
+        .run(new Date(Date.now() - 1_000).toISOString(), commandId);
+    } finally {
+      database.close();
+    }
+
+    app = buildApp({
+      databasePath,
+      setupKey: "test-setup-key",
+      pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
+    });
+    const overlappingRequest = await app.inject({
+      method: "POST",
+      url: "/api/v1/devices/" + credentials.deviceId + "/reboot",
+      headers: { cookie },
+    });
+    assert.equal(overlappingRequest.statusCode, 409);
+
+    await app.close();
+    const timeoutDatabase = openDatabase(databasePath);
+    try {
+      const old = new Date(Date.now() - 240_000).toISOString();
+      timeoutDatabase.prepare("UPDATE device_commands SET created_at = ?, claimed_at = ? WHERE id = ?")
+        .run(old, old, commandId);
+      timeoutDatabase.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?")
+        .run(new Date().toISOString(), credentials.deviceId);
+    } finally {
+      timeoutDatabase.close();
+    }
+
+    app = buildApp({
+      databasePath,
+      setupKey: "test-setup-key",
+      pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
+    });
+    const devices = await app.inject({
+      method: "GET",
+      url: "/api/v1/devices",
+      headers: { cookie },
+    });
+    assert.equal(devices.json().devices[0].restartCommand.status, "timed_out");
+    assert.match(devices.json().devices[0].restartCommand.message, /did not confirm/i);
+  } finally {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("production dashboard assets are served with safe cache headers and SPA fallback", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-dashboard-test-"));
+  mkdirSync(join(directory, "assets"), { recursive: true });
+  writeFileSync(join(directory, "index.html"), "<!doctype html><title>NDIView</title>");
+  writeFileSync(join(directory, "assets", "app-a1b2c3.js"), "console.log(1)");
+  const app = buildApp({ databasePath: ":memory:", setupKey: "test-setup-key", pairingSecret: "test-pairing-secret-with-at-least-32-bytes", dashboardDirectory: directory });
+  try {
+    const index = await app.inject({ method: "GET", url: "/" });
+    assert.equal(index.statusCode, 200);
+    assert.match(String(index.headers["content-type"]), /text\/html/);
+    assert.equal(index.headers["cache-control"], "no-cache");
+    const route = await app.inject({ method: "GET", url: "/devices" });
+    assert.equal(route.statusCode, 200);
+    assert.match(route.body, /NDIView/);
+    const asset = await app.inject({ method: "GET", url: "/assets/app-a1b2c3.js" });
+    assert.equal(asset.statusCode, 200);
+    assert.equal(asset.headers["cache-control"], "public, max-age=31536000, immutable");
+    const missingApi = await app.inject({ method: "GET", url: "/api/v1/not-a-route" });
+    assert.equal(missingApi.statusCode, 404);
+    assert.equal(missingApi.headers["cache-control"], "no-store");
+  } finally {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
   }
 });

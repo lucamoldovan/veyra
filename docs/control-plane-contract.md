@@ -1,14 +1,14 @@
-# Veyra control-plane contract (draft)
+# NDIView control-plane contract (draft)
 
-This document defines the intended communication contract for the Veyra local server, dashboard, and receiver agents. The operator setup/session routes, device inventory, receiver pairing, heartbeat endpoints, per-device assignments, receiver configuration polling, assigned-media manifests, and media downloads listed as implemented below exist today. Remote commands, WebSocket messages, and detailed health workflows remain design targets. Treat this as an evolving contract and keep it aligned with tested implementation.
+This document defines the intended communication contract for the NDIView local server, dashboard, and receiver agents. The operator setup/session routes, device inventory, receiver pairing, heartbeat endpoints, per-device assignments, receiver configuration polling, assigned-media manifests, and media downloads listed as implemented below exist today. Receiver restart and full-device reboot commands are implemented; WebSocket messages and detailed health workflows remain design targets. Treat this as an evolving contract and keep it aligned with tested implementation.
 
 ## Design principles
 
 1. The server is the authority for shared device assignments, media, playlists, and operator accounts. Receivers poll versioned configuration and media manifests, and activate only fully downloaded, SHA-256-verified cache snapshots.
 2. A receiver is authoritative for what is actually happening on its own display.
 3. A receiver must keep playing without an active server connection.
-4. NDI discovery and video transport are independent of the Veyra management channel.
-5. Every command has an ID, expiry, acknowledgement, and final outcome.
+4. NDI discovery and video transport are independent of the NDIView management channel.
+5. Every command has an ID, expiry, acknowledgement, and final outcome. Receiver restarts are confirmed by a reset process uptime; full-device reboots are confirmed separately by a reset system uptime.
 6. Every configuration and media manifest has a version.
 7. A failed or partial update must never overwrite the last known-good local state.
 8. Device credentials are separate from human operator sessions.
@@ -16,10 +16,10 @@ This document defines the intended communication contract for the Veyra local se
 ## Connection model
 
 - Dashboard uses authenticated HTTP requests for management operations.
-- Dashboard subscribes to a server WebSocket for live device state and operation updates.
+- Dashboard currently polls authenticated HTTP endpoints for device state; WebSocket subscriptions remain planned.
 - Receivers establish an outbound connection to the local server. The server should not need to initiate arbitrary inbound connections to receiver machines.
 - Receivers send periodic heartbeats and playback reports.
-- The server sends commands and version notifications over the receiver's persistent channel. Receivers acknowledge commands and report completion or failure.
+- The server queues allowlisted commands. Receivers poll the authenticated command endpoint and acknowledge a claimed command. A restart is marked complete only when process uptime resets; a reboot is marked complete only when system uptime resets.
 - If a persistent connection drops, the receiver retries with bounded exponential backoff and continues local playback.
 
 ## API versioning
@@ -44,6 +44,8 @@ Implemented endpoints:
 | POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |
 | POST | `/api/v1/devices/{deviceId}/revoke` | Revoke a receiver credential (authenticated operator only) |
 | DELETE | `/api/v1/devices/{deviceId}` | Remove a receiver record after its credential has been revoked (authenticated operator only) |
+| POST | `/api/v1/devices/{deviceId}/restart` | Queue an application-only NDIView receiver restart (authenticated operator only) |
+| POST | `/api/v1/devices/{deviceId}/reboot` | Queue a full-device reboot (authenticated operator only) |
 | GET | `/api/v1/sources` | List NDI sources reported by active receivers (authenticated operator only) |
 | GET | `/api/v1/media` | List local media assets (authenticated operator only) |
 | POST | `/api/v1/media` | Upload a PNG, JPEG, or WebP image (authenticated operator only) |
@@ -55,6 +57,13 @@ Implemented endpoints:
 | PUT | `/api/v1/playlists/{playlistId}` | Replace a playlist and its ordered items (authenticated operator only) |
 | DELETE | `/api/v1/playlists/{playlistId}` | Delete a playlist (authenticated operator only) |
 
+Receiver command endpoints:
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/api/v1/receiver/commands/poll` | Claim one queued command for the authenticated receiver |
+| POST | `/api/v1/receiver/commands/{commandId}/status` | Acknowledge a command or report failure; completion is confirmed by a later heartbeat |
+
 Remaining planned management endpoints:
 
 | Method | Route | Purpose |
@@ -65,15 +74,12 @@ Remaining planned management endpoints:
 | GET | `/api/v1/system/health` | Read detailed local server health |
 | GET | `/api/v1/devices/{deviceId}/logs` | Read retained receiver diagnostics |
 
-The dashboard must not have a route that accepts arbitrary shell commands. Remote actions are a fixed allowlist, initially:
+The dashboard must not have a route that accepts arbitrary shell commands. Remote actions are a fixed allowlist. Implemented actions:
 
-- `set_ndi_source`
-- `set_fallback_playlist`
-- `request_config_sync`
-- `request_media_sync`
-- `restart_receiver`
+- `restart` — restart the NDIView receiver process only
+- `reboot` — reboot the full Debian device
 
-A machine reboot command is intentionally not part of the initial allowlist.
+The implemented actions are `restart` (restart only the NDIView receiver application) and `reboot` (reboot the entire Debian device). The server distinguishes their completion using process uptime versus OS uptime; arbitrary shell commands are never accepted.
 
 ## Receiver enrollment and identity
 
@@ -97,7 +103,7 @@ Implemented endpoints:
 | Method | Route | Purpose |
 |---|---|---|
 | POST | `/api/v1/receiver/pair` | Exchange a one-time pairing code for a device ID and device credential |
-| POST | `/api/v1/receiver/heartbeat` | Submit a bearer-authenticated heartbeat, current playback state, and optional discovered NDI source snapshot |
+| POST | `/api/v1/receiver/heartbeat` | Submit a bearer-authenticated heartbeat, process uptime, system uptime, playback state, and optional discovered NDI source snapshot |
 | GET | `/api/v1/receiver/config` | Retrieve the versioned NDI source and fallback playlist assignment |
 | GET | `/api/v1/receiver/media-manifest` | Retrieve ordered image metadata for the assigned fallback playlist |
 | GET | `/api/v1/receiver/media/{mediaId}` | Download an image only when it belongs to the receiver's assigned fallback playlist |
@@ -107,7 +113,6 @@ Planned endpoints:
 | Method | Route | Purpose |
 |---|---|---|
 | POST | `/api/v1/receiver/playback` | Report playback/source/fallback transitions |
-| POST | `/api/v1/receiver/commands/{commandId}/ack` | Acknowledge a received command and report its result |
 
 The pairing endpoint accepts a short-lived, single-use 12-digit code. The receiver receives its device credential once; the server stores only its HMAC-SHA-256 verifier for pairing codes; the HMAC key is stored separately in a restrictive local file. Heartbeats use the device credential as a bearer token. The C++ receiver client implements one-time pairing, TLS-verified bearer heartbeats, source snapshots, bounded retry/backoff, owner-only credential storage, versioned config and manifest polling, SHA-256-verified media downloads, persistent local cache, and image fallback. Media synchronization runs independently of heartbeat reporting, is cancellable during shutdown, and accepts at most 512 MiB of assigned playlist assets. A failed download does not replace the active manifest; a regression test exercises this rollback path. Corrupted cached files are rejected by SHA-256 verification and can be downloaded again. A new cache snapshot becomes active only after all listed assets are downloaded and verified; the previous snapshot is retained during the transition and obsolete cache files are pruned after a subsequent successful synchronization. It is compiled independently of the NDI SDK in CI; the complete native player still requires an official NDI SDK build and hardware validation.
 
@@ -204,4 +209,4 @@ The following still need a technical decision record or implementation:
 5. Playlist behavior when an item is missing, corrupted, or cannot be decoded.
 6. Production CA provisioning and certificate renewal for multi-receiver deployments.
 
-The SQLite migration mechanism (schema v6), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, verified local cache, and timed image fallback are implemented. Remote commands and WebSocket events remain in progress. The complete player still needs an official NDI SDK build and target-hardware validation.
+The SQLite migration mechanism (schema v9), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, verified local cache, and timed image fallback are implemented. Receiver restart and device reboot commands are implemented; WebSocket events remain in progress. The complete player still needs an official NDI SDK build and target-hardware validation.

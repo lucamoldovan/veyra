@@ -116,6 +116,7 @@ export interface Device {
   playbackMode: string;
   ndiSourceName: string | null;
   uptimeSeconds: number | null;
+  deviceUptimeSeconds: number | null;
   createdAt: string;
   credentialRevokedAt: string | null;
   credentialStatus: "active" | "revoked";
@@ -123,6 +124,15 @@ export interface Device {
   assignedNdiSourceName: string | null;
   assignedNdiSourceAddress: string | null;
   fallbackPlaylistId: string | null;
+  restartCommand: DeviceCommand | null;
+  rebootCommand: DeviceCommand | null;
+}
+
+export interface DeviceCommand {
+  id: string;
+  status: "queued" | "claimed" | "restarting" | "completed" | "failed" | "timed_out";
+  createdAt: string;
+  message: string | null;
 }
 
 export interface PairingCode {
@@ -138,6 +148,10 @@ export function createDevicePairingCode(): Promise<PairingCode> {
   return request<PairingCode>("/api/v1/devices/pairing-codes", {
     method: "POST",
   });
+}
+
+export function requestDeviceAction(deviceId: string, action: "restart" | "reboot"): Promise<{ id: string; status: "queued"; createdAt: string; expiresAt: string }> {
+  return request(`/api/v1/devices/${encodeURIComponent(deviceId)}/${action}`, { method: "POST" });
 }
 
 export function revokeDeviceCredential(deviceId: string): Promise<{ revoked: true }> {
@@ -171,7 +185,7 @@ export async function uploadMedia(file: File): Promise<MediaAsset> {
     method: "POST",
     headers: {
       "Content-Type": file.type,
-      "X-Veyra-Filename": encodeURIComponent(file.name),
+      "X-NDIView-Filename": encodeURIComponent(file.name),
       Accept: "application/json",
     },
     body: file,

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace veyra::video {
+namespace ndiview::video {
 
 enum class PixelFormat {
     UYVY,
@@ -18,4 +18,4 @@ struct VideoFrame {
     std::vector<std::uint8_t> pixels;
 };
 
-}  // namespace veyra::video
+}  // namespace ndiview::video

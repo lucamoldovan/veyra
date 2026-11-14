@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace veyra::ndi {
+namespace ndiview::ndi {
 
 struct Source {
     std::string name;
@@ -34,4 +34,4 @@ private:
     NDIlib_find_instance_t instance_{nullptr};
 };
 
-}  // namespace veyra::ndi
+}  // namespace ndiview::ndi
