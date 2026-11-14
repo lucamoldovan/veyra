@@ -1155,6 +1155,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         discoveredSourcesJson = JSON.stringify(discoveredSources);
       }
       const now = new Date().toISOString();
+      const previous = database.prepare("SELECT uptime_seconds FROM devices WHERE id = ?").get(device.id) as { uptime_seconds: number | null } | undefined;
 
       database.prepare(`
         UPDATE devices
@@ -1163,7 +1164,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             discovered_sources_json = COALESCE(?, discovered_sources_json), updated_at = ?
         WHERE id = ?
       `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, discoveredSourcesJson, now, device.id);
-      database.prepare("UPDATE device_commands SET status='completed', completed_at=?, result_message='Receiver reconnected after restart' WHERE device_id=? AND status='restarting'").run(now,device.id);
+
+      // A heartbeat alone does not prove that a requested restart happened: the
+      // old process can still heartbeat after an asynchronous systemd request.
+      // The receiver's process-relative uptime must reset before we complete it.
+      if (previous?.uptime_seconds !== null && previous?.uptime_seconds !== undefined &&
+          uptimeSeconds !== null && uptimeSeconds < previous.uptime_seconds) {
+        database.prepare("UPDATE device_commands SET status='completed', completed_at=?, result_message='Receiver restarted and reported a fresh uptime counter' WHERE device_id=? AND status='restarting'").run(now, device.id);
+      }
 
       return { accepted: true, serverTime: now };
     },
