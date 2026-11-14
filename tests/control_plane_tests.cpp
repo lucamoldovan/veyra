@@ -107,7 +107,7 @@ int main() {
     const std::string token(43, 't');
 
     std::thread mockServer([&] {
-        for (int index = 0; index < 5; ++index) {
+        for (int index = 0; index < 8; ++index) {
             pollfd descriptor{listener, POLLIN, 0};
             if (::poll(&descriptor, 1, 7000) <= 0) {
                 serverFailed = true;
@@ -130,8 +130,8 @@ int main() {
             const std::string assetHash = "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
             std::string responseBody;
             std::string contentType = "application/json";
-            const int status = index == 0 ? 201 : 200;
-            const std::string reason = index == 0 ? "Created" : "OK";
+            const int status = index == 0 ? 201 : index == 7 ? 404 : 200;
+            const std::string reason = index == 0 ? "Created" : index == 7 ? "Not Found" : "OK";
             if (index == 0) {
                 responseBody = "{\"deviceId\":\"device-test\",\"deviceToken\":\"" + token +
                     "\",\"heartbeatIntervalSeconds\":5}";
@@ -141,9 +141,15 @@ int main() {
                 responseBody = "{\"schemaVersion\":1,\"configVersion\":2,\"ndi\":{\"sourceName\":\"Camera 1\",\"sourceAddress\":\"ndi://camera-1.local\"},\"fallbackPlaylistId\":\"fallback-1\"}";
             } else if (index == 3) {
                 responseBody = "{\"schemaVersion\":1,\"configVersion\":2,\"playlistId\":\"fallback-1\",\"playlistRevision\":3,\"items\":[{\"mediaId\":\"media-1\",\"position\":0,\"durationSeconds\":12,\"mimeType\":\"image/png\",\"sizeBytes\":16,\"sha256\":\"" + assetHash + "\",\"downloadPath\":\"/api/v1/receiver/media/media-1\"}]}";
-            } else {
+            } else if (index == 4) {
                 responseBody = asset;
                 contentType = "image/png";
+            } else if (index == 5) {
+                responseBody = "{\"schemaVersion\":1,\"configVersion\":3,\"ndi\":{\"sourceName\":\"Camera 2\",\"sourceAddress\":\"ndi://camera-2.local\"},\"fallbackPlaylistId\":\"fallback-1\"}";
+            } else if (index == 6) {
+                responseBody = "{\"schemaVersion\":1,\"configVersion\":3,\"playlistId\":\"fallback-1\",\"playlistRevision\":4,\"items\":[{\"mediaId\":\"media-2\",\"position\":0,\"durationSeconds\":20,\"mimeType\":\"image/png\",\"sizeBytes\":16,\"sha256\":\"260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159\",\"downloadPath\":\"/api/v1/receiver/media/media-2\"}]}";
+            } else {
+                responseBody = "{\"error\":\"Assigned media item not found\"}";
             }
             const std::string response =
                 "HTTP/1.1 " + std::to_string(status) + " " + reason + "\r\n" +
@@ -168,7 +174,7 @@ int main() {
         config.deviceName = "Test Display";
         config.pairingCode = "123456789012";
         config.credentialPath = credentialPath;
-        config.heartbeatIntervalSeconds = 5;
+        config.heartbeatIntervalSeconds = 120;
         config.syncIntervalSeconds = 5;
         config.cachePath = temporaryRoot / "cache";
 
@@ -183,8 +189,8 @@ int main() {
 
         {
             std::unique_lock lock(requestsMutex);
-            requestsChanged.wait_for(lock, std::chrono::seconds(8), [&] {
-                return requests.size() >= 5 || serverFailed;
+            requestsChanged.wait_for(lock, std::chrono::seconds(15), [&] {
+                return requests.size() >= 8 || serverFailed;
             });
         }
 
@@ -220,7 +226,16 @@ int main() {
             requests[3].find("GET /api/v1/receiver/media-manifest ") != std::string::npos;
         const bool assetRequestOk = requests.size() >= 5 &&
             requests[4].find("GET /api/v1/receiver/media/media-1 ") != std::string::npos;
+        const bool failedUpdateAttempted = requests.size() >= 8 &&
+            requests[5].find("GET /api/v1/receiver/config ") != std::string::npos &&
+            requests[6].find("GET /api/v1/receiver/media-manifest ") != std::string::npos &&
+            requests[7].find("GET /api/v1/receiver/media/media-2 ") != std::string::npos;
         const auto synced = client.syncSnapshot();
+        std::ifstream stateInput(config.cachePath / "state.json");
+        const std::string persistedState((std::istreambuf_iterator<char>(stateInput)), {});
+        const bool previousSnapshotPreserved = synced.configVersion == 2 &&
+            synced.fallbackItems.size() == 1 &&
+            persistedState.find("\"configVersion\": 2") != std::string::npos;
         const auto reloaded = veyra::control_plane::ReceiverSync(config).loadCached();
         bool cachedAssetOk = false;
         bool cachePermissionsOk = false;
@@ -256,6 +271,7 @@ int main() {
 
         success = !serverFailed && pairRequestOk && heartbeatRequestOk &&
             configRequestOk && manifestRequestOk && assetRequestOk && cachedAssetOk &&
+            failedUpdateAttempted && previousSnapshotPreserved &&
             corruptCacheRejected && cachePermissionsOk &&
             storedToken == token && fileModeOk && directoryModeOk;
     }
