@@ -1,10 +1,22 @@
 import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
 import type { VeyraDatabase } from "./database.js";
 
-const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+function deriveKey(password: string, salt: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scryptCallback(password, salt, KEY_LENGTH, {
+      N: 16_384,
+      r: 8,
+      p: 1,
+      maxmem: 64 * 1024 * 1024,
+    }, (error, derivedKey) => {
+      if (error) reject(error);
+      else resolve(derivedKey);
+    });
+  });
+}
 
 export interface Operator {
   id: string;
@@ -17,12 +29,7 @@ export function hashSessionToken(token: string): string {
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
-  const derivedKey = (await scrypt(password, salt, KEY_LENGTH, {
-    N: 16_384,
-    r: 8,
-    p: 1,
-    maxmem: 64 * 1024 * 1024,
-  })) as Buffer;
+  const derivedKey = await deriveKey(password, salt);
 
   return `scrypt$16384$8$1$${salt.toString("hex")}$${derivedKey.toString("hex")}`;
 }
@@ -38,12 +45,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   const expected = Buffer.from(hashHex, "hex");
   if (salt.length !== 16 || expected.length !== KEY_LENGTH) return false;
 
-  const actual = (await scrypt(password, salt, KEY_LENGTH, {
-    N: 16_384,
-    r: 8,
-    p: 1,
-    maxmem: 64 * 1024 * 1024,
-  })) as Buffer;
+  const actual = await deriveKey(password, salt);
 
   return timingSafeEqual(actual, expected);
 }
