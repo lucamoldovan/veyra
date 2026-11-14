@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 export type VeyraDatabase = Database.Database;
 
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite"): VeyraDatabase {
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
@@ -135,6 +135,18 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
       `);
       database.pragma("user_version = 4");
     }
+    if (currentVersion < 5) {
+      database.exec(`
+        ALTER TABLE devices ADD COLUMN config_version INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE devices ADD COLUMN assigned_ndi_source_name TEXT;
+        ALTER TABLE devices ADD COLUMN assigned_ndi_source_address TEXT;
+        ALTER TABLE devices ADD COLUMN fallback_playlist_id TEXT REFERENCES playlists(id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS devices_fallback_playlist_id_idx
+          ON devices(fallback_playlist_id);
+      `);
+      database.pragma("user_version = 5");
+    }
+
   });
 
   try {
