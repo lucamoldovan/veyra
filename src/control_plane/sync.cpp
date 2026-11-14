@@ -13,6 +13,7 @@
 #include <iterator>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <unordered_set>
@@ -325,11 +326,15 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     // observed the new snapshot. A later successful sync prunes that old set.
     std::unordered_set<std::string> retainedFiles = previousFiles;
     for (const auto& item : snapshot.fallbackItems) retainedFiles.insert(item.path.filename().string());
-    for (const auto& entry : std::filesystem::directory_iterator(mediaRoot)) {
-        if (!retainedFiles.contains(entry.path().filename().string())) {
+    std::error_code iterationError;
+    std::filesystem::directory_iterator entry(mediaRoot, iterationError);
+    const std::filesystem::directory_iterator end;
+    while (!iterationError && entry != end) {
+        if (!retainedFiles.contains(entry->path().filename().string())) {
             std::error_code ignored;
-            std::filesystem::remove(entry.path(), ignored);
+            std::filesystem::remove(entry->path(), ignored);
         }
+        entry.increment(iterationError);
     }
     return snapshot;
 }
