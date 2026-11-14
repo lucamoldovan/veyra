@@ -18,9 +18,19 @@ struct DisplayConfig {
     bool vsync{true};
 };
 
+struct ControlPlaneConfig {
+    std::string serverUrl;
+    std::string deviceName{"Veyra Receiver"};
+    std::string pairingCode;
+    std::filesystem::path caCertificatePath;
+    std::filesystem::path credentialPath;
+    int heartbeatIntervalSeconds{15};
+};
+
 struct AppConfig {
     NdiConfig ndi;
     DisplayConfig display;
+    ControlPlaneConfig controlPlane;
 };
 
 [[nodiscard]] AppConfig load(const std::filesystem::path& path);
