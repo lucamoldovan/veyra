@@ -182,7 +182,6 @@ function App() {
             >
               <Icon size={18} strokeWidth={1.8} />
               <span>{label}</span>
-              {id === "devices" && <span className="nav-count">0</span>}
             </button>
           ))}
         </nav>
