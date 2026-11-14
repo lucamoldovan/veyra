@@ -113,7 +113,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 
 ## Phase 8 — Integration and deployment
 
-- [x] Add a target Mac mini build and validation checklist\n- [x] Add secure SQLite and pairing-secret backup utility with restore instructions
+- [x] Add a target Mac mini build and validation checklist
+- [x] Add secure SQLite and pairing-secret backup utility with restore instructions
 - [ ] Build a repeatable local development environment
 - [ ] Package the server and dashboard for local-network deployment
 - [ ] Package and install the receiver as a managed service
