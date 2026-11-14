@@ -49,19 +49,20 @@ function App() {
 
     const checkHealth = async () => {
       controller?.abort();
-      controller = new AbortController();
+      const currentController = new AbortController();
+      controller = currentController;
 
       try {
-        const result = await getServerHealth(controller.signal);
+        const result = await getServerHealth(currentController.signal);
         if (!active) return;
         setHealth(result);
         setConnection("online");
       } catch {
-        if (!active || controller.signal.aborted) return;
+        if (!active || currentController.signal.aborted) return;
         setHealth(null);
         setConnection("offline");
       } finally {
-        if (active) setLastChecked(new Date());
+        if (active && !currentController.signal.aborted) setLastChecked(new Date());
       }
     };
 
