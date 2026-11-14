@@ -79,7 +79,7 @@ Supported version-1 configuration:
 }
 ```
 
-The display dimensions configure the window when it is not fullscreen. Fullscreen desktop mode uses the display's current desktop resolution. targetFps is validated and reserved for frame pacing; current playback is paced by incoming NDI frames and renderer vsync.
+The display dimensions configure the window when it is not fullscreen. Fullscreen desktop mode uses the display's current desktop resolution. targetFps caps the presentation cadence; when frames arrive faster than the configured rate, the latest-frame slot replaces older pending frames.
 
 ## Target environment
 
