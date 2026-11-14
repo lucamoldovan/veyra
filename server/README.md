@@ -61,8 +61,11 @@ To restore, stop the NDIView server first, then restore the database file to `ND
 | `NDIVIEW_TLS_CERT_PATH` | unset | PEM certificate path; required with the private key for non-loopback binds |
 | `NDIVIEW_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
 | `NDIVIEW_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
+| `NDIVIEW_DASHBOARD_DIRECTORY` | `../dashboard/dist` | Production dashboard asset directory, relative to the server working directory |
 
-| `NDIVIEW_DASHBOARD_DIRECTORY` | `../dashboard/dist` | Production dashboard asset directory, relative to the server working directory |\n\nNew deployments should use the `NDIVIEW_*` variable names shown above. Previous `VEYRA_*` names remain accepted as compatibility aliases.\n\nThe service binds to loopback by default. The SQLite database must live in a dedicated directory (not a shared system directory); NDIView restricts that directory to owner access and the database file to owner read/write. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
+New deployments should use the `NDIVIEW_*` variable names shown above. Previous `VEYRA_*` names remain accepted as compatibility aliases.
+
+The service binds to loopback by default. The SQLite database must live in a dedicated directory (not a shared system directory); NDIView restricts that directory to owner access and the database file to owner read/write. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
 
 ## Current scope
 
