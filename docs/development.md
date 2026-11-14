@@ -72,7 +72,9 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Implement versioned configuration distribution
 - [ ] Implement live WebSocket events and narrowly scoped remote commands
 - [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, and credential revocation
-- [x] Add a populated legacy database migration test\n- [x] Add credential revocation and safe removal API tests\n- [ ] Add broader API contract and abuse-case tests
+- [x] Add a populated legacy database migration test
+- [x] Add credential revocation and safe removal API tests
+- [ ] Add broader API contract and abuse-case tests
 
 ## Phase 6 — Dashboard
 
@@ -83,7 +85,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add dashboard TypeScript and production build to GitHub Actions
 - [x] Create shared API types and client helpers
 - [x] Implement first-run setup, login, session persistence, and logout
-- [x] Implement protected device inventory with 15-second refresh and live status\n- [x] Add receiver credential status, revocation, and removal controls
+- [x] Implement protected device inventory with 15-second refresh and live status
+- [x] Add receiver credential status, revocation, and removal controls
 - [ ] Implement NDI source inventory and assignment
 - [ ] Implement media library and uploads
 - [ ] Implement playlist editor with ordering and image durations
