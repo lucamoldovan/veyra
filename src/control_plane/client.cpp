@@ -266,8 +266,8 @@ Client::HttpResponse Client::postJson(
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, appendResponse);
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, &response.body);
     curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, errorBuffer.data());
-    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, 3000L);
-    curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, 5000L);
+    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, 1500L);
+    curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, 2500L);
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 1L);
