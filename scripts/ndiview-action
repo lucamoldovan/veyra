@@ -16,7 +16,7 @@ case "$1" in
     exec /usr/sbin/runuser -u veyra-kiosk -- /usr/bin/env \
       XDG_RUNTIME_DIR="$runtime" \
       DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" \
-      /usr/bin/systemctl --user restart ndiview.service
+      /usr/bin/systemctl --user --no-block restart ndiview.service
     ;;
   reboot)
     exec /usr/bin/systemctl reboot
