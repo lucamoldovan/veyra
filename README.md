@@ -18,7 +18,7 @@ NDI audio is intentionally not captured or played.
 
 ## Current implementation status
 
-The repository currently contains the **native receiver foundation**, an initial local-server scaffold, and the first dashboard interface. The server is a separate TypeScript/Fastify application with a versioned health endpoint, graceful shutdown, and independent build/test checks. It currently binds to loopback by default and does not yet expose device-management routes. The React/Vite dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages. It reads the live local-server health endpoint; management data and actions are not connected yet.
+The repository currently contains the **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage and operator sessions, but receiver/device-management routes are still being built.
 
 The native receiver foundation includes:
 
@@ -31,7 +31,7 @@ The native receiver foundation includes:
 - Leaves the NDI receiver alive during source loss so the SDK can reconnect when the source returns.
 - Loads and validates local JSON configuration.
 
-Device registration, authentication, live device/source data, media uploads, playlist editing, remote commands, and per-device cached fallback are **not yet implemented**. The dashboard's current empty states are intentional and do not use fabricated device or media data.
+Device registration, receiver authentication, live device/source data, media uploads, playlist editing, remote commands, and per-device cached fallback are **not yet implemented**. The dashboard's current empty states are intentional and do not use fabricated device or media data. On first server launch, copy the one-time setup key from the server terminal into the dashboard to create the local administrator.
 
 The player has not yet been compiled against an installed official NDI SDK or validated on the target Mac mini. The SDK-independent configuration tests run in GitHub Actions. See the [development plan](docs/development.md) for implementation and validation status.
 
