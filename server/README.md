@@ -45,24 +45,24 @@ npm run backup -- /path/to/secure-backup-directory
 
 The command uses SQLite's online backup API and copies the pairing secret and media directory alongside the database. It creates owner-only backup files and a small manifest. Store the backup directory somewhere protected; the pairing secret is sensitive and must not be published or committed.
 
-To restore, stop the NDIView server first, then restore the database file to `VEYRA_DATABASE_PATH` and the matching pairing-secret file to `VEYRA_PAIRING_SECRET_PATH`. Keep the database and pairing secret from the same backup together. The backup utility includes the server database, matching pairing secret, and the local media directory. Restore all three from the same backup set.
+To restore, stop the NDIView server first, then restore the database file to `NDIVIEW_DATABASE_PATH` and the matching pairing-secret file to `NDIVIEW_PAIRING_SECRET_PATH`. Keep the database and pairing secret from the same backup together. The backup utility includes the server database, matching pairing secret, and the local media directory. Restore all three from the same backup set.
 
 ## Configuration
 
 | Variable | Default | Description |
 |---|---|---|
-| `VEYRA_HOST` | `127.0.0.1` | Bind address |
-| `VEYRA_PORT` | `8787` | HTTP port |
+| `NDIVIEW_HOST` | `127.0.0.1` | Bind address |
+| `NDIVIEW_PORT` | `8787` | HTTP port |
 | `LOG_LEVEL` | `info` | Fastify/Pino log level |
-| `VEYRA_DATABASE_PATH` | `data/veyra.sqlite` | SQLite database path |
-| `VEYRA_SETUP_KEY_PATH` | `data/setup-key` | First-run setup key file |
-| `VEYRA_PAIRING_SECRET_PATH` | `data/pairing-secret` | Secret key used to HMAC pairing-code verifiers; back up securely with the database |
-| `VEYRA_MEDIA_DIRECTORY` | `data/media` | Local image asset directory |
-| `VEYRA_TLS_CERT_PATH` | unset | PEM certificate path; required with the private key for non-loopback binds |
-| `VEYRA_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
-| `VEYRA_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
+| `NDIVIEW_DATABASE_PATH` | `data/ndiview.sqlite` | SQLite database path |
+| `NDIVIEW_SETUP_KEY_PATH` | `data/setup-key` | First-run setup key file |
+| `NDIVIEW_PAIRING_SECRET_PATH` | `data/pairing-secret` | Secret key used to HMAC pairing-code verifiers; back up securely with the database |
+| `NDIVIEW_MEDIA_DIRECTORY` | `data/media` | Local image asset directory |
+| `NDIVIEW_TLS_CERT_PATH` | unset | PEM certificate path; required with the private key for non-loopback binds |
+| `NDIVIEW_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
+| `NDIVIEW_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
 
-The service binds to loopback by default. The SQLite database must live in a dedicated directory (not a shared system directory); NDIView restricts that directory to owner access and the database file to owner read/write. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
+| `NDIVIEW_DASHBOARD_DIRECTORY` | `../dashboard/dist` | Production dashboard asset directory, relative to the server working directory |\n\nNew deployments should use the `NDIVIEW_*` variable names shown above. Previous `VEYRA_*` names remain accepted as compatibility aliases.\n\nThe service binds to loopback by default. The SQLite database must live in a dedicated directory (not a shared system directory); NDIView restricts that directory to owner access and the database file to owner read/write. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
 
 ## Current scope
 
@@ -80,15 +80,15 @@ Implemented:
 - Per-device NDI source and fallback-playlist assignments with monotonically increasing configuration versions.
 - Receiver-authenticated configuration and assigned-media manifest polling, plus media downloads restricted to assets in that receiver's assigned fallback playlist.
 - Per-device NDI discovery snapshots reported through heartbeats and an authenticated aggregated source inventory endpoint.
-- Transactional SQLite schema migrations through version 7, including a populated version-1 upgrade test.
+- Transactional SQLite schema migrations through version 9, including populated version-1 and version-7 upgrade tests.
 - Authenticated local image uploads for PNG, JPEG, and WebP, with content-signature checks, a 20 MB limit, SHA-256 metadata, and owner-only file storage.
 - Authenticated media listing, inline content delivery, and safe deletion blocked while a playlist references the asset.
 - Playlist CRUD with ordered image items and validated per-item display durations from 1 to 3600 seconds.
 - Configurable bind address and port, TLS-enforced non-loopback binding, security response headers, health endpoint, and graceful shutdown.
-- Persistent, authenticated receiver command queue with allowlisted restart requests, receiver-scoped polling/status reporting, expiry, cooldown and post-reboot completion.
+- Persistent, authenticated receiver command queue with allowlisted application-restart and full-device-reboot requests, receiver-scoped polling/status reporting, expiry, cooldown, overlap prevention and uptime-based completion confirmation.
 - Production dashboard static serving from the server origin, with no-cache HTML and immutable hashed assets.
 - Automated server build and API tests in GitHub Actions.
 
 The C++ receiver client now implements one-time pairing, TLS-verified bearer heartbeats, discovery snapshots, bounded retry/backoff, owner-only credential storage, versioned configuration polling, SHA-256-verified media downloads, persistent cache loading, and timed image fallback. The receiver sync client and renderer compile in SDK-independent CI, but the complete native player has not yet been built against the official NDI SDK.
 
-The server now exposes `PUT /api/v1/devices/:id/config`, receiver `GET /api/v1/receiver/config`, `GET /api/v1/receiver/media-manifest`, and authenticated `GET /api/v1/receiver/media/:mediaId`. The receiver now polls these endpoints, verifies and caches assigned assets, activates complete manifests atomically, and renders timed image fallback playlists. Each assigned playlist is limited to 512 MiB. The receiver temporarily retains the previous verified snapshot while switching playback, then prunes obsolete assets after the next successful synchronization. An allowlisted receiver-restart command is implemented; arbitrary remote commands, WebSocket events, and detailed diagnostics are not implemented. Production dashboard serving is implemented and included in the signed server/dashboard release workflow described in [the deployment guide](../docs/server-deployment.md).
+The server now exposes `PUT /api/v1/devices/:id/config`, receiver `GET /api/v1/receiver/config`, `GET /api/v1/receiver/media-manifest`, and authenticated `GET /api/v1/receiver/media/:mediaId`. The receiver now polls these endpoints, verifies and caches assigned assets, activates complete manifests atomically, and renders timed image fallback playlists. Each assigned playlist is limited to 512 MiB. The receiver temporarily retains the previous verified snapshot while switching playback, then prunes obsolete assets after the next successful synchronization. Allowlisted receiver-application restart and full-device reboot commands are implemented; arbitrary remote commands, WebSocket events, receiver software updates, and detailed diagnostics are not implemented. Production dashboard serving is implemented and included in the signed server/dashboard release workflow described in [the deployment guide](../docs/server-deployment.md).
