@@ -75,7 +75,7 @@ Implemented:
 - Rate-limited setup and login endpoints, plus session inspection and logout.
 - Authenticated device inventory and one-time, 12-digit pairing codes (10-minute expiry), stored as HMAC-SHA-256 verifiers using a separate 32-byte local secret file.
 - Single-use receiver pairing that returns a device ID and one-time device credential; only a hash of the credential is stored.
-- Bearer-authenticated receiver heartbeats and derived online/stale/offline state.
+- Bearer-authenticated receiver heartbeats and derived online/stale/offline state. Online means a heartbeat within 45 seconds, stale means 46–120 seconds, and offline means older than 120 seconds. Source snapshots older than 120 seconds are omitted from the aggregated source inventory.
 - Operator-controlled device credential revocation and safe removal of revoked device records.
 - Per-device NDI discovery snapshots reported through heartbeats and an authenticated aggregated source inventory endpoint.
 - Transactional SQLite schema migrations through version 4, including a populated version-1 upgrade test.
