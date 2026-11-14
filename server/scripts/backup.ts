@@ -20,7 +20,19 @@ if (!secretInfo.isFile()) {
 }
 chmodSync(pairingSecretPath, 0o600);
 
+const unsafeBackupTargets = new Set([
+  "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
+  "/etc", "/usr", "/opt", "/run", "/mnt", "/media", "/dev", "/proc",
+  "/sys", "/boot",
+]);
+if (unsafeBackupTargets.has(backupDirectory)) {
+  throw new Error("Veyra backups must be written to a dedicated private directory");
+}
 mkdirSync(backupDirectory, { recursive: true, mode: 0o700 });
+const backupDirectoryInfo = lstatSync(backupDirectory);
+if (!backupDirectoryInfo.isDirectory() || backupDirectoryInfo.isSymbolicLink()) {
+  throw new Error("Veyra backup path must be a real directory, not a symlink");
+}
 chmodSync(backupDirectory, 0o700);
 
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
