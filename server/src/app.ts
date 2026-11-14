@@ -342,14 +342,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     mkdirSync(mediaDirectory, { recursive: true, mode: 0o700 });
     chmodSync(mediaDirectory, 0o700);
     const filePath = join(mediaDirectory, storageKey);
+    let fileCreated = false;
     try {
       writeFileSync(filePath, image, { flag: "wx", mode: 0o600 });
+      fileCreated = true;
       database.prepare(`
         INSERT INTO media_assets (id, display_name, storage_key, mime_type, size_bytes, sha256, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(id, displayName, storageKey, detectedMime, image.length, sha256, createdAt);
     } catch (error) {
-      rmSync(filePath, { force: true });
+      if (fileCreated) rmSync(filePath, { force: true });
       request.log.error(error, "Could not store uploaded Veyra media");
       return reply.code(500).send({ error: "Image could not be stored" });
     }
