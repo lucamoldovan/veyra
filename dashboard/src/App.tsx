@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, removeRevokedDevice, type ConnectionState, type Device, type Operator, type PairingCode, type ServerHealth } from "./api";
+import { MediaPage, PlaylistsPage } from "./MediaPages";
 
 type Page = "overview" | "devices" | "sources" | "media" | "playlists" | "system";
 type AuthState = "checking" | "setup" | "login" | "authenticated" | "unavailable";
@@ -244,8 +245,8 @@ function App() {
           )}
           {page === "devices" && <DevicesPage />}
           {page === "sources" && <EmptyPage kind="sources" onNavigate={navigate} />}
-          {page === "media" && <EmptyPage kind="media" onNavigate={navigate} />}
-          {page === "playlists" && <EmptyPage kind="playlists" onNavigate={navigate} />}
+          {page === "media" && <MediaPage />}
+          {page === "playlists" && <PlaylistsPage />}
           {page === "system" && (
             <SystemPage connection={connection} health={health} lastChecked={lastChecked} />
           )}
