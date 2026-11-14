@@ -7,13 +7,17 @@
 
 #include <spdlog/spdlog.h>
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -89,6 +93,10 @@ int main(int argc, char* argv[]) {
         veyra::video::Renderer renderer(config.display);
         veyra::ndi::Discovery discovery;
         std::unique_ptr<veyra::ndi::Receiver> receiver;
+        std::mutex latestFrameMutex;
+        std::optional<veyra::ndi::VideoFrame> latestFrame;
+        std::atomic_bool captureFailed{false};
+        std::jthread captureThread;
 
         bool displayIsClear = true;
         bool playbackWasActive = false;
@@ -111,6 +119,29 @@ int main(int argc, char* argv[]) {
                     );
                     receiver =
                         std::make_unique<veyra::ndi::Receiver>(*selected);
+
+                    auto* activeReceiver = receiver.get();
+                    captureThread = std::jthread(
+                        [activeReceiver, &latestFrameMutex, &latestFrame,
+                         &captureFailed](const std::stop_token stopToken) {
+                            try {
+                                while (!stopToken.stop_requested()) {
+                                    auto captured = activeReceiver->capture(100);
+                                    if (captured.has_value()) {
+                                        std::lock_guard lock(latestFrameMutex);
+                                        latestFrame = std::move(*captured);
+                                    }
+                                }
+                            } catch (const std::exception& error) {
+                                spdlog::critical(
+                                    "NDI capture worker failed: {}",
+                                    error.what()
+                                );
+                                captureFailed.store(true);
+                            }
+                        }
+                    );
+
                     lastFrameAt = std::chrono::steady_clock::now();
                     continue;
                 }
@@ -148,7 +179,19 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
-            auto frame = receiver->capture(50);
+            if (captureFailed.load()) {
+                throw std::runtime_error("NDI capture worker stopped unexpectedly");
+            }
+
+            std::optional<veyra::ndi::VideoFrame> frame;
+            {
+                std::lock_guard lock(latestFrameMutex);
+                if (latestFrame.has_value()) {
+                    frame = std::move(latestFrame);
+                    latestFrame.reset();
+                }
+            }
+
             if (frame.has_value()) {
                 renderer.present(*frame);
                 displayIsClear = false;
@@ -166,11 +209,10 @@ int main(int argc, char* argv[]) {
             }
 
             const auto now = std::chrono::steady_clock::now();
-            const bool connected = receiver->isConnected();
             const bool frameIsStale =
                 now - lastFrameAt > std::chrono::seconds(2);
 
-            if (!connected || frameIsStale) {
+            if (frameIsStale) {
                 if (playbackWasActive) {
                     spdlog::warn(
                         "NDI video stopped; waiting for the source to recover"
@@ -183,6 +225,13 @@ int main(int argc, char* argv[]) {
                     displayIsClear = true;
                 }
             }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+
+        if (captureThread.joinable()) {
+            captureThread.request_stop();
+            captureThread.join();
         }
     } catch (const std::exception& error) {
         spdlog::critical("Veyra stopped after an error: {}", error.what());
