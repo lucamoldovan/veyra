@@ -47,6 +47,7 @@ private:
     int textureHeight_{0};
     Uint32 textureFormat_{SDL_PIXELFORMAT_UNKNOWN};
     bool sdlInitialized_{false};
+    bool uyvyTextureUnavailable_{false};
     std::vector<std::uint8_t> conversionBuffer_;
 };
 
