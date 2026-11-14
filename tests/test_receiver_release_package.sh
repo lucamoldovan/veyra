@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEMP="$(mktemp -d)"
-trap 'rm -rf "$TEMP"' EXIT
+trap 'chmod -R u+w "$TEMP" 2>/dev/null || true; rm -rf "$TEMP"' EXIT
 mkdir -p "$TEMP/bin" "$TEMP/output"
 printf '#!/bin/sh\necho fake-ndiview\n' > "$TEMP/bin/ndiview"
 chmod 0755 "$TEMP/bin/ndiview"
