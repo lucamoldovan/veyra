@@ -210,6 +210,8 @@ export function openDatabase(databasePath = process.env.NDIVIEW_DATABASE_PATH ??
     if (currentVersion < 8) {
       database.exec(`
         ALTER TABLE device_commands RENAME TO device_commands_v7;
+        DROP INDEX IF EXISTS device_commands_device_created_idx;
+        DROP INDEX IF EXISTS device_commands_pending_idx;
         CREATE TABLE device_commands (
           id TEXT PRIMARY KEY,
           device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
