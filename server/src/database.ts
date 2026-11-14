@@ -34,6 +34,34 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
 
     CREATE INDEX IF NOT EXISTS sessions_operator_id_idx ON sessions(operator_id);
     CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
+
+    CREATE TABLE IF NOT EXISTS pairing_codes (
+      id TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL UNIQUE,
+      created_by TEXT NOT NULL REFERENCES operators(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS pairing_codes_expires_at_idx ON pairing_codes(expires_at);
+
+    CREATE TABLE IF NOT EXISTS devices (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      device_token_hash TEXT NOT NULL UNIQUE,
+      platform TEXT NOT NULL DEFAULT 'unknown',
+      software_version TEXT NOT NULL DEFAULT 'unknown',
+      last_seen_at TEXT,
+      last_ip TEXT,
+      playback_mode TEXT NOT NULL DEFAULT 'unknown',
+      ndi_source_name TEXT,
+      uptime_seconds INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS devices_last_seen_at_idx ON devices(last_seen_at);
   `);
   database.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(new Date().toISOString());
 
