@@ -87,6 +87,7 @@ function readPairingSecret(options: BuildAppOptions): Buffer {
 }
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
+const MAX_PLAYLIST_BYTES = 512 * 1024 * 1024;
 
 function detectImageMime(buffer: Buffer): "image/png" | "image/jpeg" | "image/webp" | null {
   if (buffer.length >= 8 &&
@@ -657,10 +658,15 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       const uniqueMediaIds = [...new Set(items.map((item) => item.mediaId))];
       if (uniqueMediaIds.length > 0) {
         const placeholders = uniqueMediaIds.map(() => "?").join(",");
-        const found = database.prepare(`SELECT COUNT(*) AS count FROM media_assets WHERE id IN (${placeholders})`)
-          .get(...uniqueMediaIds) as { count: number };
-        if (found.count !== uniqueMediaIds.length) {
+        const found = database.prepare(`SELECT id, size_bytes FROM media_assets WHERE id IN (${placeholders})`)
+          .all(...uniqueMediaIds) as Array<{ id: string; size_bytes: number }>;
+        if (found.length !== uniqueMediaIds.length) {
           return reply.code(400).send({ error: "One or more playlist images do not exist in the media library" });
+        }
+        const sizesById = new Map(found.map((asset) => [asset.id, asset.size_bytes]));
+        const totalBytes = items.reduce((total, item) => total + (sizesById.get(item.mediaId) ?? 0), 0);
+        if (totalBytes > MAX_PLAYLIST_BYTES) {
+          return reply.code(400).send({ error: "A receiver fallback playlist cannot exceed 512 MiB" });
         }
       }
 
