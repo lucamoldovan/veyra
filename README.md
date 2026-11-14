@@ -12,13 +12,13 @@ Its first deployment environment is churches, but Veyra is designed as a general
 - **Veyra Server** — local management service for authentication, devices, sources, media, playlists, configuration, commands, and system state.
 - **Veyra Dashboard** — browser-based interface for device management, NDI source assignment, media, playlists, diagnostics, and system settings.
 
-The server is hosted locally and communicates with receivers over the LAN. Receivers keep their last valid configuration and their own fallback content locally, so playback can continue during a server outage. Each receiver has its own fallback assignment.
+The server is designed to run locally and manage receivers over the LAN. The intended offline model keeps the last valid configuration and each receiver's assigned fallback content on that receiver. That offline synchronization and fallback behavior is part of the product architecture, but is not implemented yet.
 
 NDI audio is intentionally not captured or played.
 
 ## Current implementation status
 
-The repository currently contains the **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage, operator sessions, one-time receiver pairing, authenticated heartbeats, and a protected device inventory. The native receiver enrollment client, remote configuration, and source/media/playlist management remain in development.
+The repository currently contains an early **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage, operator sessions, one-time receiver pairing, authenticated heartbeats, and a protected device inventory. Non-loopback server binding now requires configured TLS certificate and private-key files. The native receiver enrollment client, remote configuration, and source/media/playlist management remain in development. The server and dashboard still use separate development processes; production dashboard serving and packaging are not implemented.
 
 The native receiver foundation includes:
 
