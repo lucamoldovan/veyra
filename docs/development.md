@@ -77,7 +77,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Implement device playlist assignment APIs
 - [ ] Implement versioned configuration distribution
 - [ ] Implement live WebSocket events and narrowly scoped remote commands
-- [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, and credential revocation
+- [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, credential revocation, media uploads, playlist editing, and backups
 - [x] Add a populated legacy database migration test
 - [x] Add credential revocation and safe removal API tests
 - [ ] Add broader API contract and abuse-case tests
@@ -100,7 +100,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Implement per-device and group playlist assignment
 - [ ] Implement device configuration and remote actions
 - [ ] Implement system health, logs, and diagnostics
-- [ ] Add responsive layout, accessibility, and dashboard tests
+- [x] Add responsive layout for desktop and mobile\n- [ ] Add accessibility review and dashboard interaction tests
 
 ## Phase 7 — Receiver management and offline-first behavior
 
@@ -124,7 +124,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Build a repeatable local development environment
 - [ ] Package the server and dashboard for local-network deployment
 - [ ] Package and install the receiver as a managed service
-- [ ] Provide backup and restore for server configuration and media
+- [x] Provide backup and restore for SQLite data, pairing secret, and media assets\n- [ ] Include server configuration and TLS key/certificate backup guidance
 - [ ] Test multiple receivers on one LAN
 - [ ] Test server outage while receivers are playing
 - [ ] Test NDI source outage with per-device fallback
