@@ -48,7 +48,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Specify versioned server API and WebSocket event contract
 - [ ] Specify device identity, pairing, and authentication
 - [x] Specify and implement media storage, upload limits, and asset validation
-- [x] Implement playlist schema, ordering, and per-item durations\n- [ ] Specify per-device assignment
+- [x] Implement playlist schema, ordering, and per-item durations
+- [ ] Specify per-device assignment
 - [ ] Specify command acknowledgement, timeout, and retry behavior
 - [x] Define initial database schema version and transactional migration mechanism
 - [x] Add forward migration and populated version-1 database upgrade test
@@ -70,7 +71,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement bearer-authenticated heartbeat ingestion and online/stale/offline state
 - [ ] Implement source inventory and per-device source assignment
 - [x] Implement authenticated media upload, local storage, metadata, content delivery, and safe deletion
-- [x] Implement playlist CRUD, ordered items, and validated display durations\n- [ ] Implement device playlist assignment APIs
+- [x] Implement playlist CRUD, ordered items, and validated display durations
+- [ ] Implement device playlist assignment APIs
 - [ ] Implement versioned configuration distribution
 - [ ] Implement live WebSocket events and narrowly scoped remote commands
 - [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, and credential revocation
