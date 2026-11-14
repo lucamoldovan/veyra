@@ -26,7 +26,7 @@ Keep mutable state outside the release directory:
 - Credentials and device identity: `/var/lib/ndiview/identity/`
 - Download/cache/fallback media: `/var/cache/ndiview/` or a dedicated persistent cache directory
 
-The current example config defaults to `~/.local/state/veyra/device-token` for the credential and `~/.local/state/veyra/cache` for cached state/media. The kiosk installer preserves this behavior under the dedicated `veyra-kiosk` account. Do not move or overwrite existing state until a migration is tested.
+The current example config defaults to `~/.local/state/ndiview/device-token` for the credential and `~/.local/state/ndiview/cache` for cached state/media. The example config now uses the `ndiview` state directory. The installer still runs under the historical `veyra-kiosk` Linux account so existing deployments remain compatible; do not rename that account or move existing credentials/cache until an explicit migration is tested.
 
 ### Central server PC
 
@@ -59,7 +59,7 @@ sudo NDIVIEW_RELEASE_VERIFY_KEY=/etc/ndiview/receiver-release-signing.pub \
   dist/receiver-releases/ndiview-0.1.0-linux-x86_64.manifest.json.sig
 ```
 
-The publisher verifies the Ed25519 manifest signature, artifact digest and size, enforces a default 100 MiB limit, rejects unsafe archive paths and link/special entries, and stores immutable release files under `/var/lib/veyra/server/receiver-releases/<version>/linux-x86_64/` (override with `NDIVIEW_RECEIVER_RELEASES_DIR`). CI tests packaging, signature verification, local publication and duplicate-release rejection.
+The publisher verifies the Ed25519 manifest signature, artifact digest and size, enforces a default 100 MiB limit, rejects unsafe archive paths and link/special entries, and stores immutable release files under `/var/lib/ndiview/server/receiver-releases/<version>/linux-x86_64/` (override with `NDIVIEW_RECEIVER_RELEASES_DIR`). CI tests packaging, signature verification, local publication and duplicate-release rejection.
 
 The files are now packaged and can be published to the server's local release store. They are **not yet exposed through an authenticated HTTP release API**. Per-device rollout, receiver polling/download, receiver-side signature verification and installation, health confirmation, rollback, and dashboard update controls are still outstanding. Do not deploy these packages to receivers yet.
  
@@ -120,7 +120,7 @@ Target behavior: power is applied -> Linux boots -> graphical display session be
 Implementation work:
 1. Validate Debian 13 on the exact Intel Mac mini: boot, Ethernet, Wi-Fi if needed, HDMI/DisplayPort output, resolution/refresh rates, Intel graphics driver, audio not required, and NDI performance.
 2. Choose and test a lightweight Xorg-based kiosk session first for SDL2 compatibility. Do not assume Wayland/DRM behavior until tested. Disable screen blanking, DPMS sleep, screensaver, desktop notifications, and power-saving behaviors that interrupt output.
-3. Create a dedicated unprivileged `veyra` account. Do not run the receiver as root.
+3. The current installer uses the dedicated unprivileged `veyra-kiosk` account (a legacy OS account identifier retained for compatibility). Do not run the receiver as root. Do not run the receiver as root.
 4. Configure display-manager automatic login directly into the dedicated kiosk account/session. This removes the local desktop login prompt only; it does not disable the NDIView dashboard's operator authentication or create an administrator session.
 5. Start a minimal Xorg session and launch NDIView automatically once the display server and target output are ready. Prefer a dedicated kiosk session with no general-purpose desktop shell, panels, notifications, or terminal shortcuts exposed to viewers. Keep an authorized maintenance path (for example, a documented keyboard shortcut requiring local access or a separate admin TTY).
 6. Run NDIView as an unprivileged user. Use a systemd user service or a system service explicitly attached to the graphical session; do not start SDL before DISPLAY/Xauthority and the output are ready. Set restart-on-failure with a sensible delay and rate limit. Avoid rapid crash loops. Add structured logs and a local health signal.

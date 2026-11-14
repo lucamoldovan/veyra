@@ -9,7 +9,7 @@ ARCHIVE="$(realpath "$1")"
 MANIFEST="$(realpath "$2")"
 SIGNATURE="$(realpath "$3")"
 PUBLIC_KEY="${NDIVIEW_RELEASE_VERIFY_KEY:-/etc/ndiview/receiver-release-signing.pub}"
-STORE_ROOT="${NDIVIEW_RECEIVER_RELEASES_DIR:-/var/lib/veyra/server/receiver-releases}"
+STORE_ROOT="${NDIVIEW_RECEIVER_RELEASES_DIR:-/var/lib/ndiview/server/receiver-releases}"
 MAX_ARTIFACT_BYTES="${NDIVIEW_MAX_RECEIVER_ARTIFACT_BYTES:-104857600}"
 if [[ ! "$MAX_ARTIFACT_BYTES" =~ ^[0-9]+$ ]]; then echo "Invalid maximum receiver artifact size." >&2; exit 2; fi
 

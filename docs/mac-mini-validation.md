@@ -38,11 +38,11 @@ Install the official NDI SDK for Linux separately, following its license and ins
 
 Record the installed SDK version and installation directory. Keep the SDK directory path handy for CMake.
 
-## 3. Get the Veyra source
+## 3. Get the NDIView source
 
 ```bash
 git clone https://github.com/lucamoldovan/veyra.git
-cd veyra
+cd veyra  # GitHub repository slug; product name is NDIView
 git rev-parse --short HEAD
 ```
 
@@ -54,8 +54,8 @@ These tests do not need the NDI SDK or a display:
 
 ```bash
 cmake -S . -B build-tests -G Ninja \
-  -DVEYRA_BUILD_PLAYER=OFF \
-  -DVEYRA_BUILD_TESTS=ON
+  -DNDIVIEW_BUILD_PLAYER=OFF \
+  -DNDIVIEW_BUILD_TESTS=ON
 cmake --build build-tests --parallel
 ctest --test-dir build-tests --output-on-failure
 ```
@@ -66,8 +66,8 @@ Do not continue if these tests fail.
 
 ```bash
 cmake -S . -B build -G Ninja \
-  -DVEYRA_BUILD_PLAYER=ON \
-  -DVEYRA_BUILD_TESTS=ON \
+  -DNDIVIEW_BUILD_PLAYER=ON \
+  -DNDIVIEW_BUILD_TESTS=ON \
   -DNDI_SDK_DIR=/absolute/path/to/ndi/sdk
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
@@ -78,7 +78,7 @@ If the build fails, save the complete CMake configure output and compiler output
 Check dynamic library resolution:
 
 ```bash
-ldd ./build/veyra
+ldd ./build/ndiview
 ```
 
 There should be no `not found` entries.
@@ -88,24 +88,24 @@ There should be no `not found` entries.
 Start a known NDI sender on the same wired LAN. Confirm both machines are on the same subnet and that multicast/discovery traffic is not blocked by the network.
 
 ```bash
-./build/veyra --list-sources
+./build/ndiview --list-sources
 ```
 
-Record the exact source name and address. Prefer the address in `config/veyra.example.json` and create a local configuration file. Do not commit site-specific source names or addresses.
+Record the exact source name and address. Prefer the address in `config/ndiview.example.json` and create a local configuration file. Do not commit site-specific source names or addresses.
 
 ## 7. Configure receiver pairing, synchronization, and fallback
 
 The receiver includes a control-plane client for one-time pairing and periodic heartbeats. It is independent of NDI playback: if the local server is unavailable, playback continues and the client retries with bounded backoff.
 
-1. Start the Veyra server with HTTPS enabled and make its certificate chain trusted by the Mac mini. The server intentionally refuses non-loopback HTTP.
+1. Start the NDIView server with HTTPS enabled and make its certificate chain trusted by the Mac mini. The server intentionally refuses non-loopback HTTP.
 2. In the dashboard, create a fresh receiver pairing code. It is 12 digits and expires after 10 minutes.
 3. Install the example config at the default path and edit it:
 
 ```bash
-sudo install -d -m 755 /etc/veyra
-sudo install -m 600 config/veyra.example.json /etc/veyra/config.json
-sudo chown "$(id -un):$(id -gn)" /etc/veyra/config.json
-nano /etc/veyra/config.json
+sudo install -d -m 755 /etc/ndiview
+sudo install -m 600 config/ndiview.example.json /etc/ndiview/config.json
+sudo chown "$(id -un):$(id -gn)" /etc/ndiview/config.json
+nano /etc/ndiview/config.json
 ```
 
 Then set the `controlPlane` section to the following values:
@@ -113,12 +113,12 @@ Then set the `controlPlane` section to the following values:
 ```json
 {
   "controlPlane": {
-    "serverUrl": "https://veyra-server.local:8787",
+    "serverUrl": "https://ndiview-server.local:8787",
     "deviceName": "Lobby Display",
     "pairingCode": "YOUR_12_DIGIT_CODE",
-    "caCertificatePath": "/etc/veyra/veyra-ca.pem",
-    "credentialPath": "~/.local/state/veyra/device-token",
-    "cachePath": "~/.local/state/veyra/cache",
+    "caCertificatePath": "/etc/ndiview/veyra-ca.pem",
+    "credentialPath": "~/.local/state/ndiview/device-token",
+    "cachePath": "~/.local/state/ndiview/cache",
     "syncIntervalSeconds": 10,
     "heartbeatIntervalSeconds": 15
   }
@@ -129,30 +129,30 @@ Use the actual server DNS name covered by its TLS certificate. If the CA is alre
 
 After successful pairing, the receiver stores its device token in the credential file with owner-only permissions. Subsequent starts use that credential; the one-time pairing code is not reused. The heartbeat reports playback mode, current source, uptime, and the latest discovered NDI source list. After pairing, the receiver polls versioned configuration and its assigned fallback playlist. It downloads PNG/JPEG/WebP assets into an owner-only cache, verifies each file against its SHA-256 and declared size, and atomically switches to the new manifest only after every item is present and verified. Each assigned playlist is limited to 512 MiB. During a playlist transition, the receiver retains the previous verified snapshot until the next successful synchronization, so temporary cache use can be higher.
 
-If an operator revokes the receiver credential, stop Veyra, remove the local `device-token` file, create a new pairing code, and update the config before restarting. The control-plane client has not yet been verified against the actual NDI SDK build or physical Mac mini.
+If an operator revokes the receiver credential, stop NDIView, remove the local `device-token` file, create a new pairing code, and update the config before restarting. The control-plane client has not yet been verified against the actual NDI SDK build or physical Mac mini.
 
 ## 8. Test playback in a controlled sequence
 
-Before testing outages, assign an NDI source and a fallback playlist to the receiver in the dashboard. Wait until the receiver logs a successful sync and confirm the cache exists under `~/.local/state/veyra/cache`. Start windowed or on a spare display first if the current configuration allows it. Then test:
+Before testing outages, assign an NDI source and a fallback playlist to the receiver in the dashboard. Wait until the receiver logs a successful sync and confirm the cache exists under `~/.local/state/ndiview/cache`. Start windowed or on a spare display first if the current configuration allows it. Then test:
 
 1. Stable 1080p30 NDI video for at least 30 minutes.
 2. Stop the assigned NDI sender; verify the receiver switches to the cached image playlist and respects each image duration.
-3. Restart the sender; verify NDI video automatically resumes without restarting Veyra.
-4. Stop the local Veyra server while NDI is playing; verify playback continues.
+3. Restart the sender; verify NDI video automatically resumes without restarting NDIView.
+4. Stop the local NDIView server while NDI is playing; verify playback continues.
 5. With the server still stopped, stop the NDI sender; verify the cached fallback still plays.
 6. Restart the receiver while the server is unavailable; verify it loads its last verified cache and can display fallback.
 7. Restart the server, change the assigned playlist, and verify the receiver activates the new playlist only after its assets have downloaded and passed hash verification.
 8. Ethernet disconnect and reconnect; sender application restart.
 9. Display sleep/wake and XFCE session restart.
-10. Veyra process termination and systemd restart.
+10. NDIView process termination and systemd restart.
 11. A sustained 24-hour run only after the shorter tests are clean.
 
 For each test, record whether the image freezes, turns black, recovers automatically, or needs a process restart. Record CPU and memory usage:
 
 ```bash
-top -H -p "$(pgrep -n veyra)"
-ps -o pid,etime,%cpu,%mem,rss,cmd -C veyra
-journalctl --user -u veyra.service --since "30 minutes ago"
+top -H -p "$(pgrep -n ndiview)"
+ps -o pid,etime,%cpu,%mem,rss,cmd -C ndiview
+journalctl --user -u ndiview.service --since "30 minutes ago"
 ```
 
 Do not treat a visually smooth short test as proof of 24-hour stability.
@@ -162,8 +162,8 @@ Do not treat a visually smooth short test as proof of 24-hour stability.
 Follow the systemd user-service instructions in the root README. Confirm that the service runs inside the logged-in XFCE/X11 session and has the correct `DISPLAY` and `XAUTHORITY`.
 
 ```bash
-systemctl --user status veyra.service
-journalctl --user -u veyra.service -f
+systemctl --user status ndiview.service
+journalctl --user -u ndiview.service -f
 ```
 
 The initial deployment depends on an active graphical session. Unattended startup therefore requires a deliberate display-manager/autologin configuration.
@@ -178,7 +178,7 @@ Do not expose the server on the LAN until its certificate is trusted by the rece
 
 Record the following in an issue or test note:
 
-- Test date and Veyra commit SHA
+- Test date and NDIView commit SHA
 - Debian release and kernel version
 - NDI SDK version
 - Display model, resolution, and refresh rate
