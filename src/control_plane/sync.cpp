@@ -1,0 +1,257 @@
+#include "veyra/control_plane/sync.hpp"
+
+#include <curl/curl.h>
+#include <nlohmann/json.hpp>
+#include <openssl/evp.h>
+
+#include <algorithm>
+#include <array>
+#include <cerrno>
+#include <cstdio>
+#include <fstream>
+#include <stdexcept>
+#include <string_view>
+#include <sys/stat.h>
+#include <unistd.h>
+
+namespace veyra::control_plane {
+namespace {
+using Json = nlohmann::json;
+constexpr std::size_t kMaxResponseBytes = 20U * 1024U * 1024U + 1024U * 1024U;
+
+struct Response {
+    long status{0};
+    std::string body;
+    std::string error;
+};
+
+std::size_t writeBody(const char* data, std::size_t size, std::size_t count, void* user) {
+    const auto bytes = size * count;
+    auto* body = static_cast<std::string*>(user);
+    if (bytes > kMaxResponseBytes - body->size()) return 0;
+    body->append(data, bytes);
+    return bytes;
+}
+
+Response get(const std::string& base, const std::string& path,
+             const std::string& token, const std::filesystem::path& caPath) {
+    Response response;
+    CURL* curl = curl_easy_init();
+    if (!curl) { response.error = "could not create sync request"; return response; }
+    curl_slist* headers = nullptr;
+    const std::string auth = "Authorization: Bearer " + token;
+    headers = curl_slist_append(headers, auth.c_str());
+    headers = curl_slist_append(headers, "Accept: application/json, image/png, image/jpeg, image/webp");
+    const std::string url = base + path;
+    std::array<char, CURL_ERROR_SIZE> error{};
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeBody);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.body);
+    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error.data());
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 1500L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 10000L);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Veyra/0.1.0");
+    const auto ca = caPath.string();
+    if (!ca.empty()) curl_easy_setopt(curl, CURLOPT_CAINFO, ca.c_str());
+    const auto result = curl_easy_perform(curl);
+    if (result == CURLE_OK) curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status);
+    else response.error = error[0] ? error.data() : curl_easy_strerror(result);
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+    return response;
+}
+
+std::string sha256(const std::string& bytes) {
+    std::array<unsigned char, EVP_MAX_MD_SIZE> digest{};
+    unsigned int length = 0;
+    EVP_MD_CTX* context = EVP_MD_CTX_new();
+    if (!context) throw std::runtime_error("Could not allocate SHA-256 context");
+    const bool ok = EVP_DigestInit_ex(context, EVP_sha256(), nullptr) == 1 &&
+        EVP_DigestUpdate(context, bytes.data(), bytes.size()) == 1 &&
+        EVP_DigestFinal_ex(context, digest.data(), &length) == 1;
+    EVP_MD_CTX_free(context);
+    if (!ok || length != 32) throw std::runtime_error("Could not calculate media SHA-256");
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string result;
+    result.reserve(64);
+    for (unsigned int i = 0; i < length; ++i) {
+        result.push_back(hex[digest[i] >> 4]);
+        result.push_back(hex[digest[i] & 0x0f]);
+    }
+    return result;
+}
+
+bool validHash(const std::string& value) {
+    return value.size() == 64 && std::all_of(value.begin(), value.end(), [](unsigned char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+    });
+}
+
+std::string extensionFor(const std::string& mime) {
+    if (mime == "image/png") return ".png";
+    if (mime == "image/jpeg") return ".jpg";
+    if (mime == "image/webp") return ".webp";
+    throw std::runtime_error("Unsupported media MIME type in receiver manifest");
+}
+
+void ensurePrivateDirectory(const std::filesystem::path& path) {
+    std::filesystem::create_directories(path);
+    struct stat info{};
+    if (::lstat(path.c_str(), &info) != 0 || !S_ISDIR(info.st_mode) || S_ISLNK(info.st_mode))
+        throw std::runtime_error("Receiver cache path must be a real directory");
+    if (::chmod(path.c_str(), S_IRWXU) != 0)
+        throw std::runtime_error("Could not restrict receiver cache permissions");
+}
+
+void atomicWrite(const std::filesystem::path& target, const std::string& bytes) {
+    const auto temporary = target.string() + ".tmp-" + std::to_string(static_cast<long long>(::getpid()));
+    const int fd = ::open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR);
+    if (fd < 0) throw std::runtime_error("Could not create temporary cache file");
+    std::size_t offset = 0;
+    bool ok = true;
+    while (offset < bytes.size()) {
+        const auto written = ::write(fd, bytes.data() + offset, bytes.size() - offset);
+        if (written <= 0) { ok = false; break; }
+        offset += static_cast<std::size_t>(written);
+    }
+    if (ok && ::fsync(fd) != 0) ok = false;
+    if (::close(fd) != 0) ok = false;
+    if (!ok || ::rename(temporary.c_str(), target.c_str()) != 0) {
+        ::unlink(temporary.c_str());
+        throw std::runtime_error("Could not atomically commit receiver cache file");
+    }
+}
+
+SyncSnapshot parseState(const Json& state, const std::filesystem::path& root, bool verify) {
+    SyncSnapshot snapshot;
+    if (state.value("schemaVersion", 0) != 1) return snapshot;
+    snapshot.configVersion = state.value("configVersion", 0);
+    snapshot.ndiSourceName = state.value("ndiSourceName", "");
+    snapshot.ndiSourceAddress = state.value("ndiSourceAddress", "");
+    snapshot.fallbackPlaylistId = state.value("fallbackPlaylistId", "");
+    snapshot.playlistRevision = state.value("playlistRevision", 0);
+    if (snapshot.configVersion < 0 || snapshot.playlistRevision < 0) return {};
+    if (!state.contains("items") || !state["items"].is_array() || state["items"].size() > 200) return {};
+    for (const auto& item : state["items"]) {
+        const auto hash = item.value("sha256", "");
+        const auto mime = item.value("mimeType", "");
+        const auto size = item.value("sizeBytes", std::uint64_t{0});
+        const auto duration = item.value("durationSeconds", 0);
+        if (!validHash(hash) || size == 0 || size > 20U * 1024U * 1024U || duration < 1 || duration > 3600)
+            return {};
+        const auto file = root / (hash + extensionFor(mime));
+        struct stat info{};
+        if (::lstat(file.c_str(), &info) != 0 || !S_ISREG(info.st_mode) ||
+            static_cast<std::uint64_t>(info.st_size) != size) return {};
+        if (verify) {
+            std::ifstream input(file, std::ios::binary);
+            std::string bytes((std::istreambuf_iterator<char>(input)), {});
+            if (!input.good() && !input.eof()) return {};
+            if (sha256(bytes) != hash) return {};
+        }
+        snapshot.fallbackItems.push_back({
+            item.value("mediaId", ""), file, duration, hash
+        });
+    }
+    snapshot.hasValidCachedState = true;
+    return snapshot;
+}
+}  // namespace
+
+ReceiverSync::ReceiverSync(config::ControlPlaneConfig config) : config_(std::move(config)) {}
+
+SyncSnapshot ReceiverSync::loadCached() const {
+    try {
+        const auto root = config_.cachePath / "media";
+        const auto statePath = config_.cachePath / "state.json";
+        std::ifstream input(statePath);
+        if (!input) return {};
+        Json state;
+        input >> state;
+        return parseState(state, root, true);
+    } catch (...) {
+        return {};
+    }
+}
+
+SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::string& deviceToken,
+                                       const std::filesystem::path& caCertificatePath) {
+    ensurePrivateDirectory(config_.cachePath);
+    const auto mediaRoot = config_.cachePath / "media";
+    ensurePrivateDirectory(mediaRoot);
+
+    const auto configResponse = get(serverUrl, "/api/v1/receiver/config", deviceToken, caCertificatePath);
+    if (configResponse.status != 200) throw std::runtime_error("Receiver config request failed (HTTP " + std::to_string(configResponse.status) + ")");
+    const Json remoteConfig = Json::parse(configResponse.body);
+    if (remoteConfig.value("schemaVersion", 0) != 1) throw std::runtime_error("Unsupported receiver config schema");
+    const int configVersion = remoteConfig.at("configVersion").get<int>();
+    const auto ndi = remoteConfig.at("ndi");
+    const std::string sourceName = ndi.value("sourceName", "");
+    const std::string sourceAddress = ndi.value("sourceAddress", "");
+    if (sourceName.empty() != sourceAddress.empty()) throw std::runtime_error("Server returned an incomplete NDI source assignment");
+
+    const auto manifestResponse = get(serverUrl, "/api/v1/receiver/media-manifest", deviceToken, caCertificatePath);
+    if (manifestResponse.status != 200) throw std::runtime_error("Receiver media manifest request failed (HTTP " + std::to_string(manifestResponse.status) + ")");
+    const Json manifest = Json::parse(manifestResponse.body);
+    if (manifest.value("schemaVersion", 0) != 1 || manifest.value("configVersion", -1) != configVersion)
+        throw std::runtime_error("Receiver config and media manifest versions do not match");
+    if (!manifest.contains("items") || !manifest["items"].is_array() || manifest["items"].size() > 200)
+        throw std::runtime_error("Receiver media manifest has an invalid item list");
+
+    Json committedItems = Json::array();
+    SyncSnapshot snapshot;
+    snapshot.configVersion = configVersion;
+    snapshot.ndiSourceName = sourceName;
+    snapshot.ndiSourceAddress = sourceAddress;
+    snapshot.fallbackPlaylistId = manifest.value("playlistId", "");
+    snapshot.playlistRevision = manifest.value("playlistRevision", 0);
+
+    for (const auto& item : manifest["items"]) {
+        const auto mediaId = item.at("mediaId").get<std::string>();
+        const auto hash = item.at("sha256").get<std::string>();
+        const auto mime = item.at("mimeType").get<std::string>();
+        const auto size = item.at("sizeBytes").get<std::uint64_t>();
+        const int duration = item.at("durationSeconds").get<int>();
+        const auto path = item.at("downloadPath").get<std::string>();
+        if (!validHash(hash) || size == 0 || size > 20U * 1024U * 1024U ||
+            duration < 1 || duration > 3600 || path != "/api/v1/receiver/media/" + mediaId)
+            throw std::runtime_error("Receiver media manifest contains invalid asset metadata");
+        const auto extension = extensionFor(mime);
+        const auto destination = mediaRoot / (hash + extension);
+        bool cached = false;
+        struct stat info{};
+        if (::lstat(destination.c_str(), &info) == 0 && S_ISREG(info.st_mode) &&
+            static_cast<std::uint64_t>(info.st_size) == size) {
+            cached = true;
+        }
+        if (!cached) {
+            const auto mediaResponse = get(serverUrl, path, deviceToken, caCertificatePath);
+            if (mediaResponse.status != 200 || mediaResponse.body.size() != size ||
+                sha256(mediaResponse.body) != hash)
+                throw std::runtime_error("Media download failed integrity verification for " + mediaId);
+            atomicWrite(destination, mediaResponse.body);
+        }
+        committedItems.push_back({
+            {"mediaId", mediaId}, {"sha256", hash}, {"mimeType", mime},
+            {"sizeBytes", size}, {"durationSeconds", duration}
+        });
+        snapshot.fallbackItems.push_back({mediaId, destination, duration, hash});
+    }
+    snapshot.hasValidCachedState = true;
+    Json state = {
+        {"schemaVersion", 1}, {"configVersion", configVersion},
+        {"ndiSourceName", sourceName}, {"ndiSourceAddress", sourceAddress},
+        {"fallbackPlaylistId", snapshot.fallbackPlaylistId},
+        {"playlistRevision", snapshot.playlistRevision}, {"items", committedItems}
+    };
+    atomicWrite(config_.cachePath / "state.json", state.dump(2));
+    return snapshot;
+}
+
+}  // namespace veyra::control_plane
