@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildApp } from "../src/app.js";
+import { openDatabase } from "../src/database.js";
 
 function createTestApp() {
   return buildApp({
@@ -20,6 +21,8 @@ test("health endpoint reports the local server status", async () => {
     });
 
     assert.equal(response.statusCode, 200);
+    assert.equal(response.headers["cache-control"], "no-store");
+    assert.equal(response.headers["x-content-type-options"], "nosniff");
     assert.deepEqual(response.json(), {
       status: "ok",
       service: "veyra-server",
@@ -216,6 +219,48 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
     assert.equal(device.softwareVersion, "0.1.1");
     assert.equal(device.playbackMode, "ndi");
     assert.equal(device.ndiSourceName, "Camera 1");
+  } finally {
+    await app.close();
+  }
+});
+
+test("database initializes a versioned schema", () => {
+  const database = openDatabase(":memory:");
+
+  try {
+    assert.equal(database.pragma("user_version", { simple: true }), 1);
+    const tables = database.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+    ).all() as Array<{ name: string }>;
+    assert.deepEqual(
+      tables.map((table) => table.name),
+      ["devices", "operators", "pairing_codes", "sessions"],
+    );
+  } finally {
+    database.close();
+  }
+});
+
+test("secure cookie policy can be enforced by the HTTPS deployment", async () => {
+  const app = buildApp({
+    databasePath: ":memory:",
+    setupKey: "test-setup-key",
+    secureCookies: true,
+  });
+
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/setup",
+      payload: {
+        setupKey: "test-setup-key",
+        username: "admin",
+        password: "a-very-long-test-password",
+      },
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.match(String(response.headers["set-cookie"]), /; Secure/i);
   } finally {
     await app.close();
   }
