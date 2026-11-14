@@ -275,12 +275,9 @@ Client::HttpResponse Client::postJson(
     curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 2L);
     curl_easy_setopt(handle, CURLOPT_USERAGENT, "Veyra/0.1.0");
-    if (!config_.caCertificatePath.empty()) {
-        curl_easy_setopt(
-            handle,
-            CURLOPT_CAINFO,
-            config_.caCertificatePath.string().c_str()
-        );
+    const std::string caCertificatePath = config_.caCertificatePath.string();
+    if (!caCertificatePath.empty()) {
+        curl_easy_setopt(handle, CURLOPT_CAINFO, caCertificatePath.c_str());
     }
 
     const CURLcode result = curl_easy_perform(handle);
