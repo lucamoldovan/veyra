@@ -154,7 +154,7 @@ Avahi must be enabled at the system level:
 sudo systemctl enable --now avahi-daemon
 ```
 
-## Run configuration tests without the NDI SDK
+## Run SDK-independent C++ tests
 
 ```bash
 cmake -S . -B build-tests -DVEYRA_BUILD_PLAYER=OFF -DVEYRA_BUILD_TESTS=ON
