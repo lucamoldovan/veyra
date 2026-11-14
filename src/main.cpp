@@ -335,7 +335,10 @@ int main(int argc, char* argv[]) {
                     sourceSetStableSince = discoveryNow;
                 }
 
+                // A managed receiver must never guess which NDI source to display.
+                // Automatic single-source selection is only for standalone mode.
                 const bool automaticSelectionReady =
+                    config.controlPlane.serverUrl.empty() &&
                     discoveryNow - discoveryStartedAt >=
                         std::chrono::seconds(5) &&
                     discoveryNow - sourceSetStableSince >=
@@ -375,14 +378,14 @@ int main(int argc, char* argv[]) {
                                         }
                                     }
                                 } catch (const std::exception& error) {
-                                spdlog::error(
-                                    "NDI capture worker failed: {}",
-                                    error.what()
-                                );
-                                captureFailed.store(true);
+                                    spdlog::error(
+                                        "NDI capture worker failed: {}",
+                                        error.what()
+                                    );
+                                    captureFailed.store(true);
+                                }
                             }
-                        }
-                    );
+                        );
 
                     lastFrameAt = std::chrono::steady_clock::now();
                     continue;
