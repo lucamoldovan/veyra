@@ -59,7 +59,8 @@ int readInteger(
 
     if (value.is_number_unsigned()) {
         const auto parsed = value.get<std::uint64_t>();
-        if (parsed > static_cast<std::uint64_t>(maximum)) {
+        if (parsed < static_cast<std::uint64_t>(minimum) ||
+            parsed > static_cast<std::uint64_t>(maximum)) {
             throw std::runtime_error(std::string("Configuration value '") +
                                      key + "' is outside its allowed range");
         }
@@ -112,9 +113,7 @@ AppConfig load(const std::filesystem::path& path) {
         throw std::runtime_error("Configuration root must be a JSON object");
     }
 
-    const int schemaVersion =
-        readInteger(document, "schemaVersion", 1, 1, 1);
-    (void)schemaVersion;
+    (void)readInteger(document, "schemaVersion", 1, 1, 1);
 
     Json emptyObject = Json::object();
     const Json& ndi = objectOrEmpty(document, "ndi", emptyObject);
