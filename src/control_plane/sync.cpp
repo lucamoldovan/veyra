@@ -93,6 +93,14 @@ std::string sha256(const std::string& bytes) {
     return result;
 }
 
+bool validMediaId(const std::string& value) {
+    return !value.empty() && value.size() <= 64 &&
+        std::all_of(value.begin(), value.end(), [](unsigned char c) {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                   (c >= '0' && c <= '9') || c == '-';
+        });
+}
+
 bool validHash(const std::string& value) {
     return value.size() == 64 && std::all_of(value.begin(), value.end(), [](unsigned char c) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
@@ -234,7 +242,8 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
         const auto size = item.at("sizeBytes").get<std::uint64_t>();
         const int duration = item.at("durationSeconds").get<int>();
         const auto path = item.at("downloadPath").get<std::string>();
-        if (!validHash(hash) || size == 0 || size > 20U * 1024U * 1024U ||
+        if (!validMediaId(mediaId) || !validHash(hash) || size == 0 ||
+            size > 20U * 1024U * 1024U ||
             size > kMaxPlaylistBytes - totalPlaylistBytes ||
             duration < 1 || duration > 3600 || path != "/api/v1/receiver/media/" + mediaId)
             throw std::runtime_error("Receiver media manifest contains invalid metadata or exceeds the 512 MiB cache limit");
