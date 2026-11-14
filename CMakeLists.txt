@@ -53,6 +53,7 @@ add_executable(veyra
     src/config/config.cpp
     src/ndi/discovery.cpp
     src/ndi/receiver.cpp
+    src/video/renderer.cpp
 )
 
 target_include_directories(veyra PRIVATE
