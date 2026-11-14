@@ -100,7 +100,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Implement per-device and group playlist assignment
 - [ ] Implement device configuration and remote actions
 - [ ] Implement system health, logs, and diagnostics
-- [x] Add responsive layout for desktop and mobile\n- [ ] Add accessibility review and dashboard interaction tests
+- [x] Add responsive layout for desktop and mobile
+- [ ] Add accessibility review and dashboard interaction tests
 
 ## Phase 7 — Receiver management and offline-first behavior
 
@@ -124,7 +125,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Build a repeatable local development environment
 - [ ] Package the server and dashboard for local-network deployment
 - [ ] Package and install the receiver as a managed service
-- [x] Provide backup and restore for SQLite data, pairing secret, and media assets\n- [ ] Include server configuration and TLS key/certificate backup guidance
+- [x] Provide backup and restore for SQLite data, pairing secret, and media assets
+- [ ] Include server configuration and TLS key/certificate backup guidance
 - [ ] Test multiple receivers on one LAN
 - [ ] Test server outage while receivers are playing
 - [ ] Test NDI source outage with per-device fallback
