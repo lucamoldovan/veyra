@@ -45,7 +45,7 @@ sudo scripts/install-server-release.sh \
   dist/releases/ndiview-0.2.0.tar.gz.sig \
   0.2.0 \
   https://ndiview-server.local:8787/api/v1/health \
-  /etc/ssl/certs/veyra-lan-ca.pem
+  /etc/ssl/certs/ndiview-lan-ca.pem
 ```
 
 The install script:
@@ -63,7 +63,7 @@ The dashboard is bundled into `dashboard/dist` and served by NDIView Server. HTM
 ```bash
 sudo scripts/rollback-server-release.sh 0.1.0 \
   https://ndiview-server.local:8787/api/v1/health \
-  /etc/ssl/certs/veyra-lan-ca.pem
+  /etc/ssl/certs/ndiview-lan-ca.pem
 ```
 
 Keep at least the previous known-good release and regular off-machine backups. The automatic pre-update backup is stored under `/var/backups/veyra/`; it is not a substitute for an independent backup.

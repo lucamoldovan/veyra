@@ -301,7 +301,7 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
 
 
 test("operator assigns a receiver source and fallback playlist; receiver sync is scoped to assigned media", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-assignment-test-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-assignment-test-"));
   const app = buildApp({
     databasePath: ":memory:",
     setupKey: "test-setup-key",
@@ -387,7 +387,7 @@ test("operator assigns a receiver source and fallback playlist; receiver sync is
 });
 
 test("media library validates image signatures and protects playlist references", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-media-test-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-media-test-"));
   const app = buildApp({
     databasePath: ":memory:",
     setupKey: "test-setup-key",
@@ -517,7 +517,7 @@ test("media library validates image signatures and protects playlist references"
 });
 
 test("backup command creates a consistent database and pairing-secret backup", () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-backup-test-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-backup-test-"));
   const databasePath = join(directory, "source.sqlite");
   const pairingSecretPath = join(directory, "pairing-secret");
   const backupDirectory = join(directory, "backups");
@@ -581,8 +581,8 @@ test("backup command creates a consistent database and pairing-secret backup", (
 });
 
 test("invalid pairing secret fails startup without leaking the database handle", () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-invalid-secret-"));
-  const databasePath = join(directory, "veyra.sqlite");
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-invalid-secret-"));
+  const databasePath = join(directory, "ndiview.sqlite");
   const pairingSecretPath = join(directory, "pairing-secret");
 
   try {
@@ -600,8 +600,8 @@ test("invalid pairing secret fails startup without leaking the database handle",
 });
 
 test("pairing secret is generated with restrictive permissions and remains stable", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-pairing-secret-"));
-  const databasePath = join(directory, "veyra.sqlite");
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-pairing-secret-"));
+  const databasePath = join(directory, "ndiview.sqlite");
   const pairingSecretPath = join(directory, "pairing-secret");
 
   try {
@@ -629,9 +629,9 @@ test("pairing secret is generated with restrictive permissions and remains stabl
 });
 
 test("database files and containing directory are private", () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-private-db-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-private-db-"));
   const databaseDirectory = join(directory, "private-data");
-  const databasePath = join(databaseDirectory, "veyra.sqlite");
+  const databasePath = join(databaseDirectory, "ndiview.sqlite");
 
   try {
     const database = openDatabase(databasePath);
@@ -648,7 +648,7 @@ test("database files and containing directory are private", () => {
 
 test("database refuses shared system directories", () => {
   const temporaryDirectoryMode = statSync(tmpdir()).mode & 0o777;
-  assert.throws(() => openDatabase(join(tmpdir(), "veyra-unsafe.sqlite")));
+  assert.throws(() => openDatabase(join(tmpdir(), "ndiview-unsafe.sqlite")));
   assert.equal(statSync(tmpdir()).mode & 0o777, temporaryDirectoryMode);
 });
 
@@ -671,8 +671,8 @@ test("database initializes a versioned schema", () => {
 
 
 test("database upgrades a populated version-one schema without losing devices", () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-migration-"));
-  const databasePath = join(directory, "veyra.sqlite");
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-migration-"));
+  const databasePath = join(directory, "ndiview.sqlite");
 
   try {
     const legacy = openDatabase(databasePath);
@@ -820,7 +820,7 @@ test("operator can queue receiver restart and full-device reboot separately", as
 });
 
 test("production dashboard assets are served with safe cache headers and SPA fallback", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "veyra-dashboard-test-"));
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-dashboard-test-"));
   mkdirSync(join(directory, "assets"), { recursive: true });
   writeFileSync(join(directory, "index.html"), "<!doctype html><title>NDIView</title>");
   writeFileSync(join(directory, "assets", "app-a1b2c3.js"), "console.log(1)");
