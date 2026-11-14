@@ -235,6 +235,8 @@ int main(int argc, char* argv[]) {
             } else if (receiver && sourceConnected.load() &&
                        now - lastFrameAt <= std::chrono::seconds(2)) {
                 snapshot.mode = "ndi";
+            } else if (fallbackVisible) {
+                snapshot.mode = "fallback";
             } else {
                 snapshot.mode = "idle";
             }
