@@ -108,7 +108,7 @@ int main() {
         configPath,
         R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://veyra.local:8787","deviceName":"Lobby Display","pairingCode":"123456789012","caCertificatePath":"/etc/veyra/ca.pem","credentialPath":"/var/lib/veyra/device-token","heartbeatIntervalSeconds":20}})"
     );
-    const controlPlane = veyra::config::load(configPath).controlPlane;
+    const auto controlPlane = veyra::config::load(configPath).controlPlane;
     check(controlPlane.serverUrl == "https://veyra.local:8787", "loads HTTPS control-plane URL");
     check(controlPlane.deviceName == "Lobby Display", "loads receiver device name");
     check(controlPlane.pairingCode == "123456789012", "loads a twelve-digit pairing code");
