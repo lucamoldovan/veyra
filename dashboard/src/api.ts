@@ -147,3 +147,101 @@ export function removeRevokedDevice(deviceId: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+export interface MediaAsset {
+  id: string;
+  name: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+  contentUrl: string;
+}
+
+export function getMedia(signal?: AbortSignal): Promise<{ media: MediaAsset[] }> {
+  return request<{ media: MediaAsset[] }>("/api/v1/media", { signal });
+}
+
+export async function uploadMedia(file: File): Promise<MediaAsset> {
+  const response = await fetch("/api/v1/media", {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type,
+      "X-Veyra-Filename": encodeURIComponent(file.name),
+      Accept: "application/json",
+    },
+    body: file,
+    cache: "no-store",
+  });
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message =
+      typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+        ? payload.error
+        : `Upload failed with HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return payload as MediaAsset;
+}
+
+export function deleteMedia(mediaId: string): Promise<void> {
+  return request<void>(`/api/v1/media/${encodeURIComponent(mediaId)}`, { method: "DELETE" });
+}
+
+export interface PlaylistSummary {
+  id: string;
+  name: string;
+  description: string;
+  itemCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlaylistItem {
+  id?: string;
+  mediaId: string;
+  position?: number;
+  durationSeconds: number;
+  mediaName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  contentUrl?: string;
+}
+
+export interface PlaylistDetail {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  items: PlaylistItem[];
+}
+
+export function getPlaylists(signal?: AbortSignal): Promise<{ playlists: PlaylistSummary[] }> {
+  return request<{ playlists: PlaylistSummary[] }>("/api/v1/playlists", { signal });
+}
+
+export function createPlaylist(input: { name: string; description?: string }): Promise<PlaylistSummary> {
+  return request<PlaylistSummary>("/api/v1/playlists", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getPlaylist(playlistId: string, signal?: AbortSignal): Promise<PlaylistDetail> {
+  return request<PlaylistDetail>(`/api/v1/playlists/${encodeURIComponent(playlistId)}`, { signal });
+}
+
+export function updatePlaylist(
+  playlistId: string,
+  input: { name: string; description: string; items: Array<{ mediaId: string; durationSeconds: number }> },
+): Promise<{ id: string; name: string; description: string; itemCount: number; updatedAt: string }> {
+  return request(`/api/v1/playlists/${encodeURIComponent(playlistId)}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deletePlaylist(playlistId: string): Promise<void> {
+  return request<void>(`/api/v1/playlists/${encodeURIComponent(playlistId)}`, { method: "DELETE" });
+}
