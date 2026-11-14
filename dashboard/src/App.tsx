@@ -337,6 +337,7 @@ function AuthScreen({
                   Setup key
                   <input
                     autoComplete="off"
+                    maxLength={128}
                     required
                     value={setupKey}
                     onChange={(event) => setSetupKey(event.target.value)}
