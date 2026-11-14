@@ -26,6 +26,16 @@ Renderer::Renderer(const config::DisplayConfig& config) {
         throw sdlError("Could not initialize SDL");
     }
     sdlInitialized_ = true;
+    const int imageFlags = IMG_INIT_JPG | IMG_INIT_PNG | IMG_INIT_WEBP;
+    const int initializedImageFlags = IMG_Init(imageFlags);
+    if ((initializedImageFlags & imageFlags) != imageFlags) {
+        const auto error = std::runtime_error(std::string("Could not initialize SDL_image: ") + IMG_GetError());
+        IMG_Quit();
+        SDL_Quit();
+        sdlInitialized_ = false;
+        throw error;
+    }
+    imageInitialized_ = true;
     SDL_DisableScreenSaver();
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
@@ -88,6 +98,7 @@ Renderer::Renderer(const config::DisplayConfig& config) {
 
 Renderer::~Renderer() {
     destroyTexture();
+    if (imageTexture_ != nullptr) SDL_DestroyTexture(imageTexture_);
 
     if (renderer_ != nullptr) {
         SDL_DestroyRenderer(renderer_);
@@ -95,6 +106,7 @@ Renderer::~Renderer() {
     if (window_ != nullptr) {
         SDL_DestroyWindow(window_);
     }
+    if (imageInitialized_) IMG_Quit();
     if (sdlInitialized_) {
         SDL_ShowCursor(SDL_ENABLE);
         SDL_EnableScreenSaver();
@@ -417,6 +429,50 @@ void Renderer::present(const VideoFrame& frame) {
         throw sdlError("Could not render the video frame");
     }
 
+    SDL_RenderPresent(renderer_);
+}
+
+
+void Renderer::presentImage(const std::filesystem::path& path) {
+    if (path.empty()) throw std::runtime_error("Fallback image path is empty");
+    if (path != imagePath_ || imageTexture_ == nullptr) {
+        SDL_Texture* replacement = IMG_LoadTexture(renderer_, path.c_str());
+        if (replacement == nullptr) {
+            throw std::runtime_error(std::string("Could not load fallback image '") +
+                                     path.string() + "': " + IMG_GetError());
+        }
+        int width = 0;
+        int height = 0;
+        if (SDL_QueryTexture(replacement, nullptr, nullptr, &width, &height) != 0 ||
+            width <= 0 || height <= 0) {
+            SDL_DestroyTexture(replacement);
+            throw sdlError("Could not inspect fallback image");
+        }
+        if (imageTexture_ != nullptr) SDL_DestroyTexture(imageTexture_);
+        imageTexture_ = replacement;
+        imagePath_ = path;
+        imageWidth_ = width;
+        imageHeight_ = height;
+    }
+
+    int outputWidth = 0;
+    int outputHeight = 0;
+    if (SDL_GetRendererOutputSize(renderer_, &outputWidth, &outputHeight) != 0 ||
+        outputWidth <= 0 || outputHeight <= 0) {
+        throw sdlError("Could not read renderer output dimensions");
+    }
+    const double scale = std::min(
+        static_cast<double>(outputWidth) / imageWidth_,
+        static_cast<double>(outputHeight) / imageHeight_
+    );
+    const int width = static_cast<int>(std::lround(imageWidth_ * scale));
+    const int height = static_cast<int>(std::lround(imageHeight_ * scale));
+    SDL_Rect destination{(outputWidth - width) / 2, (outputHeight - height) / 2, width, height};
+    if (SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255) != 0 ||
+        SDL_RenderClear(renderer_) != 0 ||
+        SDL_RenderCopy(renderer_, imageTexture_, nullptr, &destination) != 0) {
+        throw sdlError("Could not render fallback image");
+    }
     SDL_RenderPresent(renderer_);
 }
 
