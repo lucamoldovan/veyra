@@ -46,7 +46,13 @@ Receiver::Receiver(Source source) : source_(std::move(source)) {
     settings.color_format = NDIlib_recv_color_format_UYVY_BGRA;
     settings.bandwidth = NDIlib_recv_bandwidth_highest;
     settings.allow_video_fields = false;
+#if defined(VEYRA_NDI_RECV_NAME_FIELD_P_NDI_NAME)
     settings.p_ndi_name = "Veyra Receiver";
+#elif defined(VEYRA_NDI_RECV_NAME_FIELD_P_NDI_RECV_NAME)
+    settings.p_ndi_recv_name = "Veyra Receiver";
+#else
+#error "CMake must detect the NDI receiver-name field before compiling"
+#endif
 
     instance_ = NDIlib_recv_create_v3(&settings);
     if (instance_ == nullptr) {
