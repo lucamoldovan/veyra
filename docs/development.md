@@ -60,7 +60,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
 - [x] Commit npm lockfiles and use reproducible npm ci installs in CI
-- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 5
+- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 6
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
