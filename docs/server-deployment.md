@@ -1,6 +1,6 @@
-# Central server and dashboard deployment
+# NDIView central server and dashboard deployment
 
-The central server and dashboard are deployed together as one immutable release. The server serves the production Vite build from the same HTTPS origin, so operators do not run a separate Vite process in production. Refreshing the browser loads the current dashboard release.
+The NDIView central server and dashboard are deployed together as one immutable release. Existing server-side paths, service identifiers and `VEYRA_*` environment variables retain their legacy names for compatibility; do not rename them manually. The server serves the production Vite build from the same HTTPS origin, so operators do not run a separate Vite process in production. Refreshing the browser loads the current dashboard release.
 
 ## One-time signing setup
 
@@ -56,7 +56,7 @@ The install script:
 - Stops the service, backs up persistent state, atomically switches `/opt/veyra/current`, and restarts.
 - Checks the HTTPS health endpoint. If the new release fails, it restores the previous release automatically.
 
-The dashboard is bundled into `dashboard/dist` and served by Veyra Server. HTML is revalidated on refresh; hashed assets receive immutable cache headers.
+The dashboard is bundled into `dashboard/dist` and served by NDIView Server. HTML is revalidated on refresh; hashed assets receive immutable cache headers.
 
 ## Manual rollback
 
