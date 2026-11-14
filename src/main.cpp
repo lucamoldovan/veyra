@@ -155,6 +155,7 @@ int main(int argc, char* argv[]) {
         std::jthread captureThread;
 
         bool displayIsClear = true;
+        bool connectionWasActive = false;
         bool playbackWasActive = false;
         const auto frameInterval =
             std::chrono::duration_cast<std::chrono::steady_clock::duration>(
@@ -302,6 +303,15 @@ int main(int argc, char* argv[]) {
 
             const auto statusTime = std::chrono::steady_clock::now();
             const bool connected = sourceConnected.load();
+            if (connected != connectionWasActive) {
+                if (connected) {
+                    spdlog::info("NDI source connection established");
+                } else {
+                    spdlog::warn("NDI source connection lost");
+                }
+                connectionWasActive = connected;
+            }
+
             const bool frameIsStale =
                 statusTime - lastFrameAt > std::chrono::seconds(2);
 
