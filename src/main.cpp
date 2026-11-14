@@ -29,6 +29,29 @@ void handleShutdownSignal(int) {
     shutdownRequested = 1;
 }
 
+int listSources() {
+    try {
+        veyra::ndi::Discovery discovery;
+        (void)discovery.waitForChanges(3000);
+        const auto sources = discovery.currentSources();
+
+        if (sources.empty()) {
+            spdlog::warn("No NDI sources found");
+            return EXIT_SUCCESS;
+        }
+
+        spdlog::info("Found {} NDI source(s):", sources.size());
+        for (const auto& source : sources) {
+            spdlog::info("Name: {}", source.name);
+            spdlog::info("Address: {}", source.identity());
+        }
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
+        spdlog::error("Could not list NDI sources: {}", error.what());
+        return EXIT_FAILURE;
+    }
+}
+
 std::optional<veyra::ndi::Source> selectSource(
     const std::vector<veyra::ndi::Source>& sources,
     const veyra::config::NdiConfig& config
@@ -62,12 +85,20 @@ std::optional<veyra::ndi::Source> selectSource(
 
 int main(int argc, char* argv[]) {
     std::filesystem::path configPath = "/etc/veyra/config.json";
+    bool listSourcesOnly = false;
 
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--help" || argument == "-h") {
-            spdlog::info("Usage: veyra [--config /path/to/config.json]");
+            spdlog::info(
+                "Usage: veyra [--config /path/to/config.json] [--list-sources]"
+            );
             return EXIT_SUCCESS;
+        }
+
+        if (argument == "--list-sources") {
+            listSourcesOnly = true;
+            continue;
         }
 
         if (argument == "--config" && index + 1 < argc) {
@@ -76,7 +107,9 @@ int main(int argc, char* argv[]) {
         }
 
         spdlog::error("Unknown or incomplete argument: {}", argument);
-        spdlog::info("Usage: veyra [--config /path/to/config.json]");
+        spdlog::info(
+            "Usage: veyra [--config /path/to/config.json] [--list-sources]"
+        );
         return EXIT_FAILURE;
     }
 
@@ -88,6 +121,12 @@ int main(int argc, char* argv[]) {
     if (!NDIlib_initialize()) {
         spdlog::critical("Failed to initialize the NDI runtime");
         return EXIT_FAILURE;
+    }
+
+    if (listSourcesOnly) {
+        const int listExitCode = listSources();
+        NDIlib_destroy();
+        return listExitCode;
     }
 
     int exitCode = EXIT_SUCCESS;
