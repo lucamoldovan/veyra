@@ -17,6 +17,7 @@
 #include <string_view>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <unordered_set>
 
 namespace veyra::control_plane {
 namespace {
@@ -153,12 +154,13 @@ SyncSnapshot parseState(const Json& state, const std::filesystem::path& root, bo
         const auto file = root / (hash + extensionFor(mime));
         struct stat info{};
         if (::lstat(file.c_str(), &info) != 0 || !S_ISREG(info.st_mode) ||
-            static_cast<std::uint64_t>(info.st_size) != size) return {};
+            static_cast<std::uint64_t>(info.st_size) != size) continue;
         if (verify) {
             std::ifstream input(file, std::ios::binary);
+            if (!input) continue;
             std::string bytes((std::istreambuf_iterator<char>(input)), {});
-            if (!input.good() && !input.eof()) return {};
-            if (sha256(bytes) != hash) return {};
+            if (!input.good() && !input.eof()) continue;
+            if (sha256(bytes) != hash) continue;
         }
         snapshot.fallbackItems.push_back({
             item.value("mediaId", ""), file, duration, hash
@@ -269,6 +271,15 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
         {"playlistRevision", snapshot.playlistRevision}, {"items", committedItems}
     };
     atomicWrite(config_.cachePath / "state.json", state.dump(2));
+
+    std::unordered_set<std::string> retainedFiles;
+    for (const auto& item : snapshot.fallbackItems) retainedFiles.insert(item.path.filename().string());
+    for (const auto& entry : std::filesystem::directory_iterator(mediaRoot)) {
+        if (!retainedFiles.contains(entry.path().filename().string())) {
+            std::error_code ignored;
+            std::filesystem::remove(entry.path(), ignored);
+        }
+    }
     return snapshot;
 }
 
