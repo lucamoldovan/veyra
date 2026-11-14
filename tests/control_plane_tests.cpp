@@ -134,7 +134,7 @@ int main() {
             const std::string reason = index == 0 ? "Created" : index == 7 ? "Not Found" : "OK";
             if (index == 0) {
                 responseBody = "{\"deviceId\":\"device-test\",\"deviceToken\":\"" + token +
-                    "\",\"heartbeatIntervalSeconds\":5}";
+                    "\",\"heartbeatIntervalSeconds\":120}";
             } else if (index == 1) {
                 responseBody = "{}";
             } else if (index == 2) {
