@@ -1,6 +1,6 @@
 # Veyra control-plane contract (draft)
 
-This document is the working contract for communication between the Veyra local server, dashboard, and receiver agents. It is a design artifact, not an implemented API. Route names and payloads may change before the first server release; once implementation begins, the contract must be versioned and tested.
+This document defines the intended communication contract for the Veyra local server, dashboard, and receiver agents. The operator setup/session routes, device inventory, receiver pairing, and heartbeat endpoints listed as implemented below exist today. The remaining routes, WebSocket messages, and workflows are design targets, not implemented behavior. Treat this as an evolving contract and keep it aligned with tested implementation.
 
 ## Design principles
 
@@ -190,13 +190,12 @@ Commands are idempotent where possible. Replaying the same command ID must not c
 
 These need a technical decision record before implementation:
 
-1. Exact server and dashboard framework versions.
-2. Database engine and migration strategy.
-3. Device credential format, rotation, and LAN transport security.
-4. Whether the receiver uses HTTP polling plus WebSocket, or one persistent WebSocket channel for live control.
-5. Media storage layout, quotas, backup, and restore.
-6. Pairing UX and how the receiver receives its first server URL/code.
-7. Heartbeat interval and stale/offline thresholds.
-8. Playlist behavior when an item is missing or corrupted.
+1. Database migration strategy for the existing SQLite schema.
+2. Device credential rotation, revocation, recovery, and LAN transport security.
+3. Whether the receiver uses HTTP polling plus WebSocket, or one persistent WebSocket channel for live control.
+4. Media storage layout, quotas, backup, and restore.
+5. Pairing UX and how the receiver receives its first server URL/code.
+6. Whether heartbeat interval and stale/offline thresholds should be configurable.
+7. Playlist behavior when an item is missing or corrupted.
 
 Until these are resolved, this document is a contract draft and must not be mistaken for an implemented security or compatibility guarantee.
