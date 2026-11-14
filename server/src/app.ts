@@ -110,8 +110,9 @@ function safeDisplayName(rawName: string | undefined): string {
     try { decoded = decodeURIComponent(rawName); } catch { decoded = rawName; }
   }
   return decoded
-    .replace(/[\\x00-\\x1f\\x7f]/g, "")
-    .replace(/[\\/\\\\]/g, "_")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replaceAll("/", "_")
+    .replaceAll("\\", "_")
     .trim()
     .slice(0, 120) || "Untitled image";
 }
