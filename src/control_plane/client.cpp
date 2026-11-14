@@ -68,6 +68,7 @@ std::string trim(std::string value) {
 
 Client::Client(config::ControlPlaneConfig config)
     : config_(std::move(config)),
+      sync_(config_),
       heartbeatIntervalSeconds_(config_.heartbeatIntervalSeconds),
       startedAt_(std::chrono::steady_clock::now()) {
     if (config_.serverUrl.empty()) {
@@ -107,7 +108,17 @@ void Client::updateStatus(PlaybackSnapshot snapshot) {
     snapshot_ = std::move(snapshot);
 }
 
+SyncSnapshot Client::syncSnapshot() const {
+    std::lock_guard lock(syncMutex_);
+    return syncSnapshot_;
+}
+
 void Client::run(const std::stop_token stopToken) {
+    {
+        std::lock_guard lock(syncMutex_);
+        syncSnapshot_ = sync_.loadCached();
+    }
+    auto nextSyncAt = std::chrono::steady_clock::now();
     try {
         deviceToken_ = loadCredential();
     } catch (const std::exception& error) {
@@ -133,6 +144,19 @@ void Client::run(const std::stop_token stopToken) {
 
         if (sendHeartbeat()) {
             retryDelay = std::chrono::seconds{5};
+            if (std::chrono::steady_clock::now() >= nextSyncAt) {
+                try {
+                    auto synced = sync_.synchronize(config_.serverUrl, deviceToken_, config_.caCertificatePath);
+                    {
+                        std::lock_guard lock(syncMutex_);
+                        syncSnapshot_ = std::move(synced);
+                    }
+                    std::clog << "Veyra receiver configuration and fallback cache synchronized" << '\n';
+                } catch (const std::exception& error) {
+                    std::clog << "Veyra receiver sync deferred: " << error.what() << '\n';
+                }
+                nextSyncAt = std::chrono::steady_clock::now() + std::chrono::seconds{config_.syncIntervalSeconds};
+            }
             waitFor(stopToken, std::chrono::seconds{heartbeatIntervalSeconds_});
         } else {
             waitFor(stopToken, retryDelay);
