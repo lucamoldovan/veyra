@@ -164,14 +164,16 @@ void Client::run(const std::stop_token stopToken) {
 void Client::runSync(const std::stop_token stopToken, std::string deviceToken) {
     while (!stopToken.stop_requested()) {
         try {
-            auto synced = sync_.synchronize(config_.serverUrl, deviceToken, config_.caCertificatePath);
+            auto synced = sync_.synchronize(config_.serverUrl, deviceToken, config_.caCertificatePath, stopToken);
             {
                 std::lock_guard lock(syncMutex_);
                 syncSnapshot_ = std::move(synced);
             }
             std::clog << "Veyra receiver configuration and fallback cache synchronized" << '\n';
         } catch (const std::exception& error) {
-            std::clog << "Veyra receiver sync deferred: " << error.what() << '\n';
+            if (!stopToken.stop_requested()) {
+                std::clog << "Veyra receiver sync deferred: " << error.what() << '\n';
+            }
         }
         waitFor(stopToken, std::chrono::seconds{config_.syncIntervalSeconds});
     }
