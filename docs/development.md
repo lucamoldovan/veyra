@@ -60,7 +60,7 @@ This roadmap covers the complete NDIView platform. Checkboxes describe repositor
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
 - [x] Commit npm lockfiles and use reproducible npm ci installs in CI
-- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 8
+- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 9
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
