@@ -104,3 +104,32 @@ export function logout(): Promise<{ authenticated: false }> {
     method: "DELETE",
   });
 }
+
+export interface Device {
+  id: string;
+  name: string;
+  status: "online" | "stale" | "offline";
+  platform: string;
+  softwareVersion: string;
+  lastSeenAt: string | null;
+  lastIp: string | null;
+  playbackMode: string;
+  ndiSourceName: string | null;
+  uptimeSeconds: number | null;
+  createdAt: string;
+}
+
+export interface PairingCode {
+  code: string;
+  expiresAt: string;
+}
+
+export function getDevices(signal?: AbortSignal): Promise<{ devices: Device[] }> {
+  return request<{ devices: Device[] }>("/api/v1/devices", { signal });
+}
+
+export function createDevicePairingCode(): Promise<PairingCode> {
+  return request<PairingCode>("/api/v1/devices/pairing-codes", {
+    method: "POST",
+  });
+}
