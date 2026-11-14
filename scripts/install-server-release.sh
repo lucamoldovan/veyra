@@ -89,10 +89,10 @@ systemctl restart veyra-server.service || true
 HEALTHY=0
 for attempt in $(seq 1 20); do
   if curl --fail --silent --show-error --max-time 5 --cacert "$CA_BUNDLE" "$HEALTH_URL" -o /tmp/ndiview-health.json &&
-     grep -q '"status":"ok"' /tmp/veyra-health.json; then HEALTHY=1; break; fi
+     grep -q '"status":"ok"' /tmp/ndiview-health.json; then HEALTHY=1; break; fi
   sleep 3
 done
-rm -f /tmp/veyra-health.json
+rm -f /tmp/ndiview-health.json
 if [[ "$HEALTHY" -ne 1 ]]; then
   echo "New server release failed its health check; rolling back." >&2
   systemctl stop veyra-server.service || true
@@ -105,6 +105,6 @@ if [[ "$HEALTHY" -ne 1 ]]; then
   fi
   exit 1
 fi
-echo "Veyra server and dashboard release $VERSION is healthy."
+echo "NDIView server and dashboard release $VERSION is healthy."
 echo "Previous release retained at: ${OLD_TARGET:-none}"
 echo "Persistent data and pre-update backup: $BACKUP"
