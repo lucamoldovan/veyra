@@ -102,9 +102,10 @@ The receiver includes a control-plane client for one-time pairing and periodic h
 3. Install the example config at the default path and edit it:
 
 ```bash
-sudo install -d -m 700 /etc/veyra
+sudo install -d -m 755 /etc/veyra
 sudo install -m 600 config/veyra.example.json /etc/veyra/config.json
-sudo nano /etc/veyra/config.json
+sudo chown "$(id -un):$(id -gn)" /etc/veyra/config.json
+nano /etc/veyra/config.json
 ```
 
 Then set the `controlPlane` section to the following values:
