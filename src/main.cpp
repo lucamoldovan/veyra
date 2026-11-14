@@ -110,7 +110,12 @@ int main(int argc, char* argv[]) {
 
         bool displayIsClear = true;
         bool playbackWasActive = false;
-        auto lastFrameAt = std::chrono::steady_clock::now();
+        const auto frameInterval =
+            std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>(1.0 / config.display.targetFps)
+            );
+        auto nextPresentationAt = std::chrono::steady_clock::now();
+        auto lastFrameAt = nextPresentationAt;
         auto lastDiscoveryLog = lastFrameAt;
 
         spdlog::info("Waiting for the configured NDI source");
@@ -193,8 +198,9 @@ int main(int argc, char* argv[]) {
                 throw std::runtime_error("NDI capture worker stopped unexpectedly");
             }
 
+            const auto now = std::chrono::steady_clock::now();
             std::optional<veyra::ndi::VideoFrame> frame;
-            {
+            if (now >= nextPresentationAt) {
                 std::lock_guard lock(latestFrameMutex);
                 if (latestFrame.has_value()) {
                     frame = std::move(latestFrame);
@@ -203,6 +209,7 @@ int main(int argc, char* argv[]) {
             }
 
             if (frame.has_value()) {
+                nextPresentationAt = now + frameInterval;
                 renderer.present(*frame);
                 displayIsClear = false;
 
@@ -218,9 +225,9 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
-            const auto now = std::chrono::steady_clock::now();
+            const auto statusTime = std::chrono::steady_clock::now();
             const bool frameIsStale =
-                now - lastFrameAt > std::chrono::seconds(2);
+                statusTime - lastFrameAt > std::chrono::seconds(2);
 
             if (frameIsStale) {
                 if (playbackWasActive) {
