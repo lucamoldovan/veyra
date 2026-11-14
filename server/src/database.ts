@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 export type VeyraDatabase = Database.Database;
@@ -10,10 +10,37 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
 
   if (resolvedPath !== ":memory:") {
-    mkdirSync(dirname(resolvedPath), { recursive: true });
+    const directory = dirname(resolvedPath);
+    const absoluteDirectory = resolve(directory);
+    const unsafeTargets = new Set([
+      "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
+      "/etc", "/usr", "/opt", "/run", "/mnt", "/media", "/dev", "/proc",
+      "/sys", "/boot",
+    ]);
+    if (unsafeTargets.has(absoluteDirectory)) {
+      throw new Error("Veyra database must live in a dedicated private directory");
+    }
+    mkdirSync(absoluteDirectory, { recursive: true, mode: 0o700 });
+    const directoryInfo = lstatSync(absoluteDirectory);
+    if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
+      throw new Error("Veyra database directory must be a real directory, not a symlink");
+    }
+    chmodSync(absoluteDirectory, 0o700);
+
+    if (existsSync(resolvedPath)) {
+      const databaseInfo = lstatSync(resolvedPath);
+      if (!databaseInfo.isFile() || databaseInfo.isSymbolicLink()) {
+        throw new Error("Veyra database path must be a regular file, not a symlink");
+      }
+      chmodSync(resolvedPath, 0o600);
+    } else {
+      const descriptor = openSync(resolvedPath, "wx", 0o600);
+      closeSync(descriptor);
+    }
   }
 
   const database = new Database(resolvedPath);
+  if (resolvedPath !== ":memory:") chmodSync(resolvedPath, 0o600);
   database.pragma("journal_mode = WAL");
   database.pragma("foreign_keys = ON");
   database.pragma("busy_timeout = 5000");
