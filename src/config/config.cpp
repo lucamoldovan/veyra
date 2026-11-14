@@ -3,6 +3,9 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -75,6 +78,60 @@ int readInteger(
     return static_cast<int>(parsed);
 }
 
+std::filesystem::path expandHome(const std::string& value) {
+    if (value == "~" || value.starts_with("~/")) {
+        const char* home = std::getenv("HOME");
+        if (home == nullptr || *home == '\\0') {
+            throw std::runtime_error("HOME is not set; configure an absolute credentialPath");
+        }
+        if (value == "~") return std::filesystem::path(home);
+        return std::filesystem::path(home) / value.substr(2);
+    }
+    return std::filesystem::path(value);
+}
+
+void validateServerUrl(const std::string& url) {
+    if (url.empty()) return;
+    const auto schemeEnd = url.find("://");
+    if (schemeEnd == std::string::npos) {
+        throw std::runtime_error("controlPlane.serverUrl must use https:// (or loopback http://)");
+    }
+    std::string scheme = url.substr(0, schemeEnd);
+    std::transform(scheme.begin(), scheme.end(), scheme.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (scheme != "https" && scheme != "http") {
+        throw std::runtime_error("controlPlane.serverUrl must use HTTPS");
+    }
+
+    const auto authorityStart = schemeEnd + 3;
+    const auto authorityEnd = url.find_first_of("/?#", authorityStart);
+    const std::string authority = url.substr(
+        authorityStart,
+        authorityEnd == std::string::npos ? std::string::npos : authorityEnd - authorityStart
+    );
+    if (authority.empty() || authority.find('@') != std::string::npos) {
+        throw std::runtime_error("controlPlane.serverUrl has an invalid authority");
+    }
+    if (url.find_first_of("?#") != std::string::npos) {
+        throw std::runtime_error("controlPlane.serverUrl must not contain a query or fragment");
+    }
+
+    if (scheme == "http") {
+        std::string host = authority;
+        if (host.starts_with("[")) {
+            const auto bracket = host.find(']');
+            if (bracket != std::string::npos) host = host.substr(0, bracket + 1);
+        } else if (const auto colon = host.find(':'); colon != std::string::npos) {
+            host = host.substr(0, colon);
+        }
+        std::transform(host.begin(), host.end(), host.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (host != "127.0.0.1" && host != "localhost" && host != "[::1]") {
+            throw std::runtime_error("Plain HTTP is allowed only for a loopback control-plane URL");
+        }
+    }
+}
+
 bool readBoolean(const Json& object, const char* key, const bool fallback) {
     if (!object.contains(key)) {
         return fallback;
@@ -130,6 +187,35 @@ AppConfig load(const std::filesystem::path& path) {
     config.display.fullscreen =
         readBoolean(display, "fullscreen", true);
     config.display.vsync = readBoolean(display, "vsync", true);
+
+    const Json& controlPlane = objectOrEmpty(document, "controlPlane", emptyObject);
+    config.controlPlane.serverUrl = readString(controlPlane, "serverUrl", "");
+    while (!config.controlPlane.serverUrl.empty() && config.controlPlane.serverUrl.back() == '/') {
+        config.controlPlane.serverUrl.pop_back();
+    }
+    validateServerUrl(config.controlPlane.serverUrl);
+    config.controlPlane.deviceName = readString(controlPlane, "deviceName", "Veyra Receiver");
+    if (config.controlPlane.deviceName.empty() || config.controlPlane.deviceName.size() > 80) {
+        throw std::runtime_error("controlPlane.deviceName must contain 1 to 80 characters");
+    }
+    config.controlPlane.pairingCode = readString(controlPlane, "pairingCode", "");
+    if (!config.controlPlane.pairingCode.empty() &&
+        (config.controlPlane.pairingCode.size() != 12 ||
+         !std::all_of(config.controlPlane.pairingCode.begin(), config.controlPlane.pairingCode.end(),
+                      [](unsigned char c) { return c >= '0' && c <= '9'; }))) {
+        throw std::runtime_error("controlPlane.pairingCode must contain exactly 12 digits");
+    }
+    const auto caPath = readString(controlPlane, "caCertificatePath", "");
+    config.controlPlane.caCertificatePath = caPath.empty()
+        ? std::filesystem::path{}
+        : expandHome(caPath);
+    const auto credentialPath = readString(
+        controlPlane, "credentialPath", "~/.local/state/veyra/device-token"
+    );
+    config.controlPlane.credentialPath = expandHome(credentialPath);
+    config.controlPlane.heartbeatIntervalSeconds = readInteger(
+        controlPlane, "heartbeatIntervalSeconds", 15, 5, 120
+    );
 
     return config;
 }
