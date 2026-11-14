@@ -89,6 +89,26 @@ test("first-run setup creates an operator and a session", async () => {
     });
     assert.equal(session.json().authenticated, true);
     assert.equal(session.json().operator.username, "admin");
+
+    const legacyCookie = String(cookie).split(";")[0].replace(/^ndiview_session=/, "veyra_session=");
+    const legacySession = await app.inject({
+      method: "GET",
+      url: "/api/v1/auth/session",
+      headers: { cookie: legacyCookie },
+    });
+    assert.equal(legacySession.json().authenticated, true);
+    const legacyLogout = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/auth/session",
+      headers: { cookie: legacyCookie },
+    });
+    assert.deepEqual(legacyLogout.json(), { authenticated: false });
+    const expiredLegacySession = await app.inject({
+      method: "GET",
+      url: "/api/v1/auth/session",
+      headers: { cookie: legacyCookie },
+    });
+    assert.equal(expiredLegacySession.json().authenticated, false);
   } finally {
     await app.close();
   }
