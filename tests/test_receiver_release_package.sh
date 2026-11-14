@@ -20,7 +20,6 @@ openssl pkeyutl -verify -rawin -pubin -inkey "$TEMP/public.pem" -sigfile "$SIGNA
 python3 - "$MANIFEST" "$ARCHIVE" <<'PY'
 import hashlib
 import json
-import os
 import sys
 manifest_path, archive_path = sys.argv[1:]
 with open(manifest_path, encoding="utf-8") as stream:
@@ -34,8 +33,7 @@ assert manifest["artifactSha256"] == hashlib.sha256(archive).hexdigest()
 assert manifest["artifactSizeBytes"] == len(archive)
 assert manifest["signingKeyId"] == "test-key"
 PY
-tar -tzf "$ARCHIVE" | grep -Eq '^\./bin/ndiview
-
+tar -tzf "$ARCHIVE" | grep -Eq '^\\./bin/ndiview$'
 NDIVIEW_RELEASE_VERIFY_KEY="$TEMP/public.pem" \
 NDIVIEW_RECEIVER_RELEASES_DIR="$TEMP/store" \
 bash "$ROOT/scripts/publish-receiver-release.sh" "$ARCHIVE" "$MANIFEST" "$SIGNATURE"
