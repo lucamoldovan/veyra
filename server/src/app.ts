@@ -835,7 +835,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const device = database.prepare("SELECT id, last_seen_at FROM devices WHERE id = ? AND credential_revoked_at IS NULL").get(request.params.deviceId) as { id: string; last_seen_at: string | null } | undefined;
     if (!device) return reply.code(404).send({ error: "Active receiver not found" });
     if (!device.last_seen_at || now.getTime() - Date.parse(device.last_seen_at) > 45_000) return reply.code(409).send({ error: "Receiver must be online before it can receive an action" });
-    const active = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type=? AND status IN ('queued','claimed','restarting') AND expires_at>? LIMIT 1").get(device.id, action, nowIso) as { id: string } | undefined;
+    const active = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND status IN ('queued','claimed','restarting') AND expires_at>? LIMIT 1").get(device.id, nowIso) as { id: string } | undefined;
     if (active) return reply.code(409).send({ error: `A ${action} request is already active for this receiver` });
     const recent = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type=? AND created_at>? LIMIT 1").get(device.id, action, new Date(now.getTime()-120_000).toISOString()) as { id: string } | undefined;
     if (recent) return reply.code(429).send({ error: "Please wait two minutes before repeating this action" });
