@@ -735,6 +735,50 @@ test("database upgrades a populated version-one schema without losing devices", 
   }
 });
 
+test("database upgrades a version-seven command table while preserving its indexes", () => {
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-v7-migration-"));
+  const databasePath = join(directory, "ndiview.sqlite");
+  try {
+    const legacy = openDatabase(databasePath);
+    legacy.exec(`
+      DROP TABLE device_commands;
+      CREATE TABLE device_commands (
+        id TEXT PRIMARY KEY,
+        device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+        command_type TEXT NOT NULL CHECK (command_type IN ('restart')),
+        status TEXT NOT NULL CHECK (status IN ('queued', 'claimed', 'restarting', 'completed', 'failed', 'timed_out')),
+        requested_by TEXT NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+        created_at TEXT NOT NULL, expires_at TEXT NOT NULL, claimed_at TEXT, completed_at TEXT, result_message TEXT
+      );
+      CREATE INDEX device_commands_device_created_idx ON device_commands(device_id, created_at DESC);
+      CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
+    `);
+    legacy.pragma("user_version = 7");
+    legacy.close();
+
+    const migrated = openDatabase(databasePath);
+    try {
+      assert.equal(migrated.pragma("user_version", { simple: true }), 9);
+      const indexes = migrated.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('device_commands_device_created_idx', 'device_commands_pending_idx') ORDER BY name",
+      ).all() as Array<{ name: string }>;
+      assert.deepEqual(indexes.map((item) => item.name), [
+        "device_commands_device_created_idx",
+        "device_commands_pending_idx",
+      ]);
+      assert.throws(() => migrated.prepare(`
+        INSERT INTO device_commands (
+          id, device_id, command_type, status, requested_by, created_at, expires_at
+        ) VALUES ('invalid', 'missing-device', 'invalid-action', 'queued', 'missing-operator', 'now', 'later')
+      `).run());
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("secure cookie policy can be enforced by the HTTPS deployment", async () => {
   const app = buildApp({
     databasePath: ":memory:",
