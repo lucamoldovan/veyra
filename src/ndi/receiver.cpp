@@ -1,4 +1,4 @@
-#include "veyra/ndi/receiver.hpp"
+#include "ndiview/ndi/receiver.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace veyra::ndi {
+namespace ndiview::ndi {
 namespace {
 
 class VideoFrameReleaser {
@@ -47,9 +47,9 @@ Receiver::Receiver(Source source) : source_(std::move(source)) {
     settings.bandwidth = NDIlib_recv_bandwidth_highest;
     settings.allow_video_fields = false;
 #if defined(NDIVIEW_NDI_RECV_NAME_FIELD_P_NDI_NAME)
-    settings.p_ndi_name = "Veyra Receiver";
+    settings.p_ndi_name = "NDIView Receiver";
 #elif defined(NDIVIEW_NDI_RECV_NAME_FIELD_P_NDI_RECV_NAME)
-    settings.p_ndi_recv_name = "Veyra Receiver";
+    settings.p_ndi_recv_name = "NDIView Receiver";
 #else
 #error "CMake must detect the NDI receiver-name field before compiling"
 #endif
@@ -150,4 +150,4 @@ std::optional<VideoFrame> Receiver::capture(const std::uint32_t timeoutMs) {
     return frame;
 }
 
-}  // namespace veyra::ndi
+}  // namespace ndiview::ndi

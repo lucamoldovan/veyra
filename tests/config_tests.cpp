@@ -1,4 +1,4 @@
-#include "veyra/config/config.hpp"
+#include "ndiview/config/config.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -39,13 +39,13 @@ bool throws(Callback&& callback) {
 
 int main() {
     const auto testDirectory =
-        std::filesystem::temp_directory_path() / "veyra-config-tests";
+        std::filesystem::temp_directory_path() / "ndiview-config-tests";
     std::filesystem::remove_all(testDirectory);
     std::filesystem::create_directories(testDirectory);
 
     const auto configPath = testDirectory / "config.json";
 
-    const auto defaults = veyra::config::load(configPath);
+    const auto defaults = ndiview::config::load(configPath);
     check(defaults.display.width == 1920, "missing config uses 1920 width");
     check(defaults.display.height == 1080, "missing config uses 1080 height");
     check(defaults.display.targetFps == 30, "missing config uses 30 FPS");
@@ -75,7 +75,7 @@ int main() {
         })"
     );
 
-    const auto loaded = veyra::config::load(configPath);
+    const auto loaded = ndiview::config::load(configPath);
     check(loaded.ndi.sourceName == "Studio Output", "loads NDI source name");
     check(
         loaded.ndi.sourceAddress == "ndi://192.168.1.20",
@@ -92,7 +92,7 @@ int main() {
         R"({"schemaVersion":1,"display":{"width":0}})"
     );
     check(
-        throws([&] { (void)veyra::config::load(configPath); }),
+        throws([&] { (void)ndiview::config::load(configPath); }),
         "rejects out-of-range display width"
     );
 
@@ -101,23 +101,23 @@ int main() {
         R"({"schemaVersion":1,"display":{"targetFps":121}})"
     );
     check(
-        throws([&] { (void)veyra::config::load(configPath); }),
+        throws([&] { (void)ndiview::config::load(configPath); }),
         "rejects an output frame rate above 120 FPS"
     );
 
 
     writeFile(
         configPath,
-        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://veyra.local:8787","deviceName":"Lobby Display","pairingCode":"123456789012","caCertificatePath":"/etc/veyra/ca.pem","credentialPath":"/var/lib/veyra/device-token","cachePath":"/var/cache/veyra","syncIntervalSeconds":30,"heartbeatIntervalSeconds":20}})"
+        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://ndiview.local:8787","deviceName":"Lobby Display","pairingCode":"123456789012","caCertificatePath":"/etc/ndiview/ca.pem","credentialPath":"/var/lib/ndiview/device-token","cachePath":"/var/cache/ndiview","syncIntervalSeconds":30,"heartbeatIntervalSeconds":20}})"
     );
-    const auto controlPlane = veyra::config::load(configPath).controlPlane;
-    check(controlPlane.serverUrl == "https://veyra.local:8787", "loads HTTPS control-plane URL");
+    const auto controlPlane = ndiview::config::load(configPath).controlPlane;
+    check(controlPlane.serverUrl == "https://ndiview.local:8787", "loads HTTPS control-plane URL");
     check(controlPlane.deviceName == "Lobby Display", "loads receiver device name");
     check(controlPlane.pairingCode == "123456789012", "loads a twelve-digit pairing code");
-    check(controlPlane.caCertificatePath == "/etc/veyra/ca.pem", "loads custom CA certificate path");
-    check(controlPlane.credentialPath == "/var/lib/veyra/device-token", "loads device credential path");
+    check(controlPlane.caCertificatePath == "/etc/ndiview/ca.pem", "loads custom CA certificate path");
+    check(controlPlane.credentialPath == "/var/lib/ndiview/device-token", "loads device credential path");
     check(controlPlane.heartbeatIntervalSeconds == 20, "loads heartbeat interval");
-    check(controlPlane.cachePath == "/var/cache/veyra", "loads custom receiver cache path");
+    check(controlPlane.cachePath == "/var/cache/ndiview", "loads custom receiver cache path");
     check(controlPlane.syncIntervalSeconds == 30, "loads receiver sync interval");
 
     writeFile(
@@ -125,7 +125,7 @@ int main() {
         R"({"schemaVersion":1,"controlPlane":{"serverUrl":"http://127.0.0.1:8787"}})"
     );
     check(
-        veyra::config::load(configPath).controlPlane.serverUrl == "http://127.0.0.1:8787",
+        ndiview::config::load(configPath).controlPlane.serverUrl == "http://127.0.0.1:8787",
         "allows plain HTTP only for loopback development"
     );
 
@@ -134,7 +134,7 @@ int main() {
         R"({"schemaVersion":1,"controlPlane":{"serverUrl":"http://192.168.1.10:8787"}})"
     );
     check(
-        throws([&] { (void)veyra::config::load(configPath); }),
+        throws([&] { (void)ndiview::config::load(configPath); }),
         "rejects plain HTTP to a LAN host"
     );
 
@@ -143,16 +143,16 @@ int main() {
         R"({"schemaVersion":1,"controlPlane":{"pairingCode":"1234"}})"
     );
     check(
-        throws([&] { (void)veyra::config::load(configPath); }),
+        throws([&] { (void)ndiview::config::load(configPath); }),
         "rejects pairing codes that are not exactly twelve digits"
     );
 
     writeFile(
         configPath,
-        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://operator:secret@veyra.local"}})"
+        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://operator:secret@ndiview.local"}})"
     );
     check(
-        throws([&] { (void)veyra::config::load(configPath); }),
+        throws([&] { (void)ndiview::config::load(configPath); }),
         "rejects credentials embedded in the control-plane URL"
     );
 
@@ -161,19 +161,19 @@ int main() {
         R"({"schemaVersion":1,"ndi":{"sourceName":42}})"
     );
     check(
-        throws([&] { (void)veyra::config::load(configPath); }),
+        throws([&] { (void)ndiview::config::load(configPath); }),
         "rejects a non-string NDI source name"
     );
 
     writeFile(configPath, R"({"schemaVersion":2})");
     check(
-        throws([&] { (void)veyra::config::load(configPath); }),
+        throws([&] { (void)ndiview::config::load(configPath); }),
         "rejects unsupported schema versions"
     );
 
     writeFile(configPath, R"({"schemaVersion":1,"ndi":)");
     check(
-        throws([&] { (void)veyra::config::load(configPath); }),
+        throws([&] { (void)ndiview::config::load(configPath); }),
         "rejects malformed JSON"
     );
 

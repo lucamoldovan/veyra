@@ -1,4 +1,4 @@
-#include "veyra/video/renderer.hpp"
+#include "ndiview/video/renderer.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace veyra::video {
+namespace ndiview::video {
 namespace {
 
 std::runtime_error sdlError(const std::string& operation) {
@@ -47,7 +47,7 @@ Renderer::Renderer(const config::DisplayConfig& config) {
     }
 
     window_ = SDL_CreateWindow(
-        "Veyra",
+        "NDIView",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         config.width,
@@ -56,7 +56,7 @@ Renderer::Renderer(const config::DisplayConfig& config) {
     );
 
     if (window_ == nullptr) {
-        const auto error = sdlError("Could not create the Veyra window");
+        const auto error = sdlError("Could not create the NDIView window");
         SDL_EnableScreenSaver();
         if (imageInitialized_) {
             IMG_Quit();
@@ -508,4 +508,4 @@ void Renderer::clear() {
     SDL_RenderPresent(renderer_);
 }
 
-}  // namespace veyra::video
+}  // namespace ndiview::video
