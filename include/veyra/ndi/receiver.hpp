@@ -1,6 +1,7 @@
 #pragma once
 
 #include "veyra/ndi/discovery.hpp"
+#include "veyra/video/frame.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -8,18 +9,7 @@
 
 namespace veyra::ndi {
 
-enum class PixelFormat {
-    UYVY,
-    BGRA
-};
-
-struct VideoFrame {
-    int width{0};
-    int height{0};
-    int stride{0};
-    PixelFormat format{PixelFormat::UYVY};
-    std::vector<std::uint8_t> pixels;
-};
+using VideoFrame = video::VideoFrame;
 
 class Receiver {
 public:
