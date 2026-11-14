@@ -26,6 +26,7 @@ Renderer::Renderer(const config::DisplayConfig& config) {
         throw sdlError("Could not initialize SDL");
     }
     sdlInitialized_ = true;
+    SDL_DisableScreenSaver();
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
     SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_AUTOMATIC);
@@ -94,6 +95,7 @@ Renderer::~Renderer() {
     }
     if (sdlInitialized_) {
         SDL_ShowCursor(SDL_ENABLE);
+        SDL_EnableScreenSaver();
         SDL_Quit();
     }
 }
