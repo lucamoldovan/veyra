@@ -740,6 +740,14 @@ test("database upgrades a version-seven command table while preserving its index
   const databasePath = join(directory, "ndiview.sqlite");
   try {
     const legacy = openDatabase(databasePath);
+    legacy.prepare(
+      "INSERT INTO operators (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+    ).run("migration-operator", "migration-admin", "test-hash", "2026-01-01T00:00:00.000Z");
+    legacy.prepare(`
+      INSERT INTO devices (id, name, device_token_hash, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run("migration-device", "Migration receiver", "migration-token",
+      "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
     legacy.exec(`
       DROP TABLE device_commands;
       CREATE TABLE device_commands (
@@ -753,6 +761,12 @@ test("database upgrades a version-seven command table while preserving its index
       CREATE INDEX device_commands_device_created_idx ON device_commands(device_id, created_at DESC);
       CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
     `);
+    legacy.prepare(`
+      INSERT INTO device_commands (
+        id, device_id, command_type, status, requested_by, created_at, expires_at
+      ) VALUES (?, ?, 'restart', 'completed', ?, ?, ?)
+    `).run("legacy-restart", "migration-device", "migration-operator",
+      "2026-01-01T00:00:00.000Z", "2026-01-01T00:01:00.000Z");
     legacy.exec("ALTER TABLE devices DROP COLUMN device_uptime_seconds");
     legacy.pragma("user_version = 7");
     legacy.close();
@@ -767,6 +781,19 @@ test("database upgrades a version-seven command table while preserving its index
         "device_commands_device_created_idx",
         "device_commands_pending_idx",
       ]);
+      const preserved = migrated.prepare(
+        "SELECT id, command_type, status FROM device_commands WHERE id = ?",
+      ).get("legacy-restart") as { id: string; command_type: string; status: string };
+      assert.deepEqual(preserved, {
+        id: "legacy-restart",
+        command_type: "restart",
+        status: "completed",
+      });
+      migrated.prepare(`
+        INSERT INTO device_commands (
+          id, device_id, command_type, status, requested_by, created_at, expires_at
+        ) VALUES ('new-reboot', 'migration-device', 'reboot', 'queued', 'migration-operator', 'now', 'later')
+      `).run();
       assert.throws(() => migrated.prepare(`
         INSERT INTO device_commands (
           id, device_id, command_type, status, requested_by, created_at, expires_at
