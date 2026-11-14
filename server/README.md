@@ -34,6 +34,19 @@ npm test
 npm start
 ```
 
+
+## Backups
+
+With the server database and pairing secret in their configured locations, create a consistent SQLite backup while the server is running:
+
+```bash
+npm run backup -- /path/to/secure-backup-directory
+```
+
+The command uses SQLite's online backup API and copies the pairing secret alongside the database. It creates owner-only backup files and a small manifest. Store the backup directory somewhere protected; the pairing secret is sensitive and must not be published or committed.
+
+To restore, stop the Veyra server first, then restore the database file to `VEYRA_DATABASE_PATH` and the matching pairing-secret file to `VEYRA_PAIRING_SECRET_PATH`. Keep the database and pairing secret from the same backup together. The current backup utility covers the server database and pairing secret; once media storage is implemented, media assets will need to be included in the backup set as well.
+
 ## Configuration
 
 | Variable | Default | Description |
