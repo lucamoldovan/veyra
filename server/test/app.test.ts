@@ -646,6 +646,12 @@ test("database files and containing directory are private", () => {
   }
 });
 
+test("database refuses shared system directories", () => {
+  const temporaryDirectoryMode = statSync(tmpdir()).mode & 0o777;
+  assert.throws(() => openDatabase(join(tmpdir(), "veyra-unsafe.sqlite")));
+  assert.equal(statSync(tmpdir()).mode & 0o777, temporaryDirectoryMode);
+});
+
 test("database initializes a versioned schema", () => {
   const database = openDatabase(":memory:");
 
