@@ -109,13 +109,14 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add LAN communication client with TLS verification and bounded reconnect/backoff
 - [x] Add heartbeat and playback/source reporting
 - [ ] Add detailed receiver health diagnostics
-- [ ] Poll and apply remote configuration safely and atomically
-- [ ] Implement local media cache with integrity checks
-- [ ] Implement per-device cached fallback playlists
-- [ ] Switch to fallback when the assigned NDI source is unavailable
-- [ ] Continue playback when the local server is unavailable
-- [ ] Resume NDI playback when the source returns
-- [ ] Resynchronize state after server connectivity returns
+- [x] Poll and apply versioned remote NDI configuration safely
+- [x] Synchronize assigned fallback manifests and commit active cache state atomically
+- [x] Implement owner-only local media cache with SHA-256 verification and atomic asset writes
+- [x] Render cached image fallback playlists with per-item durations
+- [x] Switch to cached fallback when the assigned NDI source is unavailable
+- [x] Continue from the last verified local cache when the local server is unavailable
+- [x] Resume NDI automatically when the selected source returns
+- [x] Retry synchronization and apply the latest state after server connectivity returns
 - [ ] Test partial downloads, interrupted updates, stale commands, and version mismatches
 
 ## Phase 8 — Integration and deployment
