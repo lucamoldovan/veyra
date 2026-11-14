@@ -8,7 +8,7 @@ This document defines the intended communication contract for the NDIView local 
 2. A receiver is authoritative for what is actually happening on its own display.
 3. A receiver must keep playing without an active server connection.
 4. NDI discovery and video transport are independent of the NDIView management channel.
-5. Every command has an ID, expiry, acknowledgement, and final outcome.
+5. Every command has an ID, expiry, acknowledgement, and final outcome. Receiver restarts are confirmed by a reset process uptime; full-device reboots are confirmed separately by a reset system uptime.
 6. Every configuration and media manifest has a version.
 7. A failed or partial update must never overwrite the last known-good local state.
 8. Device credentials are separate from human operator sessions.
@@ -19,7 +19,7 @@ This document defines the intended communication contract for the NDIView local 
 - Dashboard subscribes to a server WebSocket for live device state and operation updates.
 - Receivers establish an outbound connection to the local server. The server should not need to initiate arbitrary inbound connections to receiver machines.
 - Receivers send periodic heartbeats and playback reports.
-- The server queues allowlisted commands. Receivers poll the authenticated command endpoint, acknowledge a claimed command, and report failure or completion after a subsequent heartbeat.
+- The server queues allowlisted commands. Receivers poll the authenticated command endpoint and acknowledge a claimed command. A restart is marked complete only when process uptime resets; a reboot is marked complete only when system uptime resets.
 - If a persistent connection drops, the receiver retries with bounded exponential backoff and continues local playback.
 
 ## API versioning
@@ -79,7 +79,7 @@ The dashboard must not have a route that accepts arbitrary shell commands. Remot
 - `restart` — restart the NDIView receiver process only
 - `reboot` — reboot the full Debian device
 
-The implemented actions are `restart` (restart only the NDIView receiver application) and `reboot` (reboot the entire Debian device). Both are explicit allowlisted actions; arbitrary shell commands are never accepted.
+The implemented actions are `restart` (restart only the NDIView receiver application) and `reboot` (reboot the entire Debian device). The server distinguishes their completion using process uptime versus OS uptime; arbitrary shell commands are never accepted.
 
 ## Receiver enrollment and identity
 
@@ -103,7 +103,7 @@ Implemented endpoints:
 | Method | Route | Purpose |
 |---|---|---|
 | POST | `/api/v1/receiver/pair` | Exchange a one-time pairing code for a device ID and device credential |
-| POST | `/api/v1/receiver/heartbeat` | Submit a bearer-authenticated heartbeat, current playback state, and optional discovered NDI source snapshot |
+| POST | `/api/v1/receiver/heartbeat` | Submit a bearer-authenticated heartbeat, process uptime, system uptime, playback state, and optional discovered NDI source snapshot |
 | GET | `/api/v1/receiver/config` | Retrieve the versioned NDI source and fallback playlist assignment |
 | GET | `/api/v1/receiver/media-manifest` | Retrieve ordered image metadata for the assigned fallback playlist |
 | GET | `/api/v1/receiver/media/{mediaId}` | Download an image only when it belongs to the receiver's assigned fallback playlist |
@@ -210,4 +210,4 @@ The following still need a technical decision record or implementation:
 5. Playlist behavior when an item is missing, corrupted, or cannot be decoded.
 6. Production CA provisioning and certificate renewal for multi-receiver deployments.
 
-The SQLite migration mechanism (schema v8), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, verified local cache, and timed image fallback are implemented. Receiver restart and device reboot commands are implemented; WebSocket events remain in progress. The complete player still needs an official NDI SDK build and target-hardware validation.
+The SQLite migration mechanism (schema v9), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, verified local cache, and timed image fallback are implemented. Receiver restart and device reboot commands are implemented; WebSocket events remain in progress. The complete player still needs an official NDI SDK build and target-hardware validation.

@@ -77,7 +77,7 @@ This roadmap covers the complete NDIView platform. Checkboxes describe repositor
 - [x] Implement per-device fallback playlist assignment API
 - [x] Implement versioned configuration and assigned-media manifest endpoints
 - [x] Keep heartbeat reporting independent from large media downloads and cancel sync on shutdown
-- [x] Implement the allowlisted receiver application-restart and full-device reboot command queue, receiver polling/status reporting, and completion after heartbeat
+- [x] Implement the allowlisted receiver application-restart and full-device reboot command queue, receiver polling/status reporting, and separate process-uptime/system-uptime completion confirmation
 - [ ] Implement live WebSocket events and additional remote commands
 - [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, credential revocation, media uploads, playlist editing, and backups
 - [x] Add a populated legacy database migration test
