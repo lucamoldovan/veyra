@@ -94,14 +94,49 @@ Implementation work:
 1. Validate Debian 13 on the exact Intel Mac mini: boot, Ethernet, Wi-Fi if needed, HDMI/DisplayPort output, resolution/refresh rates, Intel graphics driver, audio not required, and NDI performance.
 2. Choose and test a lightweight Xorg-based kiosk session first for SDL2 compatibility. Do not assume Wayland/DRM behavior until tested. Disable screen blanking, DPMS sleep, screensaver, desktop notifications, and power-saving behaviors that interrupt output.
 3. Create a dedicated unprivileged `veyra` account. Do not run the receiver as root.
-4. Configure automatic login into the dedicated kiosk session, with no interactive desktop steps required after power loss.
-5. Launch the receiver only after the display session is available. Prefer a systemd-managed service integrated with the graphical session (or a carefully tested systemd user service); do not start SDL before a valid display exists.
-6. Set restart-on-failure with a sensible delay and rate limit. Avoid rapid crash loops. Add structured logs and a simple local health signal.
-7. Verify fullscreen is truly borderless/fullscreen at the target output resolution and survives unplug/replug, display mode changes, source loss/reappearance, and application restart.
-8. Add a maintenance escape path for authorized local maintenance without exposing normal desktop controls to viewers.
-9. Test cold boot, power interruption, server offline at boot, NDI sender offline at boot, network interruption, and 24-hour playback.
+4. Configure display-manager automatic login directly into the dedicated kiosk account/session. This removes the local desktop login prompt only; it does not disable the Veyra dashboard's operator authentication or create an administrator session.
+5. Start a minimal Xorg session and launch Veyra automatically once the display server and target output are ready. Prefer a dedicated kiosk session with no general-purpose desktop shell, panels, notifications, or terminal shortcuts exposed to viewers. Keep an authorized maintenance path (for example, a documented keyboard shortcut requiring local access or a separate admin TTY).
+6. Run Veyra as an unprivileged user. Use a systemd user service or a system service explicitly attached to the graphical session; do not start SDL before DISPLAY/Xauthority and the output are ready. Set restart-on-failure with a sensible delay and rate limit. Avoid rapid crash loops. Add structured logs and a local health signal.
+7. Disable X11 screen blanking, DPMS monitor sleep, desktop screensaver, suspend/hibernate, and lid/power policies that could interrupt signage. Test whether firmware/BIOS restores power after AC loss; configure it if the Mac mini firmware offers that option.
+8. Verify fullscreen is truly borderless/fullscreen at the target output resolution and survives unplug/replug, display mode changes, source loss/reappearance, and application restart. SDL already requests `SDL_WINDOW_FULLSCREEN_DESKTOP` when `display.fullscreen` is true and hides the cursor/disables the screensaver while running; this does not configure autologin, Xorg, DPMS, or boot startup.
+9. Add a maintenance escape path for authorized local maintenance without exposing normal desktop controls to viewers.
+10. Test cold boot, power interruption, server offline at boot, NDI sender offline at boot, network interruption, and 24-hour playback.
 
 Do not assume the current `display.fullscreen` configuration option alone provides kiosk startup, automatic login, display power management, or service recovery. Those are separate OS/session/service responsibilities.
+
+
+## Remote receiver restart from the dashboard
+
+A remote restart is feasible, but the server must not execute arbitrary shell commands on receivers and must not rely on SSH credentials distributed to the fleet. Implement a narrowly scoped, receiver-initiated command channel.
+
+### Operator experience
+
+- Add a per-device **Restart receiver** action in the device details/overflow menu.
+- Require an explicit confirmation naming the target device. Explain that video output will be interrupted briefly.
+- Show pending, accepted, restarting, completed, timed-out, and failed states with timestamps.
+- Disable repeat requests while a restart is pending and apply a server-side cooldown.
+- Only authenticated operators with the appropriate permission can request it. Record the operator, target device, command ID, request time, result, and reason in an audit log.
+- Do not provide a bulk-restart button in the first version.
+
+### Delivery and execution design
+
+1. Add a persistent `device_commands` table with a UUID, device ID, allowlisted command type, status, created/expiry/acknowledged/completed timestamps, and operator ID. Add an index for pending commands and a retention policy for completed records.
+2. Add an authenticated operator endpoint to request a restart. Validate that the device exists, is not revoked, and is recently online; enforce cooldown and one pending restart per device.
+3. Add a receiver-authenticated command-poll endpoint. The receiver uses its existing bearer device credential over verified TLS to fetch at most one pending command, atomically claim it, and acknowledge receipt. Commands expire and cannot be replayed.
+4. The receiver accepts only a fixed enum such as `restart`; never accept a shell string, executable path, arbitrary arguments, or script from the server.
+5. Execute the restart through a tiny, separately installed privileged helper or a narrowly scoped polkit rule that permits only the exact reboot action. The main receiver process remains unprivileged. Do not grant broad passwordless sudo or general systemctl access.
+6. Report command progress/result before reboot where possible. After boot, the receiver reconnects with its device identity and reports the matching command completed. If it never returns before timeout, show an honest timed-out/offline state rather than claiming success.
+7. Keep this command channel extensible for future allowlisted actions, but implement restart only initially.
+
+### Safety and acceptance tests
+
+- A dashboard user cannot restart a device without an authenticated, authorized session.
+- A device cannot poll or acknowledge commands belonging to another device.
+- Revoked credentials, expired commands, duplicate delivery, replay, and repeated-click cases are rejected safely.
+- The receiver can still boot and play NDI if the server is unavailable; restart commands are simply unavailable until connectivity returns.
+- The kiosk account cannot obtain a general root shell or execute arbitrary privileged commands.
+- Test on one physical receiver first, including interrupted network, a restart during playback, and return to healthy status after boot.
+- Keep the central server PC restart separate from receiver restart. Do not expose a server-reboot action in the same first iteration.
 
 ## Release pipeline
 
@@ -132,12 +167,13 @@ The public CI currently disables the native player because the official NDI SDK 
 
 1. **Inventory and baseline:** inspect current receiver/server/dashboard code and config paths; record the exact working commit and test commands. No behavior changes.
 2. **Physical receiver baseline:** install Debian 13 on one test Mac mini; validate graphics, network, NDI SDK/runtime, and video output.
-3. **Kiosk lifecycle:** implement and test automatic graphical session, fullscreen launch, restart behavior, logging, and maintenance access.
-4. **Release packaging:** define version format, target platform, immutable artifact layout, manifest schema, checksums/signatures, and compatibility checks.
-5. **Receiver updater:** implement staging, verification, activation, health check, rollback, and persistent update status.
-6. **Server update coordinator:** add artifact cache, device rollout controls, update status APIs, and authorization/audit checks.
-7. **Dashboard update and UI:** serve the production dashboard from the server release; show versions, update availability, progress, errors, and release notes.
-8. **CI/release automation:** add SDK-enabled release build where licensing permits, package server/dashboard/receiver, sign, publish, and test.
-9. **Fleet validation:** test one device, then a small group, then wider rollout. Manual approval remains default until reliability is proven.
+3. **Kiosk lifecycle:** implement and test automatic graphical session, fullscreen launch, application recovery, logging, and maintenance access.
+4. **Remote restart:** add the authenticated command queue, receiver polling/acknowledgement, restricted reboot helper, dashboard confirmation/status, audit trail, and physical-device tests.
+5. **Release packaging:** define version format, target platform, immutable artifact layout, manifest schema, checksums/signatures, and compatibility checks.
+6. **Receiver updater:** implement staging, verification, activation, health check, rollback, and persistent update status.
+7. **Server update coordinator:** add artifact cache, device rollout controls, update status APIs, and authorization/audit checks.
+8. **Dashboard update and UI:** serve the production dashboard from the server release; show versions, update availability, progress, errors, and release notes.
+9. **CI/release automation:** add SDK-enabled release build where licensing permits, package server/dashboard/receiver, sign, publish, and test.
+10. **Fleet validation:** test one device, then a small group, then wider rollout. Manual approval remains default until reliability is proven.
 
 A stage is complete only when its acceptance tests pass and its implementation is reflected in code/tests/docs. This plan is not a claim that these features are already implemented.
