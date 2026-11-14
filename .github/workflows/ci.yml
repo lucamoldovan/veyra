@@ -31,3 +31,31 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
+
+  server-tests:
+    name: Local server build and tests
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Type-check and build
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
