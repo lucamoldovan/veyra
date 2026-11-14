@@ -347,6 +347,7 @@ int main(int argc, char* argv[]) {
                 );
 
                 if (selected.has_value()) {
+                    try {
                     spdlog::info(
                         "Connecting to NDI source '{}' [{}]",
                         selected->name,
@@ -385,6 +386,22 @@ int main(int argc, char* argv[]) {
 
                     lastFrameAt = std::chrono::steady_clock::now();
                     continue;
+                    } catch (const std::exception& error) {
+                        if (captureThread.joinable()) {
+                            captureThread.request_stop();
+                            captureThread.join();
+                        }
+                        receiver.reset();
+                        sourceConnected.store(false);
+                        activeSourceName.clear();
+                        spdlog::error("Could not initialize NDI receiver: {}", error.what());
+                        if (!renderFallback(discoveryNow) && !displayIsClear) {
+                            renderer.clear();
+                            displayIsClear = true;
+                        }
+                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                        continue;
+                    }
                 }
 
                 const auto now = std::chrono::steady_clock::now();
