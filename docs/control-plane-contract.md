@@ -43,6 +43,15 @@ Implemented endpoints:
 | POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |
 | POST | `/api/v1/devices/{deviceId}/revoke` | Revoke a receiver credential (authenticated operator only) |
 | DELETE | `/api/v1/devices/{deviceId}` | Remove a receiver record after its credential has been revoked (authenticated operator only) |
+| GET | `/api/v1/media` | List local media assets (authenticated operator only) |
+| POST | `/api/v1/media` | Upload a PNG, JPEG, or WebP image (authenticated operator only) |
+| GET | `/api/v1/media/{mediaId}/content` | Read an uploaded image (authenticated operator only) |
+| DELETE | `/api/v1/media/{mediaId}` | Delete an image not referenced by a playlist (authenticated operator only) |
+| GET | `/api/v1/playlists` | List playlists (authenticated operator only) |
+| POST | `/api/v1/playlists` | Create a playlist (authenticated operator only) |
+| GET | `/api/v1/playlists/{playlistId}` | Read a playlist and its ordered image items (authenticated operator only) |
+| PUT | `/api/v1/playlists/{playlistId}` | Replace a playlist and its ordered items (authenticated operator only) |
+| DELETE | `/api/v1/playlists/{playlistId}` | Delete a playlist (authenticated operator only) |
 
 Remaining planned management endpoints:
 
@@ -52,14 +61,6 @@ Remaining planned management endpoints:
 | PATCH | `/api/v1/devices/{deviceId}` | Update server-managed device settings |
 | POST | `/api/v1/devices/{deviceId}/commands` | Queue an allowlisted device command |
 | GET | `/api/v1/sources` | List known NDI sources |
-| GET | `/api/v1/media` | List media library items |
-| POST | `/api/v1/media` | Upload a media asset |
-| DELETE | `/api/v1/media/{mediaId}` | Delete an unused media asset |
-| GET | `/api/v1/playlists` | List playlists |
-| POST | `/api/v1/playlists` | Create a playlist |
-| GET | `/api/v1/playlists/{playlistId}` | Read a playlist |
-| PUT | `/api/v1/playlists/{playlistId}` | Replace a playlist and its ordered items |
-| DELETE | `/api/v1/playlists/{playlistId}` | Delete a playlist |
 | GET | `/api/v1/system/health` | Read detailed local server health |
 | GET | `/api/v1/devices/{deviceId}/logs` | Read retained receiver diagnostics |
 
