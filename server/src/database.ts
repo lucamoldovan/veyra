@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 export type NDIViewDatabase = Database.Database;
 
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 export function openDatabase(databasePath = process.env.NDIVIEW_DATABASE_PATH ?? process.env.VEYRA_DATABASE_PATH ?? "data/ndiview.sqlite"): NDIViewDatabase {
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
@@ -224,6 +224,10 @@ export function openDatabase(databasePath = process.env.NDIVIEW_DATABASE_PATH ??
         CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
       `);
       database.pragma("user_version = 8");
+    }
+    if (currentVersion < 9) {
+      database.exec("ALTER TABLE devices ADD COLUMN device_uptime_seconds INTEGER");
+      database.pragma("user_version = 9");
     }
   });
 

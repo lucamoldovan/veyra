@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -277,11 +278,16 @@ bool Client::sendHeartbeat() {
     const auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::steady_clock::now() - startedAt_
     ).count();
+    struct sysinfo systemInfo {};
+    const Json deviceUptime = ::sysinfo(&systemInfo) == 0 && systemInfo.uptime >= 0
+        ? Json(static_cast<std::uint64_t>(systemInfo.uptime))
+        : Json(nullptr);
 
     Json body = {
         {"version", "0.1.0"},
         {"platform", platformName()},
         {"uptimeSeconds", std::max<std::int64_t>(0, uptime)},
+        {"deviceUptimeSeconds", deviceUptime},
         {"playbackMode", snapshot.mode},
         {"ndiSourceName", snapshot.ndiSourceName.empty()
             ? Json(nullptr)

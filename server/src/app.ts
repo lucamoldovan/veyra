@@ -755,7 +755,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
     const rows = database.prepare(`
       SELECT d.id, d.name, d.platform, d.software_version, d.last_seen_at, d.last_ip,
-             d.playback_mode, d.ndi_source_name, d.uptime_seconds, d.created_at,
+             d.playback_mode, d.ndi_source_name, d.uptime_seconds, d.device_uptime_seconds, d.created_at,
              d.credential_revoked_at, d.config_version, d.assigned_ndi_source_name,
              d.assigned_ndi_source_address, d.fallback_playlist_id,
              (SELECT c.id FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_id,
@@ -778,6 +778,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       playback_mode: string;
       ndi_source_name: string | null;
       uptime_seconds: number | null;
+      device_uptime_seconds: number | null;
       created_at: string;
       credential_revoked_at: string | null;
       config_version: number;
@@ -813,6 +814,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           playbackMode: device.playback_mode,
           ndiSourceName: device.ndi_source_name,
           uptimeSeconds: device.uptime_seconds,
+          deviceUptimeSeconds: device.device_uptime_seconds,
           createdAt: device.created_at,
           credentialRevokedAt: device.credential_revoked_at,
           credentialStatus: device.credential_revoked_at ? "revoked" : "active",
@@ -1105,7 +1107,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
   );
 
-  app.post<{ Body: { version?: unknown; platform?: unknown; uptimeSeconds?: unknown; playbackMode?: unknown; ndiSourceName?: unknown; ndiSources?: unknown } }>(
+  app.post<{ Body: { version?: unknown; platform?: unknown; uptimeSeconds?: unknown; deviceUptimeSeconds?: unknown; playbackMode?: unknown; ndiSourceName?: unknown; ndiSources?: unknown } }>(
     "/api/v1/receiver/heartbeat",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request, reply) => {
@@ -1118,6 +1120,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       const uptimeSeconds = typeof body.uptimeSeconds === "number" &&
         Number.isSafeInteger(body.uptimeSeconds) && body.uptimeSeconds >= 0
         ? body.uptimeSeconds
+        : null;
+      const deviceUptimeSeconds = typeof body.deviceUptimeSeconds === "number" &&
+        Number.isSafeInteger(body.deviceUptimeSeconds) && body.deviceUptimeSeconds >= 0
+        ? body.deviceUptimeSeconds
         : null;
       const allowedModes = new Set(["ndi", "fallback", "idle", "error", "unknown"]);
       const playbackMode = typeof body.playbackMode === "string" && allowedModes.has(body.playbackMode)
@@ -1155,22 +1161,26 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         discoveredSourcesJson = JSON.stringify(discoveredSources);
       }
       const now = new Date().toISOString();
-      const previous = database.prepare("SELECT uptime_seconds FROM devices WHERE id = ?").get(device.id) as { uptime_seconds: number | null } | undefined;
+      const previous = database.prepare("SELECT uptime_seconds, device_uptime_seconds FROM devices WHERE id = ?").get(device.id) as { uptime_seconds: number | null; device_uptime_seconds: number | null } | undefined;
 
       database.prepare(`
         UPDATE devices
         SET last_seen_at = ?, last_ip = ?, software_version = ?, platform = ?,
-            playback_mode = ?, ndi_source_name = ?, uptime_seconds = ?,
+            playback_mode = ?, ndi_source_name = ?, uptime_seconds = ?, device_uptime_seconds = ?,
             discovered_sources_json = COALESCE(?, discovered_sources_json), updated_at = ?
         WHERE id = ?
-      `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, discoveredSourcesJson, now, device.id);
+      `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, deviceUptimeSeconds, discoveredSourcesJson, now, device.id);
 
       // A heartbeat alone does not prove that a requested restart happened: the
       // old process can still heartbeat after an asynchronous systemd request.
       // The receiver's process-relative uptime must reset before we complete it.
       if (previous?.uptime_seconds !== null && previous?.uptime_seconds !== undefined &&
           uptimeSeconds !== null && uptimeSeconds < previous.uptime_seconds) {
-        database.prepare("UPDATE device_commands SET status='completed', completed_at=?, result_message='Receiver restarted and reported a fresh uptime counter' WHERE device_id=? AND status='restarting'").run(now, device.id);
+        database.prepare("UPDATE device_commands SET status='completed', completed_at=?, result_message='Receiver application restarted and reported a fresh process uptime' WHERE device_id=? AND command_type='restart' AND status='restarting'").run(now, device.id);
+      }
+      if (previous?.device_uptime_seconds !== null && previous?.device_uptime_seconds !== undefined &&
+          deviceUptimeSeconds !== null && deviceUptimeSeconds < previous.device_uptime_seconds) {
+        database.prepare("UPDATE device_commands SET status='completed', completed_at=?, result_message='Device reboot confirmed by reset system uptime' WHERE device_id=? AND command_type='reboot' AND status='restarting'").run(now, device.id);
       }
 
       return { accepted: true, serverTime: now };
