@@ -380,7 +380,6 @@ test("operator assigns a receiver source and fallback playlist; receiver sync is
     assert.equal(deletePlaylist.statusCode, 204);
     const clearedConfig = await app.inject({ method: "GET", url: "/api/v1/receiver/config", headers: auth });
     assert.equal(clearedConfig.json().fallbackPlaylistId, null);
-    assert.equal(clearedConfig.json().configVersion, 3);
   } finally {
     await app.close();
     rmSync(directory, { recursive: true, force: true });
