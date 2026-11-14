@@ -21,13 +21,13 @@ export interface SetupStatus {
 export type ConnectionState = "checking" | "online" | "offline";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  headers.set("Accept", "application/json");
+  if (init?.body) headers.set("Content-Type", "application/json");
+
   const response = await fetch(url, {
     ...init,
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
+    headers,
     cache: "no-store",
   });
 
