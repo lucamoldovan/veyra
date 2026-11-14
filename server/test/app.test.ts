@@ -300,7 +300,7 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
 
 
 
-test.skip("operator assigns a receiver source and fallback playlist; receiver sync is scoped to assigned media", async () => {
+test("operator assigns a receiver source and fallback playlist; receiver sync is scoped to assigned media", async () => {
   const directory = mkdtempSync(join(tmpdir(), "veyra-assignment-test-"));
   const app = buildApp({
     databasePath: ":memory:",
@@ -662,8 +662,13 @@ test("database upgrades a populated version-one schema without losing devices", 
     `).run("device-1", "Lobby", "token-hash", "linux-x86_64", "0.1.0",
       "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
     legacy.exec("DROP INDEX devices_credential_revoked_at_idx");
+    legacy.exec("DROP INDEX devices_fallback_playlist_id_idx");
     legacy.exec("ALTER TABLE devices DROP COLUMN credential_revoked_at");
     legacy.exec("ALTER TABLE devices DROP COLUMN discovered_sources_json");
+    legacy.exec("ALTER TABLE devices DROP COLUMN config_version");
+    legacy.exec("ALTER TABLE devices DROP COLUMN assigned_ndi_source_name");
+    legacy.exec("ALTER TABLE devices DROP COLUMN assigned_ndi_source_address");
+    legacy.exec("ALTER TABLE devices DROP COLUMN fallback_playlist_id");
     legacy.exec("DROP TABLE playlist_items; DROP TABLE playlists; DROP TABLE media_assets;");
     legacy.pragma("user_version = 1");
     legacy.close();
