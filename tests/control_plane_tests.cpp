@@ -223,6 +223,7 @@ int main() {
         const auto synced = client.syncSnapshot();
         const auto reloaded = veyra::control_plane::ReceiverSync(config).loadCached();
         bool cachedAssetOk = false;
+        bool cachePermissionsOk = false;
         if (synced.hasValidCachedState && synced.fallbackItems.size() == 1) {
             std::ifstream cached(synced.fallbackItems[0].path, std::ios::binary);
             const std::string bytes((std::istreambuf_iterator<char>(cached)), {});
@@ -231,6 +232,9 @@ int main() {
                 synced.ndiSourceName == "Camera 1" &&
                 reloaded.hasValidCachedState && reloaded.fallbackItems.size() == 1 &&
                 reloaded.fallbackItems[0].sha256 == synced.fallbackItems[0].sha256;
+            cachePermissionsOk =
+                (stat(config.cachePath.c_str()).st_mode & 0o777) == 0o700 &&
+                (stat(synced.fallbackItems[0].path.c_str()).st_mode & 0o777) == 0o600;
         }
 
         bool corruptCacheRejected = false;
@@ -244,7 +248,8 @@ int main() {
 
         success = !serverFailed && pairRequestOk && heartbeatRequestOk &&
             configRequestOk && manifestRequestOk && assetRequestOk && cachedAssetOk &&
-            corruptCacheRejected && storedToken == token && fileModeOk && directoryModeOk;
+            corruptCacheRejected && cachePermissionsOk &&
+            storedToken == token && fileModeOk && directoryModeOk;
     }
 
     mockServer.join();
