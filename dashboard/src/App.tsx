@@ -19,6 +19,7 @@ import {
   Monitor,
   MonitorPlay,
   Network,
+  Plus,
   Radio,
   RefreshCw,
   Server,
