@@ -16,7 +16,6 @@ import {
   MonitorPlay,
   MoreHorizontal,
   Network,
-  Plus,
   Radio,
   Server,
   Settings,
