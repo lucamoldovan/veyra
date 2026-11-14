@@ -49,7 +49,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Specify device identity, pairing, and authentication
 - [x] Specify and implement media storage, upload limits, and asset validation
 - [x] Implement playlist schema, ordering, and per-item durations
-- [ ] Specify per-device assignment
+- [x] Specify per-device source and fallback-playlist assignment
 - [ ] Specify command acknowledgement, timeout, and retry behavior
 - [x] Define initial database schema version and transactional migration mechanism
 - [x] Add forward migration and populated version-1 database upgrade test
@@ -60,7 +60,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
 - [x] Commit npm lockfiles and use reproducible npm ci installs in CI
-- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 4
+- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 5
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
@@ -71,11 +71,11 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Issue per-device credentials and store only credential hashes
 - [x] Implement bearer-authenticated heartbeat ingestion and online/stale/offline state
 - [x] Implement receiver-reported source snapshots and aggregated NDI source inventory
-- [ ] Implement per-device source assignment
+- [x] Implement per-device source assignment and versioned receiver configuration
 - [x] Implement authenticated media upload, local storage, metadata, content delivery, and safe deletion
 - [x] Implement playlist CRUD, ordered items, and validated display durations
-- [ ] Implement device playlist assignment APIs
-- [ ] Implement versioned configuration distribution
+- [x] Implement per-device fallback playlist assignment API
+- [x] Implement versioned configuration and assigned-media manifest endpoints
 - [ ] Implement live WebSocket events and narrowly scoped remote commands
 - [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, credential revocation, media uploads, playlist editing, and backups
 - [x] Add a populated legacy database migration test
@@ -94,10 +94,10 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement protected device inventory with 15-second refresh and live status
 - [x] Add receiver credential status, revocation, and removal controls
 - [x] Implement NDI source inventory page
-- [ ] Implement per-device source assignment
+- [x] Implement per-device source assignment controls
 - [x] Implement media library uploads, previews, and deletion
 - [x] Implement playlist editor with ordering and editable image durations
-- [ ] Implement per-device and group playlist assignment
+- [x] Implement per-device fallback playlist assignment
 - [ ] Implement device configuration and remote actions
 - [ ] Implement system health, logs, and diagnostics
 - [x] Add responsive layout for desktop and mobile
@@ -109,7 +109,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add LAN communication client with TLS verification and bounded reconnect/backoff
 - [x] Add heartbeat and playback/source reporting
 - [ ] Add detailed receiver health diagnostics
-- [ ] Apply remote configuration safely and atomically
+- [ ] Poll and apply remote configuration safely and atomically
 - [ ] Implement local media cache with integrity checks
 - [ ] Implement per-device cached fallback playlists
 - [ ] Switch to fallback when the assigned NDI source is unavailable
