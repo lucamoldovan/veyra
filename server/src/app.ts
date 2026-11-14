@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { openDatabase, type VeyraDatabase } from "./database.js";
 import { createSession, hashPassword, SESSION_COOKIE, SESSION_TTL, hashSessionToken, verifyPassword } from "./security.js";
@@ -40,7 +40,16 @@ function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key:
   mkdirSync(dirname(setupKeyPath), { recursive: true });
 
   if (existsSync(setupKeyPath)) {
-    return { key: readFileSync(setupKeyPath, "utf8").trim(), path: setupKeyPath, generated: false };
+    const fileInfo = lstatSync(setupKeyPath);
+    if (!fileInfo.isFile()) {
+      throw new Error("Veyra setup key path must be a regular file, not a symlink or special file");
+    }
+    chmodSync(setupKeyPath, 0o600);
+    const existingKey = readFileSync(setupKeyPath, "utf8").trim();
+    if (existingKey.length < 32) {
+      throw new Error("Veyra setup key file is empty or invalid; remove it to generate a new key");
+    }
+    return { key: existingKey, path: setupKeyPath, generated: false };
   }
 
   const key = randomBytes(24).toString("base64url");
@@ -211,7 +220,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
 
     const session = createSession(database, operator.id);
-    setSessionCookie(reply, session.token);
+    setSessionCookie(reply, session.token, options.secureCookies ?? process.env.VEYRA_COOKIE_SECURE === "true");
     return { authenticated: true, operator: { id: operator.id, username: operator.username } };
   });
 
@@ -229,6 +238,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     if (!operator) return;
 
     const code = randomInt(0, 100_000_000).toString().padStart(8, "0");
+    database.prepare("DELETE FROM pairing_codes WHERE expires_at <= ? OR used_at IS NOT NULL")
+      .run(new Date().toISOString());
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
 
