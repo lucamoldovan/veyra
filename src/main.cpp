@@ -1,6 +1,7 @@
 #include <Processing.NDI.Lib.h>
 
 #include "veyra/config/config.hpp"
+#include "veyra/control_plane/client.hpp"
 #include "veyra/ndi/discovery.hpp"
 #include "veyra/ndi/receiver.hpp"
 #include "veyra/video/renderer.hpp"
@@ -147,6 +148,17 @@ int main(int argc, char* argv[]) {
 
         veyra::video::Renderer renderer(config.display);
         veyra::ndi::Discovery discovery;
+        std::unique_ptr<veyra::control_plane::Client> controlPlane;
+        if (!config.controlPlane.serverUrl.empty()) {
+            try {
+                controlPlane = std::make_unique<veyra::control_plane::Client>(
+                    config.controlPlane
+                );
+                controlPlane->start();
+            } catch (const std::exception& error) {
+                spdlog::error("Veyra control plane could not start: {}", error.what());
+            }
+        }
         std::unique_ptr<veyra::ndi::Receiver> receiver;
         std::mutex latestFrameMutex;
         std::optional<veyra::ndi::VideoFrame> latestFrame;
@@ -157,6 +169,8 @@ int main(int argc, char* argv[]) {
         bool displayIsClear = true;
         bool connectionWasActive = false;
         bool playbackWasActive = false;
+        std::string activeSourceName;
+        std::vector<veyra::ndi::Source> currentSources;
         const auto frameInterval =
             std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                 std::chrono::duration<double>(1.0 / config.display.targetFps)
@@ -167,13 +181,51 @@ int main(int argc, char* argv[]) {
         std::string sourceSetSignature;
         auto lastFrameAt = nextPresentationAt;
         auto lastDiscoveryLog = lastFrameAt;
+        auto lastSourceSnapshotAt = discoveryStartedAt;
+        auto lastControlPlaneReportAt = discoveryStartedAt;
+
+        const auto reportControlPlaneStatus = [&]() {
+            if (!controlPlane) return;
+            const auto now = std::chrono::steady_clock::now();
+            veyra::control_plane::PlaybackSnapshot snapshot;
+            snapshot.uptimeSeconds = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::seconds>(
+                    now - discoveryStartedAt
+                ).count()
+            );
+            snapshot.ndiSourceName = activeSourceName;
+            if (captureFailed.load()) {
+                snapshot.mode = "error";
+            } else if (receiver && sourceConnected.load() &&
+                       now - lastFrameAt <= std::chrono::seconds(2)) {
+                snapshot.mode = "ndi";
+            } else {
+                snapshot.mode = "idle";
+            }
+            snapshot.ndiSources.reserve(currentSources.size());
+            for (const auto& source : currentSources) {
+                snapshot.ndiSources.push_back({source.name, source.url});
+            }
+            controlPlane->updateStatus(std::move(snapshot));
+        };
 
         spdlog::info("Waiting for the configured NDI source");
 
         while (shutdownRequested == 0 && renderer.pollEvents()) {
+            const auto loopNow = std::chrono::steady_clock::now();
+            if (receiver && loopNow - lastSourceSnapshotAt >= std::chrono::seconds(5)) {
+                currentSources = discovery.currentSources();
+                lastSourceSnapshotAt = loopNow;
+            }
+            if (loopNow - lastControlPlaneReportAt >= std::chrono::seconds(1)) {
+                reportControlPlaneStatus();
+                lastControlPlaneReportAt = loopNow;
+            }
             if (!receiver) {
                 (void)discovery.waitForChanges(250);
-                const auto sources = discovery.currentSources();
+                currentSources = discovery.currentSources();
+                lastSourceSnapshotAt = std::chrono::steady_clock::now();
+                const auto& sources = currentSources;
                 const auto discoveryNow = std::chrono::steady_clock::now();
 
                 std::string currentSourceSet;
@@ -205,6 +257,7 @@ int main(int argc, char* argv[]) {
                     );
                     receiver =
                         std::make_unique<veyra::ndi::Receiver>(*selected);
+                    activeSourceName = selected->name;
 
                     auto* activeReceiver = receiver.get();
                     captureThread = std::jthread(
