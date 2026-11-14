@@ -38,6 +38,7 @@ public:
 private:
     Source source_;
     NDIlib_recv_instance_t instance_{nullptr};
+    bool unsupportedFormatLogged_{false};
 };
 
 }  // namespace veyra::ndi
