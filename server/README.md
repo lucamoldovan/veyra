@@ -43,9 +43,11 @@ npm start
 | `LOG_LEVEL` | `info` | Fastify/Pino log level |
 | `VEYRA_DATABASE_PATH` | `data/veyra.sqlite` | SQLite database path |
 | `VEYRA_SETUP_KEY_PATH` | `data/setup-key` | First-run setup key file |
-| `VEYRA_COOKIE_SECURE` | `false` | Set to `true` when served over HTTPS |
+| `VEYRA_TLS_CERT_PATH` | unset | PEM certificate path; required with the private key for non-loopback binds |
+| `VEYRA_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
+| `VEYRA_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
 
-The service intentionally binds to loopback by default. Local operator setup and session authentication are implemented, but receiver authentication and the transport-security policy for LAN deployment are not. Do not expose it to the LAN yet.
+The service binds to loopback by default. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
 
 ## Current scope
 
@@ -59,7 +61,7 @@ Implemented:
 - Authenticated device inventory and one-time, 8-digit pairing codes (10-minute expiry).
 - Single-use receiver pairing that returns a device ID and one-time device credential; only a hash of the credential is stored.
 - Bearer-authenticated receiver heartbeats and derived online/stale/offline state.
-- Configurable bind address and port, health endpoint, and graceful shutdown.
+- Configurable bind address and port, TLS-enforced non-loopback binding, security response headers, health endpoint, and graceful shutdown.
 - Automated server build and API tests in GitHub Actions.
 
 Not implemented yet: the native receiver enrollment/heartbeat client, source inventory, WebSocket events, media storage, playlists, remote commands, device credential revocation, and production dashboard serving.
