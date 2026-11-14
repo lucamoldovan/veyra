@@ -107,7 +107,7 @@ Planned endpoints:
 | POST | `/api/v1/receiver/playback` | Report playback/source/fallback transitions |
 | POST | `/api/v1/receiver/commands/{commandId}/ack` | Acknowledge a received command and report its result |
 
-The pairing endpoint accepts a short-lived, single-use 12-digit code. The receiver receives its device credential once; the server stores only its HMAC-SHA-256 verifier for pairing codes; the HMAC key is stored separately in a restrictive local file. Heartbeats use the device credential as a bearer token. The native receiver enrollment and heartbeat client is not implemented yet.
+The pairing endpoint accepts a short-lived, single-use 12-digit code. The receiver receives its device credential once; the server stores only its HMAC-SHA-256 verifier for pairing codes; the HMAC key is stored separately in a restrictive local file. Heartbeats use the device credential as a bearer token. The C++ receiver client implements one-time pairing, TLS-verified bearer heartbeats, source snapshots, bounded retry/backoff, and owner-only credential storage. It is compiled independently of the NDI SDK in CI; the complete native player still requires an official NDI SDK build and hardware validation.
 
 ## WebSocket event envelope
 
