@@ -1,9 +1,11 @@
 #include <Processing.NDI.Lib.h>
 
-#include <SDL.h>
+#include "veyra/ndi/discovery.hpp"
+
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
+#include <exception>
 
 int main() {
     spdlog::info("Veyra {} starting", "0.1.0");
@@ -13,18 +15,31 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        spdlog::critical("Failed to initialize SDL: {}", SDL_GetError());
-        NDIlib_destroy();
-        return EXIT_FAILURE;
+    int exitCode = EXIT_SUCCESS;
+    try {
+        veyra::ndi::Discovery discovery;
+
+        // NDI discovery is asynchronous; give mDNS a moment to populate
+        // the initial source list before taking the first snapshot.
+        (void)discovery.waitForChanges(3000);
+
+        const auto sources = discovery.currentSources();
+        if (sources.empty()) {
+            spdlog::warn("No NDI sources found on the local network");
+        } else {
+            spdlog::info("Discovered {} NDI source(s)", sources.size());
+            for (const auto& source : sources) {
+                spdlog::info("NDI source: {} [{}]", source.name, source.identity());
+            }
+        }
+    } catch (const std::exception& error) {
+        spdlog::critical("NDI discovery failed: {}", error.what());
+        exitCode = EXIT_FAILURE;
     }
 
-    // The receiver and renderer are implemented in the next milestones.
-    spdlog::info("NDI runtime and SDL initialized successfully");
-
-    SDL_Quit();
+    // Discovery is destroyed before the global NDI runtime is shut down.
     NDIlib_destroy();
 
-    spdlog::info("Veyra shut down cleanly");
-    return EXIT_SUCCESS;
+    spdlog::info("Veyra discovery stage finished");
+    return exitCode;
 }
