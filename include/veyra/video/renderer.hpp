@@ -1,7 +1,7 @@
 #pragma once
 
 #include "veyra/config/config.hpp"
-#include "veyra/ndi/receiver.hpp"
+#include "veyra/video/frame.hpp"
 
 #include <SDL.h>
 
@@ -22,7 +22,7 @@ public:
     Renderer& operator=(Renderer&&) = delete;
 
     [[nodiscard]] bool pollEvents();
-    void present(const ndi::VideoFrame& frame);
+    void present(const VideoFrame& frame);
     void clear();
 
 private:
