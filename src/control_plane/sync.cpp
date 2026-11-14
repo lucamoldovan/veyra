@@ -167,6 +167,22 @@ void ensurePrivateDirectory(const std::filesystem::path& path) {
         throw std::runtime_error("Could not restrict receiver cache permissions");
 }
 
+void pruneUnreferencedFiles(
+    const std::filesystem::path& mediaRoot,
+    const std::unordered_set<std::string>& retainedFiles
+) {
+    std::error_code iterationError;
+    std::filesystem::directory_iterator entry(mediaRoot, iterationError);
+    const std::filesystem::directory_iterator end;
+    while (!iterationError && entry != end) {
+        if (!retainedFiles.contains(entry->path().filename().string())) {
+            std::error_code ignored;
+            std::filesystem::remove(entry->path(), ignored);
+        }
+        entry.increment(iterationError);
+    }
+}
+
 void atomicWrite(const std::filesystem::path& target, const std::string& bytes) {
     const auto temporary = target.string() + ".tmp-" + std::to_string(static_cast<long long>(::getpid()));
     const int fd = ::open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR);
@@ -266,6 +282,9 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     const auto previousFiles = previousStateFiles(statePath);
     const auto mediaRoot = config_.cachePath / "media";
     ensurePrivateDirectory(mediaRoot);
+    // Remove leftovers from any earlier incomplete sync before starting another
+    // attempt, while keeping every file referenced by the last committed state.
+    pruneUnreferencedFiles(mediaRoot, previousFiles);
 
     const auto configResponse = get(serverUrl, "/api/v1/receiver/config", deviceToken, caCertificatePath, stopToken);
     if (configResponse.status != 200) throw std::runtime_error("Receiver config request failed (HTTP " + std::to_string(configResponse.status) + ")");
@@ -353,16 +372,7 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     // observed the new snapshot. A later successful sync prunes that old set.
     std::unordered_set<std::string> retainedFiles = previousFiles;
     for (const auto& item : snapshot.fallbackItems) retainedFiles.insert(item.path.filename().string());
-    std::error_code iterationError;
-    std::filesystem::directory_iterator entry(mediaRoot, iterationError);
-    const std::filesystem::directory_iterator end;
-    while (!iterationError && entry != end) {
-        if (!retainedFiles.contains(entry->path().filename().string())) {
-            std::error_code ignored;
-            std::filesystem::remove(entry->path(), ignored);
-        }
-        entry.increment(iterationError);
-    }
+    pruneUnreferencedFiles(mediaRoot, retainedFiles);
     return snapshot;
 }
 
