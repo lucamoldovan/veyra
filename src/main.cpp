@@ -160,6 +160,8 @@ int main(int argc, char* argv[]) {
             );
         auto nextPresentationAt = std::chrono::steady_clock::now();
         const auto discoveryStartedAt = nextPresentationAt;
+        auto sourceSetStableSince = discoveryStartedAt;
+        std::string sourceSetSignature;
         auto lastFrameAt = nextPresentationAt;
         auto lastDiscoveryLog = lastFrameAt;
 
@@ -169,9 +171,23 @@ int main(int argc, char* argv[]) {
             if (!receiver) {
                 (void)discovery.waitForChanges(250);
                 const auto sources = discovery.currentSources();
+                const auto discoveryNow = std::chrono::steady_clock::now();
+
+                std::string currentSourceSet;
+                for (const auto& source : sources) {
+                    currentSourceSet += source.identity();
+                    currentSourceSet.push_back('\0');
+                }
+                if (currentSourceSet != sourceSetSignature) {
+                    sourceSetSignature = std::move(currentSourceSet);
+                    sourceSetStableSince = discoveryNow;
+                }
+
                 const bool automaticSelectionReady =
-                    std::chrono::steady_clock::now() - discoveryStartedAt >=
-                    std::chrono::seconds(5);
+                    discoveryNow - discoveryStartedAt >=
+                        std::chrono::seconds(5) &&
+                    discoveryNow - sourceSetStableSince >=
+                        std::chrono::seconds(2);
                 const auto selected = selectSource(
                     sources,
                     config.ndi,
