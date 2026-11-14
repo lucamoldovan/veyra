@@ -40,7 +40,7 @@ Implemented endpoints:
 | POST | `/api/v1/auth/session` | Create an operator session |
 | DELETE | `/api/v1/auth/session` | End the current operator session |
 | GET | `/api/v1/devices` | List registered receivers and their reported state (authenticated operator only) |
-| POST | `/api/v1/devices/pairing-codes` | Create a one-time 8-digit receiver pairing code (authenticated operator only) |
+| POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |
 
 Remaining planned management endpoints:
 
@@ -104,7 +104,7 @@ Planned endpoints:
 | POST | `/api/v1/receiver/playback` | Report playback/source/fallback transitions |
 | POST | `/api/v1/receiver/commands/{commandId}/ack` | Acknowledge a received command and report its result |
 
-The pairing endpoint accepts a short-lived, single-use 8-digit code. The receiver receives its device credential once; the server stores only its SHA-256 hash. Heartbeats use that credential as a bearer token. The native receiver enrollment and heartbeat client is not implemented yet.
+The pairing endpoint accepts a short-lived, single-use 12-digit code. The receiver receives its device credential once; the server stores only its HMAC-SHA-256 verifier for pairing codes; the HMAC key is stored separately in a restrictive local file. Heartbeats use the device credential as a bearer token. The native receiver enrollment and heartbeat client is not implemented yet.
 
 ## WebSocket event envelope
 
