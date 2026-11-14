@@ -25,7 +25,7 @@ The receiver remains useful on its own: playback must not depend on the dashboar
 | Internet dependency | None for normal local operation |
 | Initial receiver target | Debian 13 on x86_64, including the Late-2014 Mac mini |
 
-The dashboard and server are part of the product scope. The repository now includes the dashboard foundation and a local server with persistent SQLite storage and operator authentication. The server can now create one-time pairing codes, register devices, accept authenticated heartbeats, expose a protected device inventory, store local image assets, and manage ordered playlists with per-image durations. The native receiver enrollment client, NDI source inventory, and device-to-playlist assignment are still in development.
+The dashboard and server are part of the product scope. The repository now includes the dashboard foundation and a local server with persistent SQLite storage and operator authentication. The server can now create one-time pairing codes, register devices, accept authenticated heartbeats, expose a protected device inventory, store local image assets, manage ordered playlists with per-image durations, and aggregate NDI source snapshots reported by receivers. The native receiver enrollment client, NDI source inventory, and device-to-playlist assignment are still in development.
 
 ## System topology
 
@@ -104,13 +104,13 @@ Responsibilities:
 - Remote commands, including changing source, selecting a playlist, requesting a resync, and restarting the receiver process.
 - Playback state, health metrics, logs, and diagnostics.
 
-The server currently exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, authenticated heartbeat ingestion, local image upload/storage, and playlist CRUD. The planned control plane will add a LAN API for request/response operations and a persistent WebSocket channel for heartbeats, live state, and commands. Receiver authentication and the LAN transport-security policy must be specified before LAN deployment.
+The server currently exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, authenticated heartbeat ingestion with optional source snapshots, an aggregated NDI source inventory endpoint, local image upload/storage, and playlist CRUD. The planned control plane will add a LAN API for request/response operations and a persistent WebSocket channel for heartbeats, live state, and commands. Receiver authentication and the LAN transport-security policy must be specified before LAN deployment.
 
 The server currently uses a local SQLite database in WAL mode with versioned migrations through schema version 3. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
 
 ### 3. Veyra Dashboard
 
-A browser-based operator interface that communicates with the local server. The current development build runs through Vite. The Media Library and Playlists pages now use the local server for image uploads, content previews, ordered playlist editing, and per-image durations; production static serving is still to be implemented.
+A browser-based operator interface that communicates with the local server. The current development build runs through Vite. The NDI Sources page displays receiver-reported source inventory; the Media Library and Playlists pages use the local server for image uploads, content previews, ordered playlist editing, and per-image durations; production static serving is still to be implemented.
 
 Primary sections:
 
