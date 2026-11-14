@@ -19,6 +19,7 @@ if(VEYRA_BUILD_PLAYER)
     find_package(PkgConfig REQUIRED)
     find_package(Threads REQUIRED)
     find_package(CURL REQUIRED)
+    find_package(OpenSSL REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
     pkg_check_modules(SDL2_IMAGE REQUIRED IMPORTED_TARGET SDL2_image)
 
@@ -75,6 +76,7 @@ if(VEYRA_BUILD_PLAYER)
         Threads::Threads
         spdlog::spdlog
         CURL::libcurl
+        OpenSSL::Crypto
         nlohmann_json::nlohmann_json
         "${NDI_LIBRARY}"
     )
@@ -102,6 +104,9 @@ if(VEYRA_BUILD_TESTS)
     if(NOT TARGET PkgConfig::SDL2)
         find_package(PkgConfig REQUIRED)
         pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+    endif()
+    if(NOT TARGET PkgConfig::SDL2_IMAGE)
+        pkg_check_modules(SDL2_IMAGE REQUIRED IMPORTED_TARGET SDL2_image)
     endif()
 
     add_library(veyra_renderer_compile OBJECT
