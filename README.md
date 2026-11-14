@@ -2,38 +2,86 @@
 
 **Network video. Simplified.**
 
-Veyra is a lightweight, Linux-based NDI receiver designed to turn a small computer into a reliable, unattended video display.
+Veyra is a lightweight Linux NDI receiver that turns a small computer into an unattended video display.
 
-The first target is the Apple Mac mini (Late 2014) running Debian 13, outputting 1920×1080 at 30 FPS. Veyra is video-only: NDI audio is intentionally ignored.
+The first target is an Apple Mac mini (Late 2014) running Debian 13, with a 1920×1080 display at 30 FPS. Veyra is video-only; NDI audio is intentionally not captured or played.
 
-## Goals
+## Current implementation
 
-- Discover NDI sources available on the local network.
-- Select and receive a source, then render it fullscreen.
-- Detect source loss and reconnect automatically.
-- Start on boot and recover from application failures.
-- Keep playback independent of any cloud service or central server.
-- Keep the receiver small, predictable, and easy to deploy.
+The first end-to-end playback path is now in the repository:
 
-## Initial technology
+- Discovers NDI sources on the local network.
+- Selects a source using its NDI address, or its name as a fallback.
+- Receives video without opening an audio stream.
+- Uses a one-frame latest-value slot between capture and rendering, avoiding an ever-growing latency queue.
+- Renders fullscreen through SDL2, preserving the source aspect ratio.
+- Clears the display after two seconds without a fresh frame.
+- Leaves the NDI receiver alive during source loss so the SDK can reconnect when the source returns.
 
-- C++20
-- Official NDI SDK
-- SDL2 for display and rendering
-- CMake
-- nlohmann/json for local configuration
-- spdlog for structured logging
-- systemd for process supervision on Linux
+The player has not yet been compiled against an installed official NDI SDK or validated on the target Mac mini. The SDK-independent configuration tests run in GitHub Actions.
 
-## Current status
+## Requirements
 
-The repository is at the project-foundation stage. Hardware playback and NDI performance have not yet been validated on the target Mac mini.
+- Debian 13, 64-bit x86_64
+- C++20 compiler
+- CMake 3.20+
+- SDL2 development files
+- spdlog
+- nlohmann/json
+- Official NDI SDK for Linux
+- Avahi daemon for LAN discovery
+
+Install the Debian dependencies:
+
+```bash
+sudo apt update
+sudo apt install build-essential cmake pkg-config libsdl2-dev libspdlog-dev nlohmann-json3-dev avahi-daemon
+sudo systemctl enable --now avahi-daemon
+```
+
+Install the official NDI SDK separately and keep its proprietary files out of this repository.
+
+## Build
+
+Point CMake at the SDK installation directory:
+
+```bash
+cmake -S . -B build -DNDI_SDK_DIR=/path/to/ndi/sdk
+cmake --build build --parallel
+```
+
+If the SDK is installed into standard system include/library directories, CMake may find it without an explicit `NDI_SDK_DIR`.
+
+## Configure and run
+
+Create the system configuration directory and copy the example:
+
+```bash
+sudo install -d /etc/veyra
+sudo cp config/veyra.example.json /etc/veyra/config.json
+sudo nano /etc/veyra/config.json
+```
+
+Set `ndi.sourceAddress` to the source address shown in Veyra's discovery log. This is preferred because it identifies the NDI source more precisely. If the address is unavailable, set `ndi.sourceName`. If neither is set and exactly one source is discovered, Veyra selects that source automatically.
+
+Run the player:
+
+```bash
+./build/veyra --config /etc/veyra/config.json
+```
+
+Press Escape to exit during development. The production deployment will run without keyboard or mouse interaction.
+
+## Run configuration tests without the NDI SDK
+
+```bash
+cmake -S . -B build-tests -DVEYRA_BUILD_PLAYER=OFF -DVEYRA_BUILD_TESTS=ON
+cmake --build build-tests --parallel
+ctest --test-dir build-tests --output-on-failure
+```
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Development plan](docs/development.md)
-
-## Licensing
-
-NDI SDK usage and redistribution must follow the current NDI SDK license. Veyra's own license will be selected before public distribution.
+- [Third-party licensing](LICENSE-THIRD-PARTY.md)
