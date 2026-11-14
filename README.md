@@ -80,7 +80,7 @@ Press Escape to exit during development.
 
 ## Start automatically with XFCE
 
-The supplied systemd user service starts Veyra after the graphical session is available and restarts it if the process exits.
+The supplied systemd user service starts Veyra as part of the desktop user's session and restarts it if the process exits.
 
 Install the binary and user service:
 
