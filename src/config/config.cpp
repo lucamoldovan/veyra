@@ -151,6 +151,7 @@ bool readBoolean(const Json& object, const char* key, const bool fallback) {
 AppConfig load(const std::filesystem::path& path) {
     AppConfig config;
     config.controlPlane.credentialPath = expandHome("~/.local/state/veyra/device-token");
+    config.controlPlane.cachePath = expandHome("~/.local/state/veyra/cache");
 
     if (!std::filesystem::exists(path)) {
         return config;
@@ -220,6 +221,10 @@ AppConfig load(const std::filesystem::path& path) {
         throw std::runtime_error("controlPlane.credentialPath must not be empty");
     }
     config.controlPlane.credentialPath = expandHome(credentialPath);
+    const auto cachePath = readString(controlPlane, "cachePath", "~/.local/state/veyra/cache");
+    if (cachePath.empty()) throw std::runtime_error("controlPlane.cachePath must not be empty");
+    config.controlPlane.cachePath = expandHome(cachePath);
+    config.controlPlane.syncIntervalSeconds = readInteger(controlPlane, "syncIntervalSeconds", 10, 5, 300);
     config.controlPlane.heartbeatIntervalSeconds = readInteger(
         controlPlane, "heartbeatIntervalSeconds", 15, 5, 120
     );
