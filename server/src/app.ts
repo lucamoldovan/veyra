@@ -333,7 +333,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const extension = detectedMime === "image/png" ? "png" : detectedMime === "image/jpeg" ? "jpg" : "webp";
     const id = randomUUID();
     const storageKey = `${id}.${extension}`;
-    const displayName = safeDisplayName(request.headers["x-veyra-filename"]);
+    const filenameHeader = request.headers["x-veyra-filename"];
+    const displayName = safeDisplayName(typeof filenameHeader === "string" ? filenameHeader : undefined);
     const createdAt = new Date().toISOString();
     const sha256 = createHash("sha256").update(image).digest("hex");
 
