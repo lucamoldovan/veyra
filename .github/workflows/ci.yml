@@ -55,9 +55,6 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=moderate
 
-      - name: Audit dependencies
-        run: npm audit --audit-level=moderate
-
       - name: Type-check and build
         run: npm run build
 
@@ -83,6 +80,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
 
       - name: Type-check and build
         run: npm run build
