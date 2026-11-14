@@ -264,11 +264,11 @@ int main(int argc, char* argv[]) {
                 std::string fallbackSignature;
                 for (const auto& item : synchronized.fallbackItems) {
                     fallbackSignature += item.mediaId;
-                    fallbackSignature.push_back('\\0');
+                    fallbackSignature.push_back('\0');
                     fallbackSignature += item.sha256;
-                    fallbackSignature.push_back('\\0');
+                    fallbackSignature.push_back('\0');
                     fallbackSignature += std::to_string(item.durationSeconds);
-                    fallbackSignature.push_back('\\0');
+                    fallbackSignature.push_back('\0');
                 }
                 if (synchronized.hasValidCachedState &&
                     (synchronized.configVersion != appliedConfigVersion ||
