@@ -327,22 +327,25 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           ndiSourceName: device.ndi_source_name,
           uptimeSeconds: device.uptime_seconds,
           createdAt: device.created_at,
-          credentialRevokedAt: device.credential_revoked_at,
+          credentialRevokedAt: device.credential_revoked_at,\n          credentialStatus: device.credential_revoked_at ? "revoked" : "active",
         };
       }),
     };
   });
 
-  app.delete<{ Params: { deviceId: string } }>("/api/v1/devices/:deviceId", async (request, reply) => {
+  app.post<{ Params: { deviceId: string } }>("/api/v1/devices/:deviceId/revoke", async (request, reply) => {
     const operator = getAuthenticatedOperator(database, request, reply);
     if (!operator) return;
 
-    const result = database.prepare("DELETE FROM devices WHERE id = ?")
-      .run(request.params.deviceId);
+    const result = database.prepare(`
+      UPDATE devices
+      SET credential_revoked_at = COALESCE(credential_revoked_at, ?), updated_at = ?
+      WHERE id = ?
+    `).run(new Date().toISOString(), new Date().toISOString(), request.params.deviceId);
     if (result.changes === 0) {
       return reply.code(404).send({ error: "Device not found" });
     }
-    return reply.code(204).send();
+    return { revoked: true };
   });
 
   app.post<{ Body: { code?: unknown; deviceName?: unknown; platform?: unknown; version?: unknown } }>(
