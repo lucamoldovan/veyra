@@ -126,7 +126,7 @@ trap cleanup EXIT
 install -m 0440 "$ARCHIVE" "$STAGE/artifact.tar.gz"
 install -m 0440 "$MANIFEST" "$STAGE/manifest.json"
 install -m 0440 "$SIGNATURE" "$STAGE/manifest.sig"
-if id veyra-server >/dev/null 2>&1; then chown -R root:veyra-server "$STAGE"; fi
+if [[ "$EUID" -eq 0 ]] && id veyra-server >/dev/null 2>&1; then chown -R root:veyra-server "$STAGE"; fi
 chmod 0550 "$STAGE"
 mv -T "$STAGE" "$DEST"
 trap - EXIT
