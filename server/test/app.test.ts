@@ -801,3 +801,29 @@ test("operator can queue a receiver restart and the receiver reports completion 
     await app.close();
   }
 });
+
+test("production dashboard assets are served with safe cache headers and SPA fallback", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "veyra-dashboard-test-"));
+  mkdirSync(join(directory, "assets"), { recursive: true });
+  writeFileSync(join(directory, "index.html"), "<!doctype html><title>Veyra</title>");
+  writeFileSync(join(directory, "assets", "app-a1b2c3.js"), "console.log(1)");
+  const app = buildApp({ databasePath: ":memory:", setupKey: "test-setup-key", pairingSecret: "test-pairing-secret-with-at-least-32-bytes", dashboardDirectory: directory });
+  try {
+    const index = await app.inject({ method: "GET", url: "/" });
+    assert.equal(index.statusCode, 200);
+    assert.match(String(index.headers["content-type"]), /text\/html/);
+    assert.equal(index.headers["cache-control"], "no-cache");
+    const route = await app.inject({ method: "GET", url: "/devices" });
+    assert.equal(route.statusCode, 200);
+    assert.match(route.body, /Veyra/);
+    const asset = await app.inject({ method: "GET", url: "/assets/app-a1b2c3.js" });
+    assert.equal(asset.statusCode, 200);
+    assert.equal(asset.headers["cache-control"], "public, max-age=31536000, immutable");
+    const missingApi = await app.inject({ method: "GET", url: "/api/v1/not-a-route" });
+    assert.equal(missingApi.statusCode, 404);
+    assert.equal(missingApi.headers["cache-control"], "no-store");
+  } finally {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
