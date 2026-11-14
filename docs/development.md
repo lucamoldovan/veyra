@@ -53,7 +53,9 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 
 ## Phase 5 — Local server
 
-- [ ] Create the server workspace and development scripts
+- [x] Create the initial TypeScript/Fastify server workspace and development scripts
+- [x] Add versioned health endpoint and graceful shutdown
+- [x] Add server type-check/build and endpoint tests to GitHub Actions
 - [ ] Implement local authentication and session handling
 - [ ] Implement device registration and stable device identity
 - [ ] Implement heartbeat ingestion and online/offline state
