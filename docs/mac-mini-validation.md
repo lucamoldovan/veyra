@@ -29,7 +29,7 @@ Confirm that the Intel graphics driver is loaded and that the display exposes 19
 sudo apt update
 sudo apt install --yes \
   build-essential cmake ninja-build pkg-config git \
-  libsdl2-dev libcurl4-openssl-dev libspdlog-dev nlohmann-json3-dev \
+  libsdl2-dev libsdl2-image-dev libcurl4-openssl-dev libssl-dev libspdlog-dev nlohmann-json3-dev \
   avahi-daemon curl ca-certificates
 sudo systemctl enable --now avahi-daemon
 ```
@@ -118,6 +118,8 @@ Then set the `controlPlane` section to the following values:
     "pairingCode": "YOUR_12_DIGIT_CODE",
     "caCertificatePath": "/etc/veyra/veyra-ca.pem",
     "credentialPath": "~/.local/state/veyra/device-token",
+    "cachePath": "~/.local/state/veyra/cache",
+    "syncIntervalSeconds": 10,
     "heartbeatIntervalSeconds": 15
   }
 }
@@ -125,7 +127,7 @@ Then set the `controlPlane` section to the following values:
 
 Use the actual server DNS name covered by its TLS certificate. If the CA is already installed in the system trust store, `caCertificatePath` may be left empty. Never disable certificate verification or use plaintext HTTP to a LAN server.
 
-After successful pairing, the receiver stores its device token in the credential file with owner-only permissions. Subsequent starts use that credential; the one-time pairing code is not reused. The heartbeat reports playback mode, current source, uptime, and the latest discovered NDI source list.
+After successful pairing, the receiver stores its device token in the credential file with owner-only permissions. Subsequent starts use that credential; the one-time pairing code is not reused. The heartbeat reports playback mode, current source, uptime, and the latest discovered NDI source list. After pairing, the receiver polls versioned configuration and its assigned fallback playlist. It downloads PNG/JPEG/WebP assets into an owner-only cache, verifies each file against its SHA-256 and declared size, and atomically switches to the new manifest only after every item is present and verified. The active playlist is limited to 512 MiB per receiver.
 
 If an operator revokes the receiver credential, stop Veyra, remove the local `device-token` file, create a new pairing code, and update the config before restarting. The control-plane client has not yet been verified against the actual NDI SDK build or physical Mac mini.
 
@@ -164,7 +166,7 @@ The initial deployment depends on an active graphical session. Unattended startu
 
 ## 10. Server and receiver pairing status
 
-The server can issue one-time pairing codes, register devices, and accept authenticated heartbeats. The C++ receiver client implements pairing, TLS-verified heartbeats, source snapshots, and local credential storage, but the complete native player still requires a real NDI SDK build and physical validation.
+The server can issue one-time pairing codes, register devices, and accept authenticated heartbeats. The C++ receiver now implements pairing, TLS-verified heartbeats, source snapshots, versioned configuration polling, SHA-256-verified media synchronization, persistent cache loading, and timed image fallback. The complete native player still requires a real NDI SDK build and physical validation.
 
 Do not expose the server on the LAN until its certificate is trusted by the receiver and the actual player build has been tested. The non-loopback TLS guard is intentional; do not disable it or send bearer credentials over plaintext HTTP.
 
