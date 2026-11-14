@@ -39,7 +39,8 @@ Implemented endpoints:
 | GET | `/api/v1/auth/session` | Inspect the current operator session |
 | POST | `/api/v1/auth/session` | Create an operator session |
 | DELETE | `/api/v1/auth/session` | End the current operator session |
-| GET | `/api/v1/devices` | List registered receivers and their reported state (authenticated operator only) |
+| GET | `/api/v1/devices` | List registered receivers, reported state, and desired assignments (authenticated operator only) |
+| PUT | `/api/v1/devices/{deviceId}/config` | Update the receiver's NDI source and fallback playlist assignment (authenticated operator only) |
 | POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |
 | POST | `/api/v1/devices/{deviceId}/revoke` | Revoke a receiver credential (authenticated operator only) |
 | DELETE | `/api/v1/devices/{deviceId}` | Remove a receiver record after its credential has been revoked (authenticated operator only) |
@@ -97,6 +98,9 @@ Implemented endpoints:
 |---|---|---|
 | POST | `/api/v1/receiver/pair` | Exchange a one-time pairing code for a device ID and device credential |
 | POST | `/api/v1/receiver/heartbeat` | Submit a bearer-authenticated heartbeat, current playback state, and optional discovered NDI source snapshot |
+| GET | `/api/v1/receiver/config` | Retrieve the versioned NDI source and fallback playlist assignment |
+| GET | `/api/v1/receiver/media-manifest` | Retrieve ordered image metadata for the assigned fallback playlist |
+| GET | `/api/v1/receiver/media/{mediaId}` | Download an image only when it belongs to the receiver's assigned fallback playlist |
 
 Planned endpoints:
 
@@ -147,6 +151,8 @@ The server should keep separate dimensions rather than one ambiguous online/offl
 - **Server synchronization:** current, pending, failed, unknown.
 
 A device can be connected to the server while its NDI source is unavailable. A device can also be disconnected from the server while continuing NDI playback or local fallback. The dashboard must represent these states independently.
+
+Each device now has a monotonically increasing `configVersion`, an optional exact NDI source name/address assignment, and an optional fallback playlist assignment. The operator API validates that source name/address are supplied together and that the playlist exists. The receiver config endpoint returns a schema-versioned snapshot. The manifest exposes only ordered items from that device's assigned fallback playlist, including SHA-256, byte size, MIME type, duration, and a receiver-only download path. Media download authorization is checked against the device's current playlist assignment on every request.
 
 The current server records last-seen time and derives online at 45 seconds or less, stale after 45 seconds through 120 seconds, and offline after 120 seconds. The heartbeat interval defaults to 15 seconds. These thresholds are currently server defaults rather than operator-configurable settings.
 
@@ -200,4 +206,4 @@ The following still need a technical decision record or implementation:
 5. Playlist behavior when an item is missing, corrupted, or cannot be decoded.
 6. Production CA provisioning and certificate renewal for multi-receiver deployments.
 
-The SQLite migration mechanism, initial pairing flow, TLS requirement for non-loopback binding, media storage, and database/media backup utility are implemented. This remains a broader contract draft; planned configuration sync, remote commands, and fallback behavior are not implemented.
+The SQLite migration mechanism (schema v5), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, and database/media backup utility are implemented. The native receiver does not yet poll these new endpoints or cache/play the assigned media. Remote commands, WebSocket events, and fallback behavior remain in progress.
