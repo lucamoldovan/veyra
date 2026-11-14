@@ -150,6 +150,7 @@ bool readBoolean(const Json& object, const char* key, const bool fallback) {
 
 AppConfig load(const std::filesystem::path& path) {
     AppConfig config;
+    config.controlPlane.credentialPath = expandHome("~/.local/state/veyra/device-token");
 
     if (!std::filesystem::exists(path)) {
         return config;
