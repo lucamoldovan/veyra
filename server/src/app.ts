@@ -340,8 +340,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       const platform = typeof body.platform === "string" ? body.platform.trim().slice(0, 80) : "unknown";
       const version = typeof body.version === "string" ? body.version.trim().slice(0, 40) : "unknown";
 
-      if (!/^\d{8}$/.test(code)) {
-        return reply.code(400).send({ error: "Pairing code must contain 8 digits" });
+      if (!/^\d{12}$/.test(code)) {
+        return reply.code(400).send({ error: "Pairing code must contain 12 digits" });
       }
       if (deviceName.length < 1 || deviceName.length > 64) {
         return reply.code(400).send({ error: "Device name must be between 1 and 64 characters" });
