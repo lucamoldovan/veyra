@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
@@ -21,6 +22,12 @@
 #include <vector>
 
 namespace {
+
+volatile std::sig_atomic_t shutdownRequested = 0;
+
+void handleShutdownSignal(int) {
+    shutdownRequested = 1;
+}
 
 std::optional<veyra::ndi::Source> selectSource(
     const std::vector<veyra::ndi::Source>& sources,
@@ -73,6 +80,9 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    std::signal(SIGINT, handleShutdownSignal);
+    std::signal(SIGTERM, handleShutdownSignal);
+
     spdlog::info("Veyra {} starting", "0.1.0");
 
     if (!NDIlib_initialize()) {
@@ -105,7 +115,7 @@ int main(int argc, char* argv[]) {
 
         spdlog::info("Waiting for the configured NDI source");
 
-        while (renderer.pollEvents()) {
+        while (shutdownRequested == 0 && renderer.pollEvents()) {
             if (!receiver) {
                 (void)discovery.waitForChanges(250);
                 const auto sources = discovery.currentSources();
