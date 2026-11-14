@@ -299,6 +299,7 @@ int main(int argc, char* argv[]) {
                             latestFrame.reset();
                         }
                         sourceConnected.store(false);
+                        captureFailed.store(false);
                         activeSourceName.clear();
                         playbackWasActive = false;
                         connectionWasActive = false;
