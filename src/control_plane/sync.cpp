@@ -126,6 +126,8 @@ std::string extensionFor(const std::string& mime) {
 std::unordered_set<std::string> previousStateFiles(const std::filesystem::path& statePath) {
     std::unordered_set<std::string> files;
     try {
+        struct stat stateInfo{};
+        if (::lstat(statePath.c_str(), &stateInfo) != 0 || !S_ISREG(stateInfo.st_mode)) return files;
         std::ifstream input(statePath);
         if (!input) return files;
         Json state;
@@ -219,8 +221,12 @@ ReceiverSync::ReceiverSync(config::ControlPlaneConfig config) : config_(std::mov
 
 SyncSnapshot ReceiverSync::loadCached() const {
     try {
+        ensurePrivateDirectory(config_.cachePath);
         const auto root = config_.cachePath / "media";
+        ensurePrivateDirectory(root);
         const auto statePath = config_.cachePath / "state.json";
+        struct stat stateInfo{};
+        if (::lstat(statePath.c_str(), &stateInfo) != 0 || !S_ISREG(stateInfo.st_mode)) return {};
         std::ifstream input(statePath);
         if (!input) return {};
         Json state;
