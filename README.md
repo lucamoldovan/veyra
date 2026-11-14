@@ -70,7 +70,29 @@ Run the player:
 ./build/veyra --config /etc/veyra/config.json
 ```
 
-Press Escape to exit during development. The production deployment will run without keyboard or mouse interaction.
+Press Escape to exit during development.
+
+## Start automatically with XFCE
+
+The supplied systemd user service starts Veyra after the graphical session is available and restarts it if the process exits.
+
+Install the binary and user service:
+
+```bash
+sudo cmake --install build
+mkdir -p ~/.config/systemd/user
+cp systemd/veyra.service ~/.config/systemd/user/veyra.service
+systemctl --user daemon-reload
+systemctl --user enable --now veyra.service
+```
+
+The service defaults to X11 display :0 and `~/.Xauthority`. If your XFCE session uses different values, update the `DISPLAY` and `XAUTHORITY` entries in the service file. For unattended boot, configure your display manager to automatically log in to the same desktop user; the user service starts with that session.
+
+Avahi must be enabled at the system level:
+
+```bash
+sudo systemctl enable --now avahi-daemon
+```
 
 ## Run configuration tests without the NDI SDK
 
