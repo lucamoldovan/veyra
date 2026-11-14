@@ -17,6 +17,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 if(VEYRA_BUILD_PLAYER)
     find_package(PkgConfig REQUIRED)
+    find_package(Threads REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
 
     find_package(spdlog CONFIG REQUIRED)
@@ -66,6 +67,7 @@ if(VEYRA_BUILD_PLAYER)
     )
     target_link_libraries(veyra PRIVATE
         PkgConfig::SDL2
+        Threads::Threads
         spdlog::spdlog
         nlohmann_json::nlohmann_json
         "${NDI_LIBRARY}"
