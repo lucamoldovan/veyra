@@ -3,7 +3,7 @@ import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
 import { openDatabase, type VeyraDatabase } from "./database.js";
 import { createSession, hashPassword, SESSION_COOKIE, SESSION_TTL, hashSessionToken, verifyPassword } from "./security.js";
 
@@ -16,6 +16,7 @@ interface BuildAppOptions {
   mediaDirectory?: string;
   https?: { key: Buffer; cert: Buffer; minVersion: "TLSv1.2" };
   secureCookies?: boolean;
+  dashboardDirectory?: string;
 }
 
 interface SetupBody {
@@ -221,10 +222,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     (_request, body, done) => done(null, body),
   );
 
-  app.addHook("onSend", async (_request, reply, payload) => {
+  app.addHook("onSend", async (request, reply, payload) => {
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "no-referrer");
-    reply.header("Cache-Control", "no-store");
+    if (request.url.startsWith("/api/")) reply.header("Cache-Control", "no-store");
     if (options.https) reply.header("Strict-Transport-Security", "max-age=31536000");
     return payload;
   });
@@ -1156,5 +1157,31 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
   );
 
+  const dashboardDirectory = resolve(options.dashboardDirectory ?? process.env.VEYRA_DASHBOARD_DIRECTORY ?? "../dashboard/dist");
+  const dashboardIndex = resolve(dashboardDirectory, "index.html");
+  if (existsSync(dashboardIndex)) {
+    const serveDashboard = async (request: FastifyRequest, reply: FastifyReply) => {
+      let pathname: string;
+      try { pathname = decodeURIComponent(new URL(request.url, "http://veyra.local").pathname); }
+      catch { return reply.code(400).send({ error: "Invalid dashboard path" }); }
+      if (pathname === "/api" || pathname.startsWith("/api/")) return reply.code(404).send({ error: "API route not found" });
+      const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\\/+/, "");
+      let filePath = resolve(dashboardDirectory, relativePath);
+      if (filePath !== dashboardIndex && !filePath.startsWith(dashboardDirectory + sep)) return reply.code(404).send();
+      if (!existsSync(filePath) || !lstatSync(filePath).isFile()) filePath = dashboardIndex;
+      const extension = extname(filePath).toLowerCase();
+      const contentTypes: Record<string, string> = {
+        ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+        ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
+        ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".webp": "image/webp", ".ico": "image/x-icon", ".woff": "font/woff", ".woff2": "font/woff2",
+      };
+      const isHashedAsset = pathname.startsWith("/assets/") && filePath !== dashboardIndex;
+      reply.header("Cache-Control", filePath === dashboardIndex ? "no-cache" : isHashedAsset ? "public, max-age=31536000, immutable" : "no-cache");
+      return reply.type(contentTypes[extension] ?? "application/octet-stream").send(readFileSync(filePath));
+    };
+    app.get("/", serveDashboard);
+    app.get("/*", serveDashboard);
+  }
   return app;
 }
