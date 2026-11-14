@@ -62,14 +62,14 @@ To restore, stop the Veyra server first, then restore the database file to `VEYR
 | `VEYRA_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
 | `VEYRA_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
 
-The service binds to loopback by default. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
+The service binds to loopback by default. The SQLite database must live in a dedicated directory (not a shared system directory); Veyra restricts that directory to owner access and the database file to owner read/write. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
 
 ## Current scope
 
 Implemented:
 
 - Fastify application factory for isolated tests.
-- SQLite database with WAL mode, foreign keys, and persistent local storage.
+- SQLite database with WAL mode, foreign keys, and persistent local storage; its dedicated data directory is restricted to owner access and the database file to owner read/write.
 - First-run administrator setup protected by a random one-time key printed to server logs.
 - Scrypt password hashing, opaque random session tokens stored as SHA-256 hashes, HttpOnly/SameSite=Strict cookies, and 30-day session expiry.
 - Rate-limited setup and login endpoints, plus session inspection and logout.
