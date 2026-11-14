@@ -272,6 +272,7 @@ int main() {
         std::ifstream stateInput(config.cachePath / "state.json");
         const std::string persistedState((std::istreambuf_iterator<char>(stateInput)), {});
         const bool previousSnapshotPreserved = synced.configVersion == 3 &&
+            synced.syncGeneration == 2 &&
             synced.fallbackItems.size() == 1 &&
             synced.fallbackItems[0].mediaId == "media-2" &&
             persistedState.find("\"configVersion\": 3") != std::string::npos &&
