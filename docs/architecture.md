@@ -174,11 +174,11 @@ These are implementation proposals, not immutable product requirements:
 - Use a typed, versioned HTTP API plus WebSockets for live state and commands.
 - Keep receiver configuration and cached fallback data on disk.
 
-A TypeScript server (for example, Node.js with Fastify) and a React/Vite dashboard are reasonable candidates. The database choice, exact framework versions, API schema, device authentication, and media storage layout should be settled in a short technical design before those components are scaffolded.
+The current implementation uses Node.js 22+, TypeScript, Fastify 5, React 19, Vite 6, and SQLite via better-sqlite3. The database and initial framework choices are therefore settled for the current development phase. API evolution, device transport security, schema migrations, and media storage still require explicit design and validation.
 
 ## Repository status
 
-The current repository contains the native receiver foundation and SDK-independent configuration tests. It does **not** yet contain the dashboard, local server, device registration protocol, media library, playlist editor, or remote management features.
+The repository currently contains three foundations: a native NDI receiver, a Fastify/SQLite local server, and a React/Vite dashboard. Implemented server capabilities include operator setup and sessions, one-time receiver pairing, authenticated heartbeats, and a protected device inventory. The dashboard includes authentication, server health, navigation, and device inventory/pairing-code management. NDI source inventory, receiver-side pairing/heartbeat, media uploads, playlists, remote commands, fallback playback, WebSocket updates, and production dashboard serving remain unimplemented.
 
 The full NDI player has not yet been built against an installed official NDI SDK or tested with a real sender on the target Mac mini. Do not describe the platform as production-ready until the receiver, server, dashboard, offline behavior, and target hardware have all been validated.
 
