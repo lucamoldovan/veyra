@@ -42,7 +42,7 @@ trap 'rm -rf "${STAGE}"' EXIT
 
 mkdir -p "${STAGE}/bin"
 install -m 0755 "${BINARY}" "${STAGE}/bin/ndiview"
-tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -C "${STAGE}" -cf - . | gzip -n > "${ARCHIVE}"
+tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -C "${STAGE}" -cf - . | gzip -n > "${ARCHIVE}"
 
 ARTIFACT_SHA256="$(sha256sum "${ARCHIVE}" | awk '{print $1}')"
 ARTIFACT_SIZE="$(wc -c < "${ARCHIVE}" | tr -d ' ')"
