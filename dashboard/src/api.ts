@@ -245,3 +245,16 @@ export function updatePlaylist(
 export function deletePlaylist(playlistId: string): Promise<void> {
   return request<void>(`/api/v1/playlists/${encodeURIComponent(playlistId)}`, { method: "DELETE" });
 }
+
+export interface NdiSource {
+  id: string;
+  name: string;
+  address: string | null;
+  deviceCount: number;
+  devices: Array<{ id: string; name: string }>;
+  lastSeenAt: string | null;
+}
+
+export function getSources(signal?: AbortSignal): Promise<{ sources: NdiSource[] }> {
+  return request<{ sources: NdiSource[] }>("/api/v1/sources", { signal });
+}
