@@ -15,15 +15,15 @@ ln -s "/opt/veyra/releases/$VERSION" "$BASE/current.rollback"
 mv -Tf "$BASE/current.rollback" "$BASE/current"
 systemctl start veyra-server.service
 for attempt in $(seq 1 20); do
-  if curl --fail --silent --show-error --max-time 5 --cacert "$CA_BUNDLE" "$HEALTH_URL" -o /tmp/veyra-health.json &&
-     grep -q '"status":"ok"' /tmp/veyra-health.json; then
-    rm -f /tmp/veyra-health.json
+  if curl --fail --silent --show-error --max-time 5 --cacert "$CA_BUNDLE" "$HEALTH_URL" -o /tmp/ndiview-health.json &&
+     grep -q '"status":"ok"' /tmp/ndiview-health.json; then
+    rm -f /tmp/ndiview-health.json
     echo "Rolled back to $VERSION and health check passed."
     exit 0
   fi
   sleep 3
 done
-rm -f /tmp/veyra-health.json
+rm -f /tmp/ndiview-health.json
 echo "Requested rollback failed; restoring previous active release." >&2
 systemctl stop veyra-server.service || true
 if [[ -n "$OLD_TARGET" && -d "$OLD_TARGET" ]]; then
