@@ -25,7 +25,7 @@ The receiver remains useful on its own: playback must not depend on the dashboar
 | Internet dependency | None for normal local operation |
 | Initial receiver target | Debian 13 on x86_64, including the Late-2014 Mac mini |
 
-The dashboard and server are part of the product scope. The repository now includes the dashboard foundation and a local server with persistent SQLite storage and operator authentication. Device management, content workflows, and receiver integration remain in development.
+The dashboard and server are part of the product scope. The repository now includes the dashboard foundation and a local server with persistent SQLite storage and operator authentication. The server can now create one-time pairing codes, register devices, accept authenticated heartbeats, and expose a protected device inventory. The native receiver enrollment client and the remaining content workflows are still in development.
 
 ## System topology
 
@@ -77,6 +77,7 @@ Current implementation:
 
 Planned receiver capabilities:
 
+- Complete the receiver-side enrollment flow using a one-time code and persist its issued device credential securely.
 - Register and identify itself with the local server.
 - Send periodic heartbeats and playback/health state.
 - Receive configuration and playback commands over the LAN.
@@ -103,7 +104,7 @@ Responsibilities:
 - Remote commands, including changing source, selecting a playlist, requesting a resync, and restarting the receiver process.
 - Playback state, health metrics, logs, and diagnostics.
 
-The server currently exposes a versioned health endpoint and local operator setup/session routes. The planned control plane will add a LAN API for request/response operations and a persistent WebSocket channel for heartbeats, live state, and commands. Receiver authentication and the LAN transport-security policy must be specified before LAN deployment.
+The server currently exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, and authenticated heartbeat ingestion. The planned control plane will add a LAN API for request/response operations and a persistent WebSocket channel for heartbeats, live state, and commands. Receiver authentication and the LAN transport-security policy must be specified before LAN deployment.
 
 The server currently uses a local SQLite database in WAL mode. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
 
