@@ -109,6 +109,9 @@ void validateServerUrl(const std::string& url) {
         authorityStart,
         authorityEnd == std::string::npos ? std::string::npos : authorityEnd - authorityStart
     );
+    if (authorityEnd != std::string::npos && url.substr(authorityEnd) != "/") {
+        throw std::runtime_error("controlPlane.serverUrl must be an origin URL without a path");
+    }
     if (authority.empty() || authority.find('@') != std::string::npos) {
         throw std::runtime_error("controlPlane.serverUrl has an invalid authority");
     }
