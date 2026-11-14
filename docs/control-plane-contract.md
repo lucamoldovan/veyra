@@ -40,7 +40,7 @@ Implemented endpoints:
 | POST | `/api/v1/auth/session` | Create an operator session |
 | DELETE | `/api/v1/auth/session` | End the current operator session |
 | GET | `/api/v1/devices` | List registered receivers and their reported state (authenticated operator only) |
-| POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |
+| POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |\n| POST | `/api/v1/devices/{deviceId}/revoke` | Revoke a receiver credential (authenticated operator only) |\n| DELETE | `/api/v1/devices/{deviceId}` | Remove a receiver record after its credential has been revoked (authenticated operator only) |
 
 Remaining planned management endpoints:
 
@@ -82,7 +82,7 @@ Proposed first-enrollment flow:
 5. The receiver stores its credential with restrictive filesystem permissions.
 6. Subsequent connections authenticate as that device, not as a human operator.
 
-The server stores only a verifier/hash of long-lived device credentials where practical. Credentials must be revocable from the dashboard. A receiver must not be able to enroll itself using a predictable device name or unauthenticated LAN broadcast.
+The server stores only a verifier/hash of long-lived device credentials where practical. Operators can revoke a credential from the dashboard; a revoked receiver can no longer submit heartbeats. Its record can then be removed before pairing a replacement credential. A receiver must not be able to enroll itself using a predictable device name or unauthenticated LAN broadcast.
 
 Transport security for the LAN deployment, credential rotation, and recovery from a lost device credential must be settled before production use. Being on a LAN is not, by itself, authentication.
 
