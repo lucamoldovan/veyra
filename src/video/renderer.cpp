@@ -229,7 +229,7 @@ void Renderer::convertUyvyToBgra(const ndi::VideoFrame& frame) {
     }
     conversionBuffer_.resize(outputStride * height);
 
-    const bool isHd = frame.width > 720 || frame.height > 576;
+    const bool isHd = frame.height > 576;
 
     for (int y = 0; y < frame.height; ++y) {
         const auto* source = frame.pixels.data() +
