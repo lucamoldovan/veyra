@@ -221,13 +221,16 @@ int main() {
         const bool assetRequestOk = requests.size() >= 5 &&
             requests[4].find("GET /api/v1/receiver/media/media-1 ") != std::string::npos;
         const auto synced = client.syncSnapshot();
+        const auto reloaded = veyra::control_plane::ReceiverSync(config).loadCached();
         bool cachedAssetOk = false;
         if (synced.hasValidCachedState && synced.fallbackItems.size() == 1) {
             std::ifstream cached(synced.fallbackItems[0].path, std::ios::binary);
             const std::string bytes((std::istreambuf_iterator<char>(cached)), {});
             cachedAssetOk = bytes == "veyra-cache-test" &&
                 synced.fallbackItems[0].durationSeconds == 12 &&
-                synced.ndiSourceName == "Camera 1";
+                synced.ndiSourceName == "Camera 1" &&
+                reloaded.hasValidCachedState && reloaded.fallbackItems.size() == 1 &&
+                reloaded.fallbackItems[0].sha256 == synced.fallbackItems[0].sha256;
         }
 
         success = !serverFailed && pairRequestOk && heartbeatRequestOk &&
