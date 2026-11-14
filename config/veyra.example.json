@@ -4,6 +4,14 @@
     "sourceName": "",
     "sourceAddress": ""
   },
+  "controlPlane": {
+    "serverUrl": "",
+    "deviceName": "Lobby Display",
+    "pairingCode": "",
+    "caCertificatePath": "",
+    "credentialPath": "~/.local/state/veyra/device-token",
+    "heartbeatIntervalSeconds": 15
+  },
   "display": {
     "width": 1920,
     "height": 1080,
