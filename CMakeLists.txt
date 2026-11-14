@@ -50,9 +50,13 @@ endif()
 
 add_executable(veyra
     src/main.cpp
+    src/ndi/discovery.cpp
 )
 
-target_include_directories(veyra PRIVATE "${NDI_INCLUDE_DIR}")
+target_include_directories(veyra PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${NDI_INCLUDE_DIR}"
+)
 target_link_libraries(veyra PRIVATE
     PkgConfig::SDL2
     spdlog::spdlog
