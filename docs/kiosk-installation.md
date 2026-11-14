@@ -28,7 +28,7 @@ The installer requires Debian 13, creates the unprivileged \`veyra-kiosk\` accou
 
 ## Configure
 
-Edit \`/etc/veyra/config.json\` as an administrator. Keep it owned by \`root:veyra-kiosk\` with mode \`0640\`. Set the central server HTTPS URL, device name and CA trust path if using a private CA. Pair the receiver in the dashboard and assign its NDI source before unattended operation.
+Edit \`/etc/ndiview/config.json\` as an administrator. Keep it owned by \`root:veyra-kiosk\` with mode \`0640\`. Set the central server HTTPS URL, device name and CA trust path if using a private CA. Pair the receiver in the dashboard and assign its NDI source before unattended operation.
 
 ## Reboot and verify
 

@@ -105,23 +105,23 @@ If the SDK is installed into standard system include/library directories, CMake 
 Create the system configuration directory and copy the example:
 
 ```bash
-sudo install -d -m 755 /etc/veyra
-sudo install -m 600 config/veyra.example.json /etc/veyra/config.json
-sudo chown "$USER":"$(id -gn)" /etc/veyra/config.json
-nano /etc/veyra/config.json
+sudo install -d -m 755 /etc/ndiview
+sudo install -m 600 config/ndiview.example.json /etc/ndiview/config.json
+sudo chown "$USER":"$(id -gn)" /etc/ndiview/config.json
+nano /etc/ndiview/config.json
 ```
 
 Before editing the config, list the sources visible on the LAN:
 
 ```bash
-./build/veyra --list-sources
+./build/ndiview --list-sources
 ```
 
 Set `ndi.sourceAddress` to the address printed by that command. This is preferred because it identifies the NDI source more precisely. If the address is unavailable, set `ndi.sourceName`. If neither is set, NDIView selects a source automatically only when exactly one source remains after the initial five-second discovery window and a further two-second stable-source window.
 
-To enroll the receiver with the local server, configure the optional `controlPlane` section in `/etc/veyra/config.json`:
+To enroll the receiver with the local server, configure the optional `controlPlane` section in `/etc/ndiview/config.json`:
 
-- Set `serverUrl` to the server's HTTPS origin, for example `https://veyra-server.local:8787`.
+- Set `serverUrl` to the server's HTTPS origin, for example `https://ndiview-server.local:8787`.
 - Set `deviceName` to a unique display name.
 - Create a fresh 12-digit pairing code in the dashboard and set `pairingCode`.
 - Set `caCertificatePath` if the server uses a private CA that is not already trusted by the operating system.
@@ -132,26 +132,26 @@ The client verifies TLS certificates and rejects plaintext HTTP to non-loopback 
 Run the player:
 
 ```bash
-./build/veyra --config /etc/veyra/config.json
+./build/ndiview --config /etc/ndiview/config.json
 ```
 
 Press Escape to exit during development.
 
 ## Start automatically with XFCE
 
-The supplied systemd user service starts NDIView as part of the desktop user's session and restarts it if the process exits.
+The supplied systemd user service starts NDIView as part of the kiosk user's graphical session and restarts it if the process exits. The installer retains the historical `veyra-kiosk` Linux account name for upgrade compatibility.
 
 Install the binary and user service:
 
 ```bash
 sudo cmake --install build
 mkdir -p ~/.config/systemd/user
-cp systemd/veyra.service ~/.config/systemd/user/veyra.service
+cp systemd/ndiview.service ~/.config/systemd/user/ndiview.service
 systemctl --user daemon-reload
-systemctl --user enable --now veyra.service
+systemctl --user enable --now ndiview.service
 
-systemctl --user status veyra.service
-journalctl --user -u veyra.service -f
+systemctl --user status ndiview.service
+journalctl --user -u ndiview.service -f
 ```
 
 The service defaults to X11 display :0 and `~/.Xauthority`. If your XFCE session uses different values, update the `DISPLAY` and `XAUTHORITY` entries in the service file. For unattended boot, configure your display manager to automatically log in to the same desktop user; the user service starts with that session.
@@ -165,7 +165,7 @@ sudo systemctl enable --now avahi-daemon
 ## Run SDK-independent C++ tests
 
 ```bash
-cmake -S . -B build-tests -DVEYRA_BUILD_PLAYER=OFF -DVEYRA_BUILD_TESTS=ON
+cmake -S . -B build-tests -DNDIVIEW_BUILD_PLAYER=OFF -DNDIVIEW_BUILD_TESTS=ON
 cmake --build build-tests --parallel
 ctest --test-dir build-tests --output-on-failure
 ```

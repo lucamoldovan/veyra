@@ -1,12 +1,12 @@
-# Veyra Dashboard
+# NDIView Dashboard
 
-React + TypeScript dashboard for the local Veyra network-video platform.
+React + TypeScript dashboard for the local NDIView network-video platform.
 
 ## Requirements
 
 - Node.js 22 or newer
 - npm
-- Veyra local server running on `127.0.0.1:8787`
+- NDIView local server running on `127.0.0.1:8787`
 
 ## Development
 
@@ -26,7 +26,7 @@ npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. On first launch, copy the one-time setup key printed in the server terminal into the setup screen. The Vite development server proxies `/api` requests to `http://127.0.0.1:8787` by default. To develop against a TLS-enabled server, set `VEYRA_API_TARGET` to its HTTPS origin before starting Vite (for example, `VEYRA_API_TARGET=https://localhost:8787 npm run dev`). The certificate must be trusted by Node.js; do not disable TLS certificate verification.
+Open http://127.0.0.1:5173. On first launch, copy the one-time setup key printed in the server terminal into the setup screen. The Vite development server proxies `/api` requests to `http://127.0.0.1:8787` by default. To develop against a TLS-enabled server, set `NDIVIEW_API_TARGET` to its HTTPS origin before starting Vite (for example, `NDIVIEW_API_TARGET=https://localhost:8787 npm run dev`). The certificate must be trusted by Node.js; do not disable TLS certificate verification.
 
 ## Build
 
@@ -52,4 +52,4 @@ Implemented:
 - Media Library with authenticated PNG/JPEG/WebP uploads, previews, metadata, and deletion protection for playlist-referenced assets.
 - Playlist editor with create/delete, ordered image items, per-image display durations, and save/reload.
 
-Not implemented yet: live WebSocket updates, detailed logs/diagnostics, and native receiver update controls. In production, the built dashboard is served by the central Veyra server; see [the server deployment guide](../docs/server-deployment.md). NDI source data appears after a receiver reports its discovery snapshot; an empty source list is expected before a receiver has paired and reported.
+Not implemented yet: live WebSocket updates, detailed logs/diagnostics, and native receiver update controls. In production, the built dashboard is served by the central NDIView server; see [the server deployment guide](../docs/server-deployment.md). NDI source data appears after a receiver reports its discovery snapshot; an empty source list is expected before a receiver has paired and reported.
