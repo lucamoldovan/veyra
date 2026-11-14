@@ -119,6 +119,10 @@ export interface Device {
   createdAt: string;
   credentialRevokedAt: string | null;
   credentialStatus: "active" | "revoked";
+  configVersion: number;
+  assignedNdiSourceName: string | null;
+  assignedNdiSourceAddress: string | null;
+  fallbackPlaylistId: string | null;
 }
 
 export interface PairingCode {
@@ -257,4 +261,14 @@ export interface NdiSource {
 
 export function getSources(signal?: AbortSignal): Promise<{ sources: NdiSource[] }> {
   return request<{ sources: NdiSource[] }>("/api/v1/sources", { signal });
+}
+
+export function updateDeviceConfig(deviceId: string, input: {
+  ndiSourceName: string | null;
+  ndiSourceAddress: string | null;
+  fallbackPlaylistId: string | null;
+}): Promise<{ deviceId: string; configVersion: number; ndiSourceName: string | null; ndiSourceAddress: string | null; fallbackPlaylistId: string | null }> {
+  return request(`/api/v1/devices/${encodeURIComponent(deviceId)}/config`, {
+    method: "PUT", body: JSON.stringify(input),
+  });
 }
