@@ -82,10 +82,10 @@ function getAuthenticatedOperator(database: VeyraDatabase, request: FastifyReque
   return operator;
 }
 
-function setSessionCookie(reply: FastifyReply, token: string): void {
+function setSessionCookie(reply: FastifyReply, token: string, secureCookies: boolean): void {
   reply.setCookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: options.secureCookies ?? process.env.VEYRA_COOKIE_SECURE === "true",
+    secure: secureCookies,
     sameSite: "strict",
     path: "/",
     maxAge: SESSION_TTL,
@@ -182,7 +182,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
 
     const session = createSession(database, operatorId);
-    setSessionCookie(reply, session.token);
+    setSessionCookie(reply, session.token, options.secureCookies ?? process.env.VEYRA_COOKIE_SECURE === "true");
     return reply.code(201).send({ authenticated: true, operator: { id: operatorId, username } });
   });
 
