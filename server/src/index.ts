@@ -6,7 +6,7 @@ const host = (process.env.NDIVIEW_HOST ?? process.env.VEYRA_HOST)?.trim() || "12
 const port = Number(process.env.NDIVIEW_PORT ?? process.env.VEYRA_PORT ?? "8787");
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error("VEYRA_PORT must be an integer between 1 and 65535");
+  throw new Error("NDIVIEW_PORT must be an integer between 1 and 65535");
 }
 
 function isLoopbackHost(value: string): boolean {
@@ -20,7 +20,7 @@ const certificatePath = (process.env.NDIVIEW_TLS_CERT_PATH ?? process.env.VEYRA_
 const privateKeyPath = (process.env.NDIVIEW_TLS_KEY_PATH ?? process.env.VEYRA_TLS_KEY_PATH)?.trim();
 
 if (Boolean(certificatePath) !== Boolean(privateKeyPath)) {
-  throw new Error("Set both VEYRA_TLS_CERT_PATH and VEYRA_TLS_KEY_PATH, or neither");
+  throw new Error("Set both NDIVIEW_TLS_CERT_PATH and NDIVIEW_TLS_KEY_PATH, or neither");
 }
 
 const https = certificatePath && privateKeyPath
@@ -34,7 +34,7 @@ const https = certificatePath && privateKeyPath
 if (!isLoopbackHost(host) && !https) {
   throw new Error(
     "Refusing to bind NDIView to a non-loopback interface without TLS. " +
-    "Configure VEYRA_TLS_CERT_PATH and VEYRA_TLS_KEY_PATH.",
+    "Configure NDIVIEW_TLS_CERT_PATH and NDIVIEW_TLS_KEY_PATH.",
   );
 }
 
