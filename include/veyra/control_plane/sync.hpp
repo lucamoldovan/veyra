@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <string>
+#include <stop_token>
 #include <vector>
 
 namespace veyra::control_plane {
@@ -31,7 +32,8 @@ public:
     [[nodiscard]] SyncSnapshot loadCached() const;
     [[nodiscard]] SyncSnapshot synchronize(const std::string& serverUrl,
                                              const std::string& deviceToken,
-                                             const std::filesystem::path& caCertificatePath);
+                                             const std::filesystem::path& caCertificatePath,
+                                             const std::stop_token& stopToken);
 private:
     config::ControlPlaneConfig config_;
 };
