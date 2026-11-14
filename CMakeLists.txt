@@ -60,6 +60,8 @@ if(VEYRA_BUILD_PLAYER)
     # the receiver's advertised name. Detect the installed header instead
     # of assuming one SDK generation's spelling.
     include(CheckCXXSourceCompiles)
+    unset(VEYRA_NDI_HAS_P_NDI_NAME CACHE)
+    unset(VEYRA_NDI_HAS_P_NDI_RECV_NAME CACHE)
     set(CMAKE_REQUIRED_INCLUDES "${NDI_INCLUDE_DIR}")
     check_cxx_source_compiles("
         #include <Processing.NDI.Lib.h>
