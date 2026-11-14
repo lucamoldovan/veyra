@@ -93,7 +93,34 @@ Start a known NDI sender on the same wired LAN. Confirm both machines are on the
 
 Record the exact source name and address. Prefer the address in `config/veyra.example.json` and create a local configuration file. Do not commit site-specific source names or addresses.
 
-## 7. Test playback in a controlled sequence
+## 7. Configure receiver pairing and heartbeats
+
+The receiver includes a control-plane client for one-time pairing and periodic heartbeats. It is independent of NDI playback: if the local server is unavailable, playback continues and the client retries with bounded backoff.
+
+1. Start the Veyra server with HTTPS enabled and make its certificate chain trusted by the Mac mini. The server intentionally refuses non-loopback HTTP.
+2. In the dashboard, create a fresh receiver pairing code. It is 12 digits and expires after 10 minutes.
+3. Copy `config/veyra.example.json` to the configured receiver path and set:
+
+```json
+{
+  "controlPlane": {
+    "serverUrl": "https://veyra-server.local:8787",
+    "deviceName": "Lobby Display",
+    "pairingCode": "YOUR_12_DIGIT_CODE",
+    "caCertificatePath": "/etc/veyra/veyra-ca.pem",
+    "credentialPath": "~/.local/state/veyra/device-token",
+    "heartbeatIntervalSeconds": 15
+  }
+}
+```
+
+Use the actual server DNS name covered by its TLS certificate. If the CA is already installed in the system trust store, `caCertificatePath` may be left empty. Never disable certificate verification or use plaintext HTTP to a LAN server.
+
+After successful pairing, the receiver stores its device token in the credential file with owner-only permissions. Subsequent starts use that credential; the one-time pairing code is not reused. The heartbeat reports playback mode, current source, uptime, and the latest discovered NDI source list.
+
+If an operator revokes the receiver credential, stop Veyra, remove the local `device-token` file, create a new pairing code, and update the config before restarting. The control-plane client has not yet been verified against the actual NDI SDK build or physical Mac mini.
+
+## 8. Test playback in a controlled sequence
 
 Start windowed or on a spare display first if the current configuration allows it. Then test:
 
@@ -115,7 +142,7 @@ journalctl --user -u veyra.service --since "30 minutes ago"
 
 Do not treat a visually smooth short test as proof of 24-hour stability.
 
-## 8. Install the user service only after manual playback is stable
+## 9. Install the user service only after manual playback is stable
 
 Follow the systemd user-service instructions in the root README. Confirm that the service runs inside the logged-in XFCE/X11 session and has the correct `DISPLAY` and `XAUTHORITY`.
 
@@ -126,11 +153,11 @@ journalctl --user -u veyra.service -f
 
 The initial deployment depends on an active graphical session. Unattended startup therefore requires a deliberate display-manager/autologin configuration.
 
-## 9. Server and receiver pairing status
+## 10. Server and receiver pairing status
 
-The server can issue one-time pairing codes, register devices, and accept authenticated heartbeats. The native C++ receiver does not yet implement the pairing or heartbeat client, certificate trust configuration, or credential storage.
+The server can issue one-time pairing codes, register devices, and accept authenticated heartbeats. The C++ receiver client implements pairing, TLS-verified heartbeats, source snapshots, and local credential storage, but the complete native player still requires a real NDI SDK build and physical validation.
 
-Until those pieces are implemented and tested, do not expose the server on the LAN for receiver enrollment. Keep the server on its default loopback address. The non-loopback TLS guard is intentional; do not disable it or send bearer credentials over plaintext HTTP.
+Do not expose the server on the LAN until its certificate is trusted by the receiver and the actual player build has been tested. The non-loopback TLS guard is intentional; do not disable it or send bearer credentials over plaintext HTTP.
 
 ## Test report template
 
