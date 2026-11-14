@@ -311,6 +311,68 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return { authenticated: false };
   });
 
+  app.get("/api/v1/sources", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const deviceRows = database.prepare(`
+      SELECT id, name, last_seen_at, discovered_sources_json
+      FROM devices
+      WHERE credential_revoked_at IS NULL
+    `).all() as Array<{
+      id: string;
+      name: string;
+      last_seen_at: string | null;
+      discovered_sources_json: string;
+    }>;
+
+    const sourceMap = new Map<string, {
+      name: string;
+      address: string | null;
+      devices: Map<string, string>;
+      lastSeenAt: string | null;
+    }>();
+
+    for (const device of deviceRows) {
+      let reported: unknown;
+      try { reported = JSON.parse(device.discovered_sources_json); } catch { reported = []; }
+      if (!Array.isArray(reported)) continue;
+
+      for (const rawSource of reported) {
+        if (typeof rawSource !== "object" || rawSource === null) continue;
+        const source = rawSource as { name?: unknown; url?: unknown };
+        if (typeof source.name !== "string" || source.name.length === 0) continue;
+        const address = typeof source.url === "string" && source.url.length > 0 ? source.url : null;
+        const key = address ?? source.name;
+        let entry = sourceMap.get(key);
+        if (!entry) {
+          entry = { name: source.name, address, devices: new Map(), lastSeenAt: null };
+          sourceMap.set(key, entry);
+        }
+        entry.devices.set(device.id, device.name);
+        if (device.last_seen_at && (!entry.lastSeenAt || device.last_seen_at > entry.lastSeenAt)) {
+          entry.lastSeenAt = device.last_seen_at;
+        }
+      }
+    }
+
+    return {
+      sources: [...sourceMap.entries()]
+        .map(([id, source]) => ({
+          id,
+          name: source.name,
+          address: source.address,
+          deviceCount: source.devices.size,
+          devices: [...source.devices.entries()].map(([deviceId, deviceName]) => ({
+            id: deviceId,
+            name: deviceName,
+          })),
+          lastSeenAt: source.lastSeenAt,
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    };
+  });
+
   app.post("/api/v1/media", {
     config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
   }, async (request, reply) => {
@@ -776,7 +838,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
   );
 
-  app.post<{ Body: { version?: unknown; platform?: unknown; uptimeSeconds?: unknown; playbackMode?: unknown; ndiSourceName?: unknown } }>(
+  app.post<{ Body: { version?: unknown; platform?: unknown; uptimeSeconds?: unknown; playbackMode?: unknown; ndiSourceName?: unknown; ndiSources?: unknown } }>(
     "/api/v1/receiver/heartbeat",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request, reply) => {
@@ -802,14 +864,43 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       const ndiSourceName = typeof body.ndiSourceName === "string"
         ? body.ndiSourceName.slice(0, 160)
         : null;
+      let discoveredSourcesJson: string | null = null;
+      if (body.ndiSources !== undefined) {
+        if (!Array.isArray(body.ndiSources) || body.ndiSources.length > 100) {
+          return reply.code(400).send({ error: "ndiSources must be an array of at most 100 sources" });
+        }
+        const discoveredSources: Array<{ name: string; url: string }> = [];
+        const seenSources = new Set<string>();
+        for (const rawSource of body.ndiSources) {
+          if (typeof rawSource !== "object" || rawSource === null) {
+            return reply.code(400).send({ error: "Each discovered source must be an object" });
+          }
+          const source = rawSource as { name?: unknown; url?: unknown };
+          const sourceName = typeof source.name === "string"
+            ? source.name.replace(/[\\u0000-\\u001f\\u007f]/g, "").trim().slice(0, 256)
+            : "";
+          const sourceUrl = typeof source.url === "string"
+            ? source.url.replace(/[\\u0000-\\u001f\\u007f]/g, "").trim().slice(0, 512)
+            : "";
+          if (!sourceName) {
+            return reply.code(400).send({ error: "Each discovered source needs a valid name" });
+          }
+          const identity = sourceUrl || sourceName;
+          if (seenSources.has(identity)) continue;
+          seenSources.add(identity);
+          discoveredSources.push({ name: sourceName, url: sourceUrl });
+        }
+        discoveredSourcesJson = JSON.stringify(discoveredSources);
+      }
       const now = new Date().toISOString();
 
       database.prepare(`
         UPDATE devices
         SET last_seen_at = ?, last_ip = ?, software_version = ?, platform = ?,
-            playback_mode = ?, ndi_source_name = ?, uptime_seconds = ?, updated_at = ?
+            playback_mode = ?, ndi_source_name = ?, uptime_seconds = ?,
+            discovered_sources_json = COALESCE(?, discovered_sources_json), updated_at = ?
         WHERE id = ?
-      `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, now, device.id);
+      `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, discoveredSourcesJson, now, device.id);
 
       return { accepted: true, serverTime: now };
     },
