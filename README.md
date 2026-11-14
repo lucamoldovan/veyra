@@ -90,6 +90,10 @@ mkdir -p ~/.config/systemd/user
 cp systemd/veyra.service ~/.config/systemd/user/veyra.service
 systemctl --user daemon-reload
 systemctl --user enable --now veyra.service
+
+# Check status and follow the player logs
+systemctl --user status veyra.service
+journalctl --user -u veyra.service -f
 ```
 
 The service defaults to X11 display :0 and `~/.Xauthority`. If your XFCE session uses different values, update the `DISPLAY` and `XAUTHORITY` entries in the service file. For unattended boot, configure your display manager to automatically log in to the same desktop user; the user service starts with that session.
