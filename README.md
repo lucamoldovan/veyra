@@ -68,7 +68,7 @@ Before editing the config, list the sources visible on the LAN:
 ./build/veyra --list-sources
 ```
 
-Set `ndi.sourceAddress` to the address printed by that command. This is preferred because it identifies the NDI source more precisely. If the address is unavailable, set `ndi.sourceName`. If neither is set and exactly one source is discovered after the initial five-second discovery window, Veyra selects that source automatically.
+Set `ndi.sourceAddress` to the address printed by that command. This is preferred because it identifies the NDI source more precisely. If the address is unavailable, set `ndi.sourceName`. If neither is set, Veyra selects a source automatically only when exactly one source remains after the initial five-second discovery window and a further two-second stable-source window.
 
 Run the player:
 
