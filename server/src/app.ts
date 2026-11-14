@@ -135,8 +135,15 @@ function setSessionCookie(reply: FastifyReply, token: string, secureCookies: boo
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const database = openDatabase(options.databasePath);
-  const setup = readSetupKey(database, options);
-  const pairingSecret = readPairingSecret(options);
+  let setup: ReturnType<typeof readSetupKey>;
+  let pairingSecret: Buffer;
+  try {
+    setup = readSetupKey(database, options);
+    pairingSecret = readPairingSecret(options);
+  } catch (error) {
+    database.close();
+    throw error;
+  }
   const secureCookies = Boolean(options.https) || options.secureCookies === true ||
     process.env.VEYRA_COOKIE_SECURE === "true";
   const app = Fastify({
