@@ -117,6 +117,8 @@ export interface Device {
   ndiSourceName: string | null;
   uptimeSeconds: number | null;
   createdAt: string;
+  credentialRevokedAt: string | null;
+  credentialStatus: "active" | "revoked";
 }
 
 export interface PairingCode {
