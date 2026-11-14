@@ -28,6 +28,7 @@ Renderer::Renderer(const config::DisplayConfig& config) {
     sdlInitialized_ = true;
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+    SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_AUTOMATIC);
 
     Uint32 windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI;
     if (config.fullscreen) {
