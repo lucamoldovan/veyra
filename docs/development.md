@@ -36,7 +36,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Measure 1920×1080 at 30 FPS on the target Mac mini
 - [ ] Validate display recovery after renderer/device reset on target hardware
 - [ ] Verify NDI reconnect timing and behavior during LAN interruption
-- [ ] Build against the official NDI SDK on Debian 13
+- [ ] Build the complete player against the official NDI SDK on Debian 13
 - [ ] Run a 24-hour playback test
 
 ## Phase 4 — Platform architecture and contracts
@@ -45,8 +45,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Define dashboard sections and local-server responsibilities
 - [x] Define separate receiver/server failure behavior
 - [x] Define per-device fallback and local-cache requirements
-- [ ] Specify versioned server API and WebSocket event contract
-- [ ] Specify device identity, pairing, and authentication
+- [x] Specify versioned server API and WebSocket event contract in the control-plane draft
+- [x] Specify device identity, pairing, and authentication
 - [x] Specify and implement media storage, upload limits, and asset validation
 - [x] Implement playlist schema, ordering, and per-item durations
 - [ ] Specify per-device assignment
@@ -66,10 +66,12 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
 - [x] Add setup, login, session inspection, and logout tests
 - [x] Implement one-time pairing-code generation and single-use receiver enrollment API
+- [x] Implement C++ receiver pairing, TLS-verified heartbeats, source reporting, retry/backoff, and protected credential storage
 - [x] Require TLS before binding the server to non-loopback interfaces
 - [x] Issue per-device credentials and store only credential hashes
 - [x] Implement bearer-authenticated heartbeat ingestion and online/stale/offline state
-- [x] Implement receiver-reported source snapshots and aggregated NDI source inventory\n- [ ] Implement per-device source assignment
+- [x] Implement receiver-reported source snapshots and aggregated NDI source inventory
+- [ ] Implement per-device source assignment
 - [x] Implement authenticated media upload, local storage, metadata, content delivery, and safe deletion
 - [x] Implement playlist CRUD, ordered items, and validated display durations
 - [ ] Implement device playlist assignment APIs
@@ -91,7 +93,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement first-run setup, login, session persistence, and logout
 - [x] Implement protected device inventory with 15-second refresh and live status
 - [x] Add receiver credential status, revocation, and removal controls
-- [x] Implement NDI source inventory page\n- [ ] Implement per-device source assignment
+- [x] Implement NDI source inventory page
+- [ ] Implement per-device source assignment
 - [x] Implement media library uploads, previews, and deletion
 - [x] Implement playlist editor with ordering and editable image durations
 - [ ] Implement per-device and group playlist assignment
@@ -101,9 +104,10 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 
 ## Phase 7 — Receiver management and offline-first behavior
 
-- [ ] Add receiver identity and pairing flow
-- [ ] Add LAN communication client with reconnect/backoff
-- [ ] Add heartbeat and playback/health reporting
+- [x] Add receiver identity and pairing flow
+- [x] Add LAN communication client with TLS verification and bounded reconnect/backoff
+- [x] Add heartbeat and playback/source reporting
+- [ ] Add detailed receiver health diagnostics
 - [ ] Apply remote configuration safely and atomically
 - [ ] Implement local media cache with integrity checks
 - [ ] Implement per-device cached fallback playlists
