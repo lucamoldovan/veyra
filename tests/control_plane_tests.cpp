@@ -233,8 +233,8 @@ int main() {
                 reloaded.hasValidCachedState && reloaded.fallbackItems.size() == 1 &&
                 reloaded.fallbackItems[0].sha256 == synced.fallbackItems[0].sha256;
             cachePermissionsOk =
-                (stat(config.cachePath.c_str()).st_mode & 0o777) == 0o700 &&
-                (stat(synced.fallbackItems[0].path.c_str()).st_mode & 0o777) == 0o600;
+                (stat(config.cachePath.c_str()).st_mode & 0777) == 0700 &&
+                (stat(synced.fallbackItems[0].path.c_str()).st_mode & 0777) == 0600;
         }
 
         bool corruptCacheRejected = false;
