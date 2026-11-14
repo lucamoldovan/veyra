@@ -101,6 +101,9 @@ jobs:
           bash -n scripts/uninstall-kiosk-debian.sh
           bash -n scripts/ndiview-kiosk-session
           bash -n scripts/ndiview-action
+          bash -n scripts/package-receiver-release.sh
+          bash -n tests/test_receiver_release_package.sh
+          bash tests/test_receiver_release_package.sh
                     bash -n scripts/package-server-release.sh
           bash -n scripts/install-server-release.sh
           bash -n scripts/rollback-server-release.sh
