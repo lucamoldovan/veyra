@@ -37,6 +37,9 @@ OUTPUT_DIR="$(cd "${OUTPUT_DIR}" && pwd)"
 ARCHIVE="${OUTPUT_DIR}/ndiview-${VERSION}-${PLATFORM}.tar.gz"
 MANIFEST="${OUTPUT_DIR}/ndiview-${VERSION}-${PLATFORM}.manifest.json"
 SIGNATURE="${MANIFEST}.sig"
+for output in "$ARCHIVE" "$MANIFEST" "$SIGNATURE"; do
+  [[ ! -e "$output" && ! -L "$output" ]] || { echo "Refusing to overwrite an existing immutable release artifact: $output" >&2; exit 1; }
+done
 STAGE="$(mktemp -d)"
 trap 'rm -rf "${STAGE}"' EXIT
 
