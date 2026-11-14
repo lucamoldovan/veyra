@@ -1,7 +1,7 @@
 # Deployment, fullscreen and update architecture
 
-Status: implementation plan for `feature/deployment-and-updates`.
-This document defines the target architecture. Items marked "planned" are not implemented merely because they appear here.
+Status: implementation and validation tracker for `feature/deployment-and-updates`.
+The kiosk deployment, allowlisted receiver restart, production dashboard serving, and signed central-server release workflow have code and CI coverage. Native receiver update distribution and physical Mac mini validation remain pending.
 
 ## Goals
 
@@ -26,7 +26,7 @@ Keep mutable state outside the release directory:
 - Credentials and device identity: `/var/lib/veyra/identity/`
 - Download/cache/fallback media: `/var/cache/veyra/` or a dedicated persistent cache directory
 
-The current example config defaults to `~/.local/state/veyra/device-token` for the credential and `~/.local/state/veyra/cache` for cached state/media. The proposed `/var/lib` and `/var/cache` layout is a deployment target, not the current implementation. Reconcile the service account and these paths before implementation; do not move or overwrite existing state until a migration is tested.
+The current example config defaults to `~/.local/state/veyra/device-token` for the credential and `~/.local/state/veyra/cache` for cached state/media. The kiosk installer preserves this behavior under the dedicated `veyra-kiosk` account. Do not move or overwrite existing state until a migration is tested.
 
 ### Central server PC
 
@@ -34,7 +34,7 @@ Run Debian 13 x86_64 (or another explicitly tested Linux server OS), Node.js 22+
 
 The server must be configured with TLS before listening on a LAN interface. Do not expose the current development server or authenticated device APIs over plaintext LAN. Receivers must validate the server certificate using a configured CA/certificate trust path.
 
-The central server becomes the update coordinator and LAN artifact cache. Each receiver should download an artifact from the central server, not independently fetch the same GitHub release.
+The central server currently serves the production dashboard and supports signed, staged server/dashboard releases with health-check rollback. It does not yet coordinate native receiver artifact downloads; that is the remaining update-system stage.
 
 ## Update channels and release model
 
@@ -107,25 +107,25 @@ Do not assume the current `display.fullscreen` configuration option alone provid
 
 ## Remote receiver restart from the dashboard
 
-A remote restart is feasible, but the server must not execute arbitrary shell commands on receivers and must not rely on SSH credentials distributed to the fleet. Implement a narrowly scoped, receiver-initiated command channel.
+The server uses a persistent, receiver-initiated command queue. It never executes arbitrary shell commands on receivers and does not distribute SSH credentials.
 
 ### Operator experience
 
-- Add a per-device **Restart receiver** action in the device details/overflow menu.
+- Per-device **Restart receiver** action is available in the Devices view.
 - Require an explicit confirmation naming the target device. Explain that video output will be interrupted briefly.
-- Show pending, accepted, restarting, completed, timed-out, and failed states with timestamps.
+- The Devices view shows queued, claimed, restarting, completed, timed-out, and failed status; server records include request/claim/completion timestamps.
 - Disable repeat requests while a restart is pending and apply a server-side cooldown.
 - Only authenticated operators with the appropriate permission can request it. Record the operator, target device, command ID, request time, result, and reason in an audit log.
 - Do not provide a bulk-restart button in the first version.
 
 ### Delivery and execution design
 
-1. Add a persistent `device_commands` table with a UUID, device ID, allowlisted command type, status, created/expiry/acknowledged/completed timestamps, and operator ID. Add an index for pending commands and a retention policy for completed records.
-2. Add an authenticated operator endpoint to request a restart. Validate that the device exists, is not revoked, and is recently online; enforce cooldown and one pending restart per device.
-3. Add a receiver-authenticated command-poll endpoint. The receiver uses its existing bearer device credential over verified TLS to fetch at most one pending command, atomically claim it, and acknowledge receipt. Commands expire and cannot be replayed.
+1. A persistent `device_commands` table stores UUID, device ID, allowlisted command type, status, operator ID, creation/expiry/claim/completion timestamps, and result message.
+2. The authenticated operator endpoint queues a restart only for a recently online, non-revoked receiver and enforces one pending command plus a two-minute cooldown.
+3. The receiver-authenticated command-poll endpoint atomically claims at most one command. It uses the existing bearer credential over verified TLS.
 4. The receiver accepts only a fixed enum such as `restart`; never accept a shell string, executable path, arbitrary arguments, or script from the server.
-5. Execute the restart through a tiny, separately installed privileged helper or a narrowly scoped polkit rule that permits only the exact reboot action. The main receiver process remains unprivileged. Do not grant broad passwordless sudo or general systemctl access.
-6. Report command progress/result before reboot where possible. After boot, the receiver reconnects with its device identity and reports the matching command completed. If it never returns before timeout, show an honest timed-out/offline state rather than claiming success.
+5. The kiosk installer installs a root-owned, argument-free reboot helper and a sudoers rule allowing only that helper. The main receiver process remains unprivileged; no general sudo or systemctl permission is granted.
+6. The receiver reports `restarting` before reboot; the server marks the command completed only after a fresh heartbeat arrives. Expired commands and receivers that do not return are marked timed out.
 7. Keep this command channel extensible for future allowlisted actions, but implement restart only initially.
 
 ### Safety and acceptance tests
@@ -167,12 +167,12 @@ The public CI currently disables the native player because the official NDI SDK 
 
 1. **Inventory and baseline:** inspect current receiver/server/dashboard code and config paths; record the exact working commit and test commands. No behavior changes.
 2. **Physical receiver baseline:** install Debian 13 on one test Mac mini; validate graphics, network, NDI SDK/runtime, and video output.
-3. **Kiosk lifecycle:** implement and test automatic graphical session, fullscreen launch, application recovery, logging, and maintenance access.
-4. **Remote restart:** add the authenticated command queue, receiver polling/acknowledgement, restricted reboot helper, dashboard confirmation/status, audit trail, and physical-device tests.
+3. **Kiosk lifecycle:** installer/session/service files are implemented; physical Mac mini cold-boot, display, and 24-hour tests remain.
+4. **Remote restart:** server queue, receiver polling/status reporting, restricted reboot helper, dashboard confirmation/status, and server tests are implemented; physical-device reboot testing remains.
 5. **Release packaging:** define version format, target platform, immutable artifact layout, manifest schema, checksums/signatures, and compatibility checks.
 6. **Receiver updater:** implement staging, verification, activation, health check, rollback, and persistent update status.
-7. **Server update coordinator:** add artifact cache, device rollout controls, update status APIs, and authorization/audit checks.
-8. **Dashboard update and UI:** serve the production dashboard from the server release; show versions, update availability, progress, errors, and release notes.
+7. **Server/dashboard release workflow:** signed release packaging, server-side build, immutable version directories, persistent-data backup, atomic activation, health check and rollback are implemented. Dashboard assets are served by the server and update on browser refresh.
+8. **Native receiver update coordinator:** publish signed receiver artifacts, cache them centrally, add per-device update rollout/status APIs and receiver-side staging/rollback. This is not implemented yet.
 9. **CI/release automation:** add SDK-enabled release build where licensing permits, package server/dashboard/receiver, sign, publish, and test.
 10. **Fleet validation:** test one device, then a small group, then wider rollout. Manual approval remains default until reliability is proven.
 

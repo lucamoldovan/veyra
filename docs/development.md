@@ -50,7 +50,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Specify and implement media storage, upload limits, and asset validation
 - [x] Implement playlist schema, ordering, and per-item durations
 - [x] Specify per-device source and fallback-playlist assignment
-- [ ] Specify command acknowledgement, timeout, and retry behavior
+- [x] Specify and implement receiver command acknowledgement, expiry, and restart completion behavior
 - [x] Define initial database schema version and transactional migration mechanism
 - [x] Add forward migration and populated version-1 database upgrade test
 
@@ -60,7 +60,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
 - [x] Commit npm lockfiles and use reproducible npm ci installs in CI
-- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 6
+- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 7
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
@@ -77,9 +77,11 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement per-device fallback playlist assignment API
 - [x] Implement versioned configuration and assigned-media manifest endpoints
 - [x] Keep heartbeat reporting independent from large media downloads and cancel sync on shutdown
-- [ ] Implement live WebSocket events and narrowly scoped remote commands
+- [x] Implement the allowlisted receiver-restart command queue, receiver polling/status reporting, and completion after heartbeat
+- [ ] Implement live WebSocket events and additional remote commands
 - [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, credential revocation, media uploads, playlist editing, and backups
 - [x] Add a populated legacy database migration test
+- [x] Add restart-command authorization, claim, cooldown, and completion tests
 - [x] Add credential revocation and safe removal API tests
 - [ ] Add broader API contract and abuse-case tests
 
@@ -99,7 +101,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement media library uploads, previews, and deletion
 - [x] Implement playlist editor with ordering and editable image durations
 - [x] Implement per-device fallback playlist assignment
-- [ ] Implement device configuration and remote actions
+- [x] Implement confirmed per-device receiver restart action with live command status
+- [ ] Implement update actions and detailed diagnostics
 - [ ] Implement system health, logs, and diagnostics
 - [x] Add responsive layout for desktop and mobile
 - [ ] Add accessibility review and dashboard interaction tests
@@ -127,8 +130,10 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add a target Mac mini build and validation checklist
 - [x] Add secure SQLite, pairing-secret, and media-directory backup utility with restore instructions
 - [ ] Build a repeatable local development environment
-- [ ] Package the server and dashboard for local-network deployment
-- [ ] Package and install the receiver as a managed service
+- [x] Serve the production dashboard from the server with safe HTML/hashed-asset cache headers
+- [x] Add signed server/dashboard release packaging, staged activation, health check and rollback scripts
+- [x] Add Debian 13 LightDM/Xorg kiosk installer, automatic login, fullscreen session startup and bounded receiver service recovery
+- [ ] Package and distribute signed native receiver updates
 - [x] Provide backup and restore for SQLite data, pairing secret, and media assets
 - [ ] Include server configuration and TLS key/certificate backup guidance
 - [ ] Test multiple receivers on one LAN

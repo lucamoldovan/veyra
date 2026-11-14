@@ -80,13 +80,15 @@ Implemented:
 - Per-device NDI source and fallback-playlist assignments with monotonically increasing configuration versions.
 - Receiver-authenticated configuration and assigned-media manifest polling, plus media downloads restricted to assets in that receiver's assigned fallback playlist.
 - Per-device NDI discovery snapshots reported through heartbeats and an authenticated aggregated source inventory endpoint.
-- Transactional SQLite schema migrations through version 6, including a populated version-1 upgrade test.
+- Transactional SQLite schema migrations through version 7, including a populated version-1 upgrade test.
 - Authenticated local image uploads for PNG, JPEG, and WebP, with content-signature checks, a 20 MB limit, SHA-256 metadata, and owner-only file storage.
 - Authenticated media listing, inline content delivery, and safe deletion blocked while a playlist references the asset.
 - Playlist CRUD with ordered image items and validated per-item display durations from 1 to 3600 seconds.
 - Configurable bind address and port, TLS-enforced non-loopback binding, security response headers, health endpoint, and graceful shutdown.
+- Persistent, authenticated receiver command queue with allowlisted restart requests, receiver-scoped polling/status reporting, expiry, cooldown and post-reboot completion.
+- Production dashboard static serving from the server origin, with no-cache HTML and immutable hashed assets.
 - Automated server build and API tests in GitHub Actions.
 
 The C++ receiver client now implements one-time pairing, TLS-verified bearer heartbeats, discovery snapshots, bounded retry/backoff, owner-only credential storage, versioned configuration polling, SHA-256-verified media downloads, persistent cache loading, and timed image fallback. The receiver sync client and renderer compile in SDK-independent CI, but the complete native player has not yet been built against the official NDI SDK.
 
-The server now exposes `PUT /api/v1/devices/:id/config`, receiver `GET /api/v1/receiver/config`, `GET /api/v1/receiver/media-manifest`, and authenticated `GET /api/v1/receiver/media/:mediaId`. The receiver now polls these endpoints, verifies and caches assigned assets, activates complete manifests atomically, and renders timed image fallback playlists. Each assigned playlist is limited to 512 MiB. The receiver temporarily retains the previous verified snapshot while switching playback, then prunes obsolete assets after the next successful synchronization. WebSocket events, remote commands, and production dashboard serving are also not implemented.
+The server now exposes `PUT /api/v1/devices/:id/config`, receiver `GET /api/v1/receiver/config`, `GET /api/v1/receiver/media-manifest`, and authenticated `GET /api/v1/receiver/media/:mediaId`. The receiver now polls these endpoints, verifies and caches assigned assets, activates complete manifests atomically, and renders timed image fallback playlists. Each assigned playlist is limited to 512 MiB. The receiver temporarily retains the previous verified snapshot while switching playback, then prunes obsolete assets after the next successful synchronization. An allowlisted receiver-restart command is implemented; arbitrary remote commands, WebSocket events, and detailed diagnostics are not implemented. Production dashboard serving is implemented and included in the signed server/dashboard release workflow described in [the deployment guide](../docs/server-deployment.md).
