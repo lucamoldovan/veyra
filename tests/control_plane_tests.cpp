@@ -279,9 +279,9 @@ int main() {
             synced.fallbackItems.size() == 1 &&
             synced.fallbackItems[0].mediaId == "media-2" &&
             persistedState.find("\"configVersion\": 3") != std::string::npos &&
-            persistedState.find("260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159.png") != std::string::npos &&
+            persistedState.find("68f6da47211e0732eca673fe1644112768331b196d08dc924ce5ec8b2d308237.png") != std::string::npos &&
             std::filesystem::exists(config.cachePath / "media" /
-                "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159.png");
+                "68f6da47211e0732eca673fe1644112768331b196d08dc924ce5ec8b2d308237.png");
         const auto reloaded = ndiview::control_plane::ReceiverSync(config).loadCached();
         bool cachedAssetOk = false;
         bool cachePermissionsOk = false;
