@@ -25,7 +25,7 @@ The receiver remains useful on its own: playback must not depend on the dashboar
 | Internet dependency | None for normal local operation |
 | Initial receiver target | Debian 13 on x86_64, including the Late-2014 Mac mini |
 
-The dashboard and server are part of the product scope. The repository now includes the dashboard foundation and a local server with persistent SQLite storage and operator authentication. The server can now create one-time pairing codes, register devices, accept authenticated heartbeats, expose a protected device inventory, store local image assets, manage ordered playlists with per-image durations, and aggregate NDI source snapshots reported by receivers. The native receiver enrollment client, NDI source inventory, and device-to-playlist assignment are still in development.
+The dashboard and server are part of the product scope. The repository now includes the dashboard foundation and a local server with persistent SQLite storage and operator authentication. The server can now create one-time pairing codes, register devices, accept authenticated heartbeats, expose a protected device inventory, store local image assets, manage ordered playlists with per-image durations, and aggregate NDI source snapshots reported by receivers. The C++ receiver client now implements pairing, TLS-verified heartbeats, retry/backoff, protected credential storage, and NDI source snapshots. The server aggregates those snapshots and the dashboard displays them. Device-to-source/playlist assignment and receiver configuration/media synchronization are still in development.
 
 ## System topology
 
@@ -73,13 +73,14 @@ Current implementation:
 - A bounded latest-frame slot between capture and rendering.
 - Local JSON configuration.
 - Frame-staleness detection and a black-screen state.
+- Independent libcurl control-plane client for one-time pairing, TLS-verified bearer heartbeats, discovery snapshots, and bounded retry/backoff.
+- Device token persistence with owner-only directory/file permissions.
 - Graceful shutdown and systemd deployment support.
 
 Planned receiver capabilities:
 
-- Complete the receiver-side enrollment flow using a one-time code and persist its issued device credential securely.
-- Register and identify itself with the local server.
-- Send periodic heartbeats and playback/health state.
+- Retrieve and apply versioned receiver configuration and source assignments.
+- Download and atomically cache assigned playlist assets.
 - Receive configuration and playback commands over the LAN.
 - Cache assigned media and its per-device fallback playlist.
 - Continue playback when the server is unavailable.
@@ -104,20 +105,21 @@ Responsibilities:
 - Remote commands, including changing source, selecting a playlist, requesting a resync, and restarting the receiver process.
 - Playback state, health metrics, logs, and diagnostics.
 
-The server currently exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, authenticated heartbeat ingestion with optional source snapshots, an aggregated NDI source inventory endpoint, local image upload/storage, and playlist CRUD. The planned control plane will add a LAN API for request/response operations and a persistent WebSocket channel for heartbeats, live state, and commands. Receiver authentication and the LAN transport-security policy must be specified before LAN deployment.
+The server currently exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, authenticated heartbeats with source snapshots, an aggregated NDI source inventory endpoint, local image upload/storage, playlist CRUD, and device credential revocation. The C++ client verifies TLS and stores its bearer credential locally. Receiver configuration/media synchronization, device assignments, remote commands, and WebSocket events remain planned.
 
-The server currently uses a local SQLite database in WAL mode with versioned migrations through schema version 3. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
+The server currently uses a local SQLite database in WAL mode with versioned migrations through schema version 4. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
 
 ### 3. Veyra Dashboard
 
 A browser-based operator interface that communicates with the local server. The current development build runs through Vite. The NDI Sources page displays receiver-reported source inventory; the Media Library and Playlists pages use the local server for image uploads, content previews, ordered playlist editing, and per-image durations; production static serving is still to be implemented.
 
-Primary sections:
+Current sections:
 
-- **Devices:** device list, online/offline state, current playback, assigned content, health, and per-device actions.
-- **Sources:** discovered NDI sources and receiver source assignments.
-- **Media:** uploaded media library, reuse of media across displays, and media metadata.
-- **Playlists:** create and edit ordered content sequences, configure image durations, and assign playlists to individual receivers or groups.
+- **Devices:** device list, online/stale/offline state, pairing, credential revocation, and removal.
+- **Sources:** receiver-reported NDI source inventory (assignment is not implemented yet).
+- **Media:** local image uploads, previews, metadata, and deletion with playlist-reference protection.
+- **Playlists:** ordered image sequences with editable per-image display durations.
+- **System:** local server health and storage state.
 - **System:** server health, receiver diagnostics, logs, and platform settings.
 
 Per-device actions should include changing the NDI source, selecting a playlist, restarting the Veyra receiver process, requesting configuration/media resynchronization, and viewing that device's logs.
@@ -157,7 +159,7 @@ The initial fallback content scope includes image-based sequences with explicit 
 - Receiver-to-server traffic stays on the LAN.
 - NDI discovery and video transport remain separate from the management API.
 - The receiver's playback loop must not block on server requests.
-- Device identity and authentication must be designed before exposing remote commands.
+- Device identity and authentication are implemented for pairing and heartbeats; remote commands still need a narrow, versioned contract.
 - Remote commands need acknowledgements, timeouts, and observable outcomes.
 - Configuration and media updates should be versioned and applied atomically so a partial download cannot corrupt the last working state.
 
@@ -178,9 +180,9 @@ The current implementation uses Node.js 22+, TypeScript, Fastify 5, React 19, Vi
 
 ## Repository status
 
-The repository currently contains three foundations: a native NDI receiver, a Fastify/SQLite local server, and a React/Vite dashboard. Implemented server capabilities include operator setup and sessions, one-time receiver pairing, authenticated heartbeats, and a protected device inventory. The dashboard includes authentication, server health, navigation, and device inventory/pairing-code management. NDI source inventory, receiver-side pairing/heartbeat, media uploads, playlists, remote commands, fallback playback, WebSocket updates, and production dashboard serving remain unimplemented.
+The repository now contains a native NDI receiver foundation, a Fastify/SQLite local server, and a React/Vite dashboard. Implemented capabilities include operator authentication, device pairing and revocation, TLS-verified C++ heartbeats with NDI source snapshots, an aggregated source inventory, local media uploads, ordered playlists with per-image durations, database/media backups, and a responsive dashboard for devices, sources, media, and playlists. Remaining major work includes the complete NDI SDK build, device source/playlist assignment, receiver configuration and media synchronization, cached fallback playback, remote commands, WebSocket updates, and production dashboard packaging.
 
-The full NDI player has not yet been built against an installed official NDI SDK or tested with a real sender on the target Mac mini. Do not describe the platform as production-ready until the receiver, server, dashboard, offline behavior, and target hardware have all been validated.
+The full NDI player has not yet been built against an installed official NDI SDK or tested with a real sender on the target Mac mini. The control-plane client is compiled and integration-tested independently, but that does not verify the complete player. Do not describe the platform as production-ready until the receiver, server, dashboard, offline behavior, and target hardware have all been validated.
 
 ## Target environment
 
