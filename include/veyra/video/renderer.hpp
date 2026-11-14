@@ -38,7 +38,7 @@ private:
         int rowBytes,
         int height
     );
-    void convertUyvyToBgra(const ndi::VideoFrame& frame);
+    void convertUyvyToBgra(const VideoFrame& frame);
 
     SDL_Window* window_{nullptr};
     SDL_Renderer* renderer_{nullptr};
