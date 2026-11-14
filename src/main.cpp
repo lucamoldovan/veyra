@@ -372,8 +372,8 @@ int main(int argc, char* argv[]) {
                 if (now - lastDiscoveryLog >= std::chrono::seconds(5)) {
                     if (sources.empty()) {
                         spdlog::info("No NDI sources are currently available");
-                    } else if (config.ndi.sourceName.empty() &&
-                               config.ndi.sourceAddress.empty()) {
+                    } else if (activeNdiConfig.sourceName.empty() &&
+                               activeNdiConfig.sourceAddress.empty()) {
                         spdlog::warn(
                             "Found {} NDI sources; configure sourceName or "
                             "sourceAddress to choose one",
