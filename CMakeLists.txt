@@ -73,6 +73,12 @@ if(VEYRA_BUILD_PLAYER)
         "${NDI_LIBRARY}"
     )
 
+    get_filename_component(NDI_LIBRARY_DIR "${NDI_LIBRARY}" DIRECTORY)
+    set_target_properties(veyra PROPERTIES
+        BUILD_RPATH "${NDI_LIBRARY_DIR}"
+        INSTALL_RPATH "${NDI_LIBRARY_DIR}"
+    )
+
     target_compile_options(veyra PRIVATE
         -Wall
         -Wextra
