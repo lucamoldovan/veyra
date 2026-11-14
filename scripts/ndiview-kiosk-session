@@ -10,4 +10,4 @@ if command -v xset >/dev/null 2>&1; then
 fi
 if command -v unclutter >/dev/null 2>&1; then unclutter --timeout 1 --jitter 5 --start-hidden & fi
 systemctl --user import-environment DISPLAY XAUTHORITY XDG_SESSION_TYPE XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS
-exec systemd-inhibit --what=idle:sleep --who=Veyra --why="Veyra fullscreen receiver is active" --mode=block systemctl --user start --wait veyra.service
+exec systemd-inhibit --what=idle:sleep --who=NDIView --why="NDIView fullscreen receiver is active" --mode=block systemctl --user start --wait ndiview.service

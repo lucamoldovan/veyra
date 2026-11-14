@@ -9,8 +9,8 @@
     "deviceName": "Lobby Display",
     "pairingCode": "",
     "caCertificatePath": "",
-    "credentialPath": "~/.local/state/veyra/device-token",
-    "cachePath": "~/.local/state/veyra/cache",
+    "credentialPath": "~/.local/state/ndiview/device-token",
+    "cachePath": "~/.local/state/ndiview/cache",
     "syncIntervalSeconds": 10,
     "heartbeatIntervalSeconds": 15
   },

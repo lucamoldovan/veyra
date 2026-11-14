@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(Veyra
+project(NDIView
     VERSION 0.1.0
     DESCRIPTION "A lightweight Linux NDI video receiver"
     LANGUAGES CXX
@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(VEYRA_BUILD_PLAYER "Build the NDI video player" ON)
-option(VEYRA_BUILD_TESTS "Build Veyra unit tests" ON)
+option(VEYRA_BUILD_TESTS "Build NDIView unit tests" ON)
 
 find_package(nlohmann_json CONFIG REQUIRED)
 
@@ -68,7 +68,7 @@ if(VEYRA_BUILD_PLAYER)
         #include <Processing.NDI.Lib.h>
         int main() {
             NDIlib_recv_create_v3_t settings{};
-            settings.p_ndi_name = \"Veyra Receiver\";
+            settings.p_ndi_name = \"NDIView Receiver\";
             return 0;
         }
     " VEYRA_NDI_HAS_P_NDI_NAME)
@@ -78,7 +78,7 @@ if(VEYRA_BUILD_PLAYER)
         #include <Processing.NDI.Lib.h>
             int main() {
                 NDIlib_recv_create_v3_t settings{};
-                settings.p_ndi_recv_name = \"Veyra Receiver\";
+                settings.p_ndi_recv_name = \"NDIView Receiver\";
                 return 0;
             }
         " VEYRA_NDI_HAS_P_NDI_RECV_NAME)
@@ -90,7 +90,7 @@ if(VEYRA_BUILD_PLAYER)
         )
     endif()
 
-    add_executable(veyra
+    add_executable(ndiview
         src/main.cpp
         src/config/config.cpp
         src/control_plane/client.cpp
@@ -100,11 +100,11 @@ if(VEYRA_BUILD_PLAYER)
         src/video/renderer.cpp
     )
 
-    target_include_directories(veyra PRIVATE
+    target_include_directories(ndiview PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
         "${NDI_INCLUDE_DIR}"
     )
-    target_link_libraries(veyra PRIVATE
+    target_link_libraries(ndiview PRIVATE
         PkgConfig::SDL2
         PkgConfig::SDL2_IMAGE
         Threads::Threads
@@ -116,24 +116,24 @@ if(VEYRA_BUILD_PLAYER)
     )
 
     get_filename_component(NDI_LIBRARY_DIR "${NDI_LIBRARY}" DIRECTORY)
-    set_target_properties(veyra PROPERTIES
+    set_target_properties(ndiview PROPERTIES
         BUILD_RPATH "${NDI_LIBRARY_DIR}"
         INSTALL_RPATH "${NDI_LIBRARY_DIR}"
     )
 
     if(VEYRA_NDI_HAS_P_NDI_NAME)
-        target_compile_definitions(veyra PRIVATE VEYRA_NDI_RECV_NAME_FIELD_P_NDI_NAME)
+        target_compile_definitions(ndiview PRIVATE VEYRA_NDI_RECV_NAME_FIELD_P_NDI_NAME)
     else()
         target_compile_definitions(veyra PRIVATE VEYRA_NDI_RECV_NAME_FIELD_P_NDI_RECV_NAME)
     endif()
 
-    target_compile_options(veyra PRIVATE
+    target_compile_options(ndiview PRIVATE
         -Wall
         -Wextra
         -Wpedantic
     )
 
-    install(TARGETS veyra RUNTIME DESTINATION bin)
+    install(TARGETS ndiview RUNTIME DESTINATION bin)
 endif()
 
 if(VEYRA_BUILD_TESTS)

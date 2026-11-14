@@ -818,7 +818,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
 
-  app.post<{ Params: { deviceId: string; action: string } }>("/api/v1/devices/:deviceId/:action", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+  app.post<{ Params: { deviceId: string; action: string } }>("/api/v1/devices/:deviceId/:action(restart|reboot)", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
     const operator = getAuthenticatedOperator(database, request, reply); if (!operator) return;
     const action = request.params.action;
     if (action !== "restart" && action !== "reboot") return reply.code(404).send({ error: "Unknown device action" });
