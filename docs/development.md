@@ -47,8 +47,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Define per-device fallback and local-cache requirements
 - [ ] Specify versioned server API and WebSocket event contract
 - [ ] Specify device identity, pairing, and authentication
-- [ ] Specify media storage, upload limits, and asset validation
-- [ ] Specify playlist schema, ordering, durations, and per-device assignment
+- [x] Specify and implement media storage, upload limits, and asset validation
+- [x] Implement playlist schema, ordering, and per-item durations\n- [ ] Specify per-device assignment
 - [ ] Specify command acknowledgement, timeout, and retry behavior
 - [x] Define initial database schema version and transactional migration mechanism
 - [x] Add forward migration and populated version-1 database upgrade test
@@ -59,7 +59,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
 - [x] Commit npm lockfiles and use reproducible npm ci installs in CI
-- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 2
+- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 3
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
@@ -69,8 +69,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Issue per-device credentials and store only credential hashes
 - [x] Implement bearer-authenticated heartbeat ingestion and online/stale/offline state
 - [ ] Implement source inventory and per-device source assignment
-- [ ] Implement media upload and library metadata
-- [ ] Implement playlist and device assignment APIs
+- [x] Implement authenticated media upload, local storage, metadata, content delivery, and safe deletion
+- [x] Implement playlist CRUD, ordered items, and validated display durations\n- [ ] Implement device playlist assignment APIs
 - [ ] Implement versioned configuration distribution
 - [ ] Implement live WebSocket events and narrowly scoped remote commands
 - [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, and credential revocation
@@ -90,8 +90,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement protected device inventory with 15-second refresh and live status
 - [x] Add receiver credential status, revocation, and removal controls
 - [ ] Implement NDI source inventory and assignment
-- [ ] Implement media library and uploads
-- [ ] Implement playlist editor with ordering and image durations
+- [x] Implement media library uploads, previews, and deletion
+- [x] Implement playlist editor with ordering and editable image durations
 - [ ] Implement per-device and group playlist assignment
 - [ ] Implement device configuration and remote actions
 - [ ] Implement system health, logs, and diagnostics
@@ -114,7 +114,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 ## Phase 8 — Integration and deployment
 
 - [x] Add a target Mac mini build and validation checklist
-- [x] Add secure SQLite and pairing-secret backup utility with restore instructions
+- [x] Add secure SQLite, pairing-secret, and media-directory backup utility with restore instructions
 - [ ] Build a repeatable local development environment
 - [ ] Package the server and dashboard for local-network deployment
 - [ ] Package and install the receiver as a managed service
