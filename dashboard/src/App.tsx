@@ -536,7 +536,7 @@ function Overview({
         </div>
       </section>
 
-      <footer className="page-footer"><span>VEYRA <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Local-first by design <ShieldCheck size={13} /></span></footer>
+      <footer className="page-footer"><span>NDIVIEW <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>Local-first by design <ShieldCheck size={13} /></span></footer>
     </>
   );
 }
