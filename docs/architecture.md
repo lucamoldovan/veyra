@@ -40,7 +40,7 @@ UYVY is uploaded directly to an SDL streaming texture when supported. If the ren
 
 The preferred configured identity is the NDI source URL/address (ndi.sourceAddress). If it is not configured, Veyra can select by exact source name (ndi.sourceName).
 
-If neither is configured, Veyra automatically selects a source only when exactly one source is discovered. It does not arbitrarily choose between multiple sources.
+If neither is configured, Veyra automatically selects a source only when exactly one source remains after an initial five-second discovery period and a further two-second stable-source window. It does not arbitrarily choose between multiple sources. The --list-sources command prints the discovered names and addresses without opening the display.
 
 The finder owns the source array returned by the current-sources API. Veyra copies the name and URL before calling the finder again.
 
