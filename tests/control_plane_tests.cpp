@@ -144,6 +144,8 @@ int main() {
                 reason = "Created";
                 responseBody = "{\"deviceId\":\"device-test\",\"deviceToken\":\"" + token +
                     "\",\"heartbeatIntervalSeconds\":120}";
+            } else if (request.find("POST /api/v1/receiver/commands/poll ") != std::string::npos) {
+                responseBody = "{\"command\":null}";
             } else if (request.find("POST /api/v1/receiver/heartbeat ") != std::string::npos) {
                 responseBody = "{}";
             } else if (request.find("GET /api/v1/receiver/config ") != std::string::npos) {

@@ -1165,7 +1165,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       try { pathname = decodeURIComponent(new URL(request.url, "http://veyra.local").pathname); }
       catch { return reply.code(400).send({ error: "Invalid dashboard path" }); }
       if (pathname === "/api" || pathname.startsWith("/api/")) return reply.code(404).send({ error: "API route not found" });
-      const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\\/+/, "");
+      const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
       let filePath = resolve(dashboardDirectory, relativePath);
       if (filePath !== dashboardIndex && !filePath.startsWith(dashboardDirectory + sep)) return reply.code(404).send();
       if (!existsSync(filePath) || !lstatSync(filePath).isFile()) filePath = dashboardIndex;
