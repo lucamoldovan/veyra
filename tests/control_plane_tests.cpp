@@ -163,7 +163,7 @@ int main() {
                     std::to_string(version) + ",\"playlistId\":\"fallback-1\",\"playlistRevision\":" +
                     std::to_string(revision) + ",\"items\":[{\"mediaId\":\"" + mediaId +
                     "\",\"position\":0,\"durationSeconds\":12,\"mimeType\":\"image/png\",\"sizeBytes\":16,\"sha256\":\"" +
-                    assetHash + "\",\"downloadPath\":\"/api/v1/receiver/media/" + mediaId + "\"}]}";
+                    mediaHash + "\",\"downloadPath\":\"/api/v1/receiver/media/" + mediaId + "\"}]}";
             } else if (request.find("GET /api/v1/receiver/media/media-1 ") != std::string::npos) {
                 responseBody = asset;
                 contentType = "image/png";
