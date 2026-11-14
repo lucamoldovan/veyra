@@ -25,7 +25,9 @@ const unsafeBackupTargets = new Set([
   "/etc", "/usr", "/opt", "/run", "/mnt", "/media", "/dev", "/proc",
   "/sys", "/boot",
 ]);
-if (unsafeBackupTargets.has(backupDirectory)) {
+const homeDirectory = process.env.HOME ? resolve(process.env.HOME) : "";
+if (backupDirectory === process.cwd() || (homeDirectory && backupDirectory === homeDirectory) ||
+    unsafeBackupTargets.has(backupDirectory)) {
   throw new Error("Veyra backups must be written to a dedicated private directory");
 }
 mkdirSync(backupDirectory, { recursive: true, mode: 0o700 });
