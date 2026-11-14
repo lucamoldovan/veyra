@@ -36,7 +36,7 @@ Edit \`/etc/ndiview/config.json\` as an administrator. Keep it owned by \`root:v
 sudo reboot
 \`\`\`
 
-Expected: Debian boots, LightDM logs into \`veyra-kiosk\`, the session disables X11 blanking/DPMS and blocks idle/sleep, then starts the systemd user service. NDIView's SDL renderer already requests fullscreen.
+Expected: Debian boots, LightDM logs into \`veyra-kiosk\`, the session disables X11 blanking/DPMS and blocks idle/sleep, then starts the systemd user service. The session wrapper stays alive so LightDM does not tear down the graphical session immediately after the \`Type=simple\` receiver service starts. systemd restarts the receiver on process failure. NDIView's SDL renderer already requests fullscreen.
 
 Maintenance: press Ctrl+Alt+F3 and sign in with an administrator account. Inspect boot logs with \`journalctl -b | grep -i ndiview\`. The service uses bounded restart behavior (five starts per minute) to avoid an infinite crash loop.
 
