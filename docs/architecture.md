@@ -1,100 +1,194 @@
 # Veyra architecture
 
-## Product boundary
+## Product vision
 
-Veyra is an NDI video receiver/player. It is not a church-management system, signage CMS, or centrally managed fleet platform. The first deployment context is a church, but the software is designed as a general-purpose network-video receiver.
+**Veyra — Network video. Simplified.**
 
-## Runtime model
+Veyra is a local-network video and display platform. Its first deployment environment is churches, but the product is general-purpose and is not defined by that environment.
 
-One native process owns the display and playback lifecycle. It runs locally on the receiver and does not depend on a remote dashboard or internet connection.
+The platform combines:
 
-Core subsystems:
+- A browser-based dashboard for operators.
+- A local server that acts as the management authority.
+- Lightweight receiver devices that play NDI video and locally cached fallback content.
 
-- **NDI discovery:** enumerate LAN sources and copy their display name and URL into Veyra-owned strings.
-- **NDI receiver:** connect to the selected source, receive video frames, report connection state, and rely on the SDK's automatic reconnect behavior.
-- **Renderer:** present video in a fullscreen SDL2 window while preserving the source aspect ratio.
-- **Playback loop:** coordinate source selection, frame freshness, black-screen fallback, and shutdown.
-- **Configuration:** load and validate a local JSON file.
-- **Logging:** report startup, source selection, playback transitions, and failures.
+The receiver remains useful on its own: playback must not depend on the dashboard, the server, or an internet connection.
 
-## Threading and frame ownership
+## Confirmed product decisions
 
-The SDL event/render loop runs on the main thread. NDI frame capture runs on a dedicated worker thread.
+| Area | Decision |
+|---|---|
+| Server hosting | Local, on the customer's network |
+| Device communication | LAN |
+| Receiver fallback | Per-device |
+| NDI audio | Disabled; video only |
+| Internet dependency | None for normal local operation |
+| Initial receiver target | Debian 13 on x86_64, including the Late-2014 Mac mini |
 
-The capture worker copies each supported NDI frame into Veyra-owned memory and frees the SDK frame immediately. It publishes into a single latest-frame slot protected by a mutex. If rendering falls behind, a newer frame replaces the pending frame rather than allowing latency to grow without bound.
+The dashboard and server are part of the product scope. They are planned platform components; they are not yet implemented in the current repository.
 
-The capture thread uses a bounded timeout so shutdown can request a stop and join the worker before destroying the receiver or global NDI runtime.
+## System topology
 
-## NDI receive format
-
-The receiver requests NDI's UYVY/BGRA receive format:
-
-- Sources without alpha are delivered as packed UYVY.
-- Sources with alpha are delivered as BGRA.
-- Audio and metadata pointers passed to the NDI capture function are null; Veyra does not receive or play NDI audio.
-- Interlaced sources are deinterlaced by the SDK by setting the video-fields option to false.
-
-UYVY is uploaded directly to an SDL streaming texture when supported. SDL's YUV conversion mode is set to automatic so SD uses BT.601 and HD uses BT.709. If the renderer cannot create or lock a UYVY texture, Veyra converts the frame to BGRA and uses a BGRA texture instead, using the same SD/HD matrix choice.
-
-## Source selection
-
-The preferred configured identity is the NDI source URL/address (ndi.sourceAddress). If it is not configured, Veyra can select by exact source name (ndi.sourceName).
-
-If neither is configured, Veyra automatically selects a source only when exactly one source remains after an initial five-second discovery period and a further two-second stable-source window. It does not arbitrarily choose between multiple sources. The --list-sources command prints the discovered names and addresses without opening the display.
-
-The finder owns the source array returned by the current-sources API. Veyra copies the name and URL before calling the finder again.
-
-## Playback and recovery
-
-- No configured source is found: keep the display black and continue discovery.
-- Source is discovered: create a receiver and start the capture worker.
-- Fresh video arrives: render it and mark playback active.
-- No fresh frame for two seconds: clear the display and report the loss once.
-- Source disappears: keep the receiver alive; the NDI SDK automatically attempts to reconnect when the source returns.
-- Process exits unexpectedly: the deployment service should restart it.
-- Machine reboots: the deployment service should start it after the graphical session is available.
-
-The application does not reboot the machine because a source is unavailable.
-
-## Local configuration
-
-The default configuration path is /etc/veyra/config.json. Development builds may pass another path using --config.
-
-Supported version-1 configuration:
-
-```json
-{
-  "schemaVersion": 1,
-  "ndi": {
-    "sourceName": "",
-    "sourceAddress": ""
-  },
-  "display": {
-    "width": 1920,
-    "height": 1080,
-    "targetFps": 30,
-    "fullscreen": true,
-    "vsync": true
-  }
-}
+```text
+                    Local network (LAN)
+  +------------------------------------------------------+
+  |                                                      |
+  |  Operator browser                                    |
+  |       |                                              |
+  |       v                                              |
+  |  +--------------------+      +-------------------+  |
+  |  | Veyra Dashboard    |<---->| Veyra Local Server|  |
+  |  | Devices / Sources  | API  | Auth / Database   |  |
+  |  | Media / Playlists  | WS   | Sync / Commands   |  |
+  |  | System / Logs      |      | Device registry   |  |
+  |  +--------------------+      +---------+---------+  |
+  |                                         |            |
+  |                    +--------------------+---------+  |
+  |                    |                    |         |  |
+  |                    v                    v         v  |
+  |              +-----------+        +-----------+  ... |
+  |              | Receiver  |        | Receiver  |      |
+  |              | NDI video |        | NDI video |      |
+  |              | Local     |        | Local     |      |
+  |              | fallback  |        | fallback  |      |
+  |              +-----------+        +-----------+      |
+  |                                                      |
+  +------------------------------------------------------+
 ```
 
-The display dimensions configure the window when it is not fullscreen. Fullscreen desktop mode uses the display's current desktop resolution. targetFps caps the presentation cadence; when frames arrive faster than the configured rate, the latest-frame slot replaces older pending frames.
+The dashboard is the operator interface. The local server owns shared configuration, device registration, media catalogues, playlists, and command coordination. Each receiver owns its playback process and local cache.
+
+## Main components
+
+### 1. Veyra Receiver
+
+A small native Linux process responsible for reliable display output.
+
+Current implementation:
+
+- C++20, CMake, official NDI SDK, SDL2.
+- LAN NDI discovery and source selection.
+- Video-only NDI capture (no audio or metadata capture).
+- Fullscreen rendering with aspect-ratio preservation.
+- A bounded latest-frame slot between capture and rendering.
+- Local JSON configuration.
+- Frame-staleness detection and a black-screen state.
+- Graceful shutdown and systemd deployment support.
+
+Planned receiver capabilities:
+
+- Register and identify itself with the local server.
+- Send periodic heartbeats and playback/health state.
+- Receive configuration and playback commands over the LAN.
+- Cache assigned media and its per-device fallback playlist.
+- Continue playback when the server is unavailable.
+- Use its configured fallback when its selected NDI source is unavailable.
+- Reconnect to the NDI source and synchronize with the server when connectivity returns.
+
+The receiver must not require the dashboard or server to remain running for normal playback.
+
+### 2. Veyra Local Server
+
+A service running on the customer's local network. It is the management authority, not part of the critical video-rendering path.
+
+Responsibilities:
+
+- Local operator authentication and sessions.
+- Device registration, identity, and last-seen state.
+- Device heartbeats and status aggregation.
+- NDI source inventory and source assignment.
+- Media upload, storage, and library metadata.
+- Playlist and per-device assignment management.
+- Configuration distribution and synchronization.
+- Remote commands, including changing source, selecting a playlist, requesting a resync, and restarting the receiver process.
+- Playback state, health metrics, logs, and diagnostics.
+
+The server exposes a LAN API for request/response operations and a persistent connection (planned WebSocket channel) for heartbeats, live state, and commands. The exact API contract and authentication mechanism must be specified before implementation.
+
+The server is not a cloud service. Do not introduce an internet account, external database, or mandatory third-party runtime dependency.
+
+### 3. Veyra Dashboard
+
+A browser-based operator interface served by the local server.
+
+Primary sections:
+
+- **Devices:** device list, online/offline state, current playback, assigned content, health, and per-device actions.
+- **Sources:** discovered NDI sources and receiver source assignments.
+- **Media:** uploaded media library, reuse of media across displays, and media metadata.
+- **Playlists:** create and edit ordered content sequences, configure image durations, and assign playlists to individual receivers or groups.
+- **System:** server health, receiver diagnostics, logs, and platform settings.
+
+Per-device actions should include changing the NDI source, selecting a playlist, restarting the Veyra receiver process, requesting configuration/media resynchronization, and viewing that device's logs.
+
+The dashboard should make the state of each device understandable at a glance. It must distinguish server reachability from receiver playback state; an offline server does not necessarily mean a receiver is offline.
+
+## Playback, caching, and fallback
+
+There are two distinct failure cases and they must not be conflated.
+
+### NDI source unavailable
+
+1. The receiver detects that fresh NDI video is no longer arriving.
+2. It transitions to the fallback assigned to that specific receiver.
+3. The fallback playlist is played from the receiver's local cache.
+4. The receiver continues checking for its assigned NDI source.
+5. When the source returns, the receiver resumes NDI playback according to the recovery policy.
+
+### Local server unavailable
+
+1. The receiver keeps its last successfully applied configuration.
+2. It continues current playback.
+3. If its NDI source becomes unavailable, it can still use its locally cached fallback playlist.
+4. It queues or retries state synchronization until the server is reachable again.
+
+A receiver must never need to fetch fallback media at the moment a failure occurs. Required fallback assets and configuration must already be local.
+
+### Per-device ownership
+
+Each receiver has its own fallback assignment and local cache. A fallback configured for one display must not silently replace another device's fallback. The server distributes assignments; the receiver stores the last valid version locally.
+
+The initial fallback content scope includes image-based sequences with explicit ordering and display durations. Any additional media types should be added only after their playback and caching requirements are defined.
+
+## Communication and trust boundaries
+
+- Dashboard-to-server traffic stays on the LAN.
+- Receiver-to-server traffic stays on the LAN.
+- NDI discovery and video transport remain separate from the management API.
+- The receiver's playback loop must not block on server requests.
+- Device identity and authentication must be designed before exposing remote commands.
+- Remote commands need acknowledgements, timeouts, and observable outcomes.
+- Configuration and media updates should be versioned and applied atomically so a partial download cannot corrupt the last working state.
+
+Do not expose an unauthenticated remote shell or arbitrary command execution. A restart action should invoke a narrowly defined receiver operation, not accept arbitrary shell text.
+
+## Proposed implementation boundaries
+
+These are implementation proposals, not immutable product requirements:
+
+- Keep the existing native C++ receiver as its own component.
+- Implement the local server as a separate service.
+- Implement the dashboard as a separate web application.
+- Use a small embedded database for local server state.
+- Use a typed, versioned HTTP API plus WebSockets for live state and commands.
+- Keep receiver configuration and cached fallback data on disk.
+
+A TypeScript server (for example, Node.js with Fastify) and a React/Vite dashboard are reasonable candidates. The database choice, exact framework versions, API schema, device authentication, and media storage layout should be settled in a short technical design before those components are scaffolded.
+
+## Repository status
+
+The current repository contains the native receiver foundation and SDK-independent configuration tests. It does **not** yet contain the dashboard, local server, device registration protocol, media library, playlist editor, or remote management features.
+
+The full NDI player has not yet been built against an installed official NDI SDK or tested with a real sender on the target Mac mini. Do not describe the platform as production-ready until the receiver, server, dashboard, offline behavior, and target hardware have all been validated.
 
 ## Target environment
 
-- Debian 13, 64-bit x86_64, XFCE/X11 during development
-- Apple Mac mini (Late 2014), Intel Core i5-4278U, 8 GB RAM, Intel Iris 5100
-- Initial target output: 1920×1080 at 30 FPS
-- Wired LAN preferred
-- Avahi daemon available and running for LAN discovery
+- Debian 13, 64-bit x86_64, XFCE/X11 during initial development.
+- Apple Mac mini (Late 2014), Intel Core i5-4278U, 8 GB RAM, Intel Iris 5100.
+- Initial display target: 1920×1080 at 30 FPS.
+- Wired LAN preferred.
+- The target machine has a mechanical HDD; development must not assume an SSD.
 
-The initial hardware has a mechanical HDD; development must not assume an SSD. Actual performance and long-duration stability must be measured on the target hardware when it is available.
+## Third-party licensing
 
-## Current validation boundary
-
-The configuration loader has SDK-independent unit tests and runs in GitHub Actions. The complete player still needs to be built against the installed official NDI SDK and SDL2 on Debian 13, then tested with real NDI senders and the target Mac mini.
-
-## Security and licensing
-
-Veyra does not expose a network control server. NDI traffic remains on the local network. Do not bundle or redistribute NDI SDK binaries until the applicable SDK license and redistribution terms have been reviewed.
+The official NDI SDK is proprietary. Keep its headers and binaries out of the repository unless the applicable license explicitly permits redistribution. Review all third-party licenses before packaging Veyra for distribution.
