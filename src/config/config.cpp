@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstdint>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -56,7 +57,16 @@ int readInteger(
                                  key + "' must be an integer");
     }
 
-    const auto parsed = value.get<long long>();
+    if (value.is_number_unsigned()) {
+        const auto parsed = value.get<std::uint64_t>();
+        if (parsed > static_cast<std::uint64_t>(maximum)) {
+            throw std::runtime_error(std::string("Configuration value '") +
+                                     key + "' is outside its allowed range");
+        }
+        return static_cast<int>(parsed);
+    }
+
+    const auto parsed = value.get<std::int64_t>();
     if (parsed < minimum || parsed > maximum) {
         throw std::runtime_error(std::string("Configuration value '") +
                                  key + "' is outside its allowed range");
