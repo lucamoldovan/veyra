@@ -129,3 +129,94 @@ test("operator can log in and log out", async () => {
     await app.close();
   }
 });
+
+test("operator can pair a receiver and read its heartbeat state", async () => {
+  const app = createTestApp();
+
+  try {
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/setup",
+      payload: { setupKey: "test-setup-key", username: "admin", password: "a-very-long-test-password" },
+    });
+
+    const unauthenticatedList = await app.inject({ method: "GET", url: "/api/v1/devices" });
+    assert.equal(unauthenticatedList.statusCode, 401);
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/session",
+      payload: { username: "admin", password: "a-very-long-test-password" },
+    });
+    const operatorCookie = String(login.headers["set-cookie"]).split(";")[0];
+
+    const pairingCodeResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/devices/pairing-codes",
+      headers: { cookie: operatorCookie },
+    });
+    assert.equal(pairingCodeResponse.statusCode, 201);
+    const pairingCode = pairingCodeResponse.json().code as string;
+    assert.match(pairingCode, /^\d{8}$/);
+
+    const paired = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/pair",
+      payload: {
+        code: pairingCode,
+        deviceName: "Lobby Display",
+        platform: "linux-x86_64",
+        version: "0.1.0",
+      },
+    });
+    assert.equal(paired.statusCode, 201);
+    const credentials = paired.json() as { deviceId: string; deviceToken: string; heartbeatIntervalSeconds: number };
+    assert.ok(credentials.deviceId);
+    assert.ok(credentials.deviceToken);
+    assert.equal(credentials.heartbeatIntervalSeconds, 15);
+
+    const replay = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/pair",
+      payload: { code: pairingCode, deviceName: "Second Display" },
+    });
+    assert.equal(replay.statusCode, 403);
+
+    const initialList = await app.inject({
+      method: "GET",
+      url: "/api/v1/devices",
+      headers: { cookie: operatorCookie },
+    });
+    assert.equal(initialList.json().devices.length, 1);
+    assert.equal(initialList.json().devices[0].status, "offline");
+
+    const heartbeat = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/heartbeat",
+      headers: { authorization: `Bearer ${credentials.deviceToken}` },
+      payload: {
+        version: "0.1.1",
+        platform: "linux-x86_64",
+        uptimeSeconds: 120,
+        playbackMode: "ndi",
+        ndiSourceName: "Camera 1",
+      },
+    });
+    assert.equal(heartbeat.statusCode, 200);
+    assert.equal(heartbeat.json().accepted, true);
+
+    const updatedList = await app.inject({
+      method: "GET",
+      url: "/api/v1/devices",
+      headers: { cookie: operatorCookie },
+    });
+    const device = updatedList.json().devices[0];
+    assert.equal(device.status, "online");
+    assert.equal(device.name, "Lobby Display");
+    assert.equal(device.softwareVersion, "0.1.1");
+    assert.equal(device.playbackMode, "ndi");
+    assert.equal(device.ndiSourceName, "Camera 1");
+  } finally {
+    await app.close();
+  }
+});
