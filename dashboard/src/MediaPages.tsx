@@ -1,6 +1,6 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
-import { ChevronDown, ChevronUp, Disc3, Image, LoaderCircle, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Disc3, Image, LoaderCircle, Plus, Radio, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
 import {
   createPlaylist,
   deleteMedia,
@@ -8,12 +8,81 @@ import {
   getMedia,
   getPlaylist,
   getPlaylists,
+  getSources,
   updatePlaylist,
   uploadMedia,
   type MediaAsset,
+  type NdiSource,
   type PlaylistItem,
   type PlaylistSummary,
 } from "./api";
+
+
+export function SourcesPage() {
+  const [sources, setSources] = useState<NdiSource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    getSources(controller.signal).then((result) => {
+      if (active) {
+        setSources(result.sources);
+        setError("");
+      }
+    }).catch((loadError) => {
+      if (active && !controller.signal.aborted) {
+        setError(loadError instanceof Error ? loadError.message : "Could not load NDI sources.");
+      }
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [refreshTick]);
+
+  return (
+    <>
+      <section className="page-heading">
+        <div><div className="eyebrow">NETWORK INPUTS</div><h1>NDI sources</h1><p>Sources reported by Veyra receivers on your local network.</p></div>
+        <button className="button button-secondary" onClick={() => setRefreshTick((tick) => tick + 1)} disabled={loading}><RefreshCw size={14} /> Refresh</button>
+      </section>
+      {error && <div className="inline-error" role="alert">{error}</div>}
+      <section className="panel sources-panel">
+        <div className="panel-heading">
+          <div><h2>Discovered sources</h2><p>Aggregated from receiver discovery reports</p></div>
+          <span className="media-count">{sources.length} {sources.length === 1 ? "source" : "sources"}</span>
+        </div>
+        {loading ? (
+          <div className="devices-empty"><LoaderCircle size={22} className="auth-spinner" /><span>Loading sources…</span></div>
+        ) : sources.length === 0 ? (
+          <div className="devices-empty">
+            <div className="empty-icon"><Radio size={20} /></div>
+            <strong>No NDI sources reported yet</strong>
+            <span>Once the receiver discovery client is connected, sources found by each display will appear here.</span>
+          </div>
+        ) : (
+          <div className="source-list">
+            <div className="source-list-head"><span>SOURCE</span><span>ADDRESS</span><span>REPORTED BY</span><span>LAST SEEN</span></div>
+            {sources.map((source) => (
+              <div className="source-row" key={source.id}>
+                <div className="source-name"><span className="source-icon"><Radio size={15} /></span><strong>{source.name}</strong></div>
+                <code>{source.address ?? "Name-based source"}</code>
+                <div className="source-devices">{source.devices.map((device) => <span key={device.id}>{device.name}</span>)}</div>
+                <span className="source-last-seen">{source.lastSeenAt ? new Date(source.lastSeenAt).toLocaleString() : "Not reported"}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      <footer className="page-footer"><span>VEYRA <span className="footer-separator">/</span> NETWORK VIDEO. SIMPLIFIED.</span><span>NDI transport stays independent of server control <ShieldCheck size={13} /></span></footer>
+    </>
+  );
+}
 
 export function MediaPage() {
   const [media, setMedia] = useState<MediaAsset[]>([]);
