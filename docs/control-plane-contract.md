@@ -16,7 +16,7 @@ This document defines the intended communication contract for the NDIView local 
 ## Connection model
 
 - Dashboard uses authenticated HTTP requests for management operations.
-- Dashboard subscribes to a server WebSocket for live device state and operation updates.
+- Dashboard currently polls authenticated HTTP endpoints for device state; WebSocket subscriptions remain planned.
 - Receivers establish an outbound connection to the local server. The server should not need to initiate arbitrary inbound connections to receiver machines.
 - Receivers send periodic heartbeats and playback reports.
 - The server queues allowlisted commands. Receivers poll the authenticated command endpoint and acknowledge a claimed command. A restart is marked complete only when process uptime resets; a reboot is marked complete only when system uptime resets.
@@ -113,7 +113,6 @@ Planned endpoints:
 | Method | Route | Purpose |
 |---|---|---|
 | POST | `/api/v1/receiver/playback` | Report playback/source/fallback transitions |
-| POST | `/api/v1/receiver/commands/{commandId}/ack` | Acknowledge a received command and report its result |
 
 The pairing endpoint accepts a short-lived, single-use 12-digit code. The receiver receives its device credential once; the server stores only its HMAC-SHA-256 verifier for pairing codes; the HMAC key is stored separately in a restrictive local file. Heartbeats use the device credential as a bearer token. The C++ receiver client implements one-time pairing, TLS-verified bearer heartbeats, source snapshots, bounded retry/backoff, owner-only credential storage, versioned config and manifest polling, SHA-256-verified media downloads, persistent local cache, and image fallback. Media synchronization runs independently of heartbeat reporting, is cancellable during shutdown, and accepts at most 512 MiB of assigned playlist assets. A failed download does not replace the active manifest; a regression test exercises this rollback path. Corrupted cached files are rejected by SHA-256 verification and can be downloaded again. A new cache snapshot becomes active only after all listed assets are downloaded and verified; the previous snapshot is retained during the transition and obsolete cache files are pruned after a subsequent successful synchronization. It is compiled independently of the NDI SDK in CI; the complete native player still requires an official NDI SDK build and hardware validation.
 
