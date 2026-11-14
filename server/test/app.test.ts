@@ -7,7 +7,7 @@ import { openDatabase } from "../src/database.js";
 function createTestApp() {
   return buildApp({
     databasePath: ":memory:",
-    setupKey: "test-setup-key",
+    setupKey: "test-setup-key",\n    pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
   });
 }
 
