@@ -725,7 +725,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const rows = database.prepare(`
       SELECT id, name, platform, software_version, last_seen_at, last_ip,
              playback_mode, ndi_source_name, uptime_seconds, created_at,
-             credential_revoked_at
+             credential_revoked_at, config_version, assigned_ndi_source_name,
+             assigned_ndi_source_address, fallback_playlist_id
       FROM devices
       ORDER BY name COLLATE NOCASE ASC
     `).all() as Array<{
@@ -740,6 +741,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       uptime_seconds: number | null;
       created_at: string;
       credential_revoked_at: string | null;
+      config_version: number;
+      assigned_ndi_source_name: string | null;
+      assigned_ndi_source_address: string | null;
+      fallback_playlist_id: string | null;
     }>;
 
     const now = Date.now();
@@ -761,9 +766,168 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           createdAt: device.created_at,
           credentialRevokedAt: device.credential_revoked_at,
           credentialStatus: device.credential_revoked_at ? "revoked" : "active",
+          configVersion: device.config_version,
+          assignedNdiSourceName: device.assigned_ndi_source_name,
+          assignedNdiSourceAddress: device.assigned_ndi_source_address,
+          fallbackPlaylistId: device.fallback_playlist_id,
         };
       }),
     };
+  });
+
+
+  app.put<{ Params: { deviceId: string }; Body: { ndiSourceName?: unknown; ndiSourceAddress?: unknown; fallbackPlaylistId?: unknown } }>(
+    "/api/v1/devices/:deviceId/config",
+    async (request, reply) => {
+      const operator = getAuthenticatedOperator(database, request, reply);
+      if (!operator) return;
+
+      const device = database.prepare(
+        "SELECT id FROM devices WHERE id = ? AND credential_revoked_at IS NULL",
+      ).get(request.params.deviceId) as { id: string } | undefined;
+      if (!device) return reply.code(404).send({ error: "Active device not found" });
+
+      const body = request.body ?? {};
+      const sourceName = body.ndiSourceName === null || body.ndiSourceName === ""
+        ? null
+        : typeof body.ndiSourceName === "string" ? stripControlCharacters(body.ndiSourceName).trim() : undefined;
+      const sourceAddress = body.ndiSourceAddress === null || body.ndiSourceAddress === ""
+        ? null
+        : typeof body.ndiSourceAddress === "string" ? stripControlCharacters(body.ndiSourceAddress).trim() : undefined;
+      const fallbackPlaylistId = body.fallbackPlaylistId === null || body.fallbackPlaylistId === ""
+        ? null
+        : typeof body.fallbackPlaylistId === "string" ? body.fallbackPlaylistId : undefined;
+
+      if (sourceName === undefined || sourceAddress === undefined || fallbackPlaylistId === undefined ||
+          (sourceName !== null && sourceName.length > 160) ||
+          (sourceAddress !== null && sourceAddress.length > 2048)) {
+        return reply.code(400).send({ error: "Invalid device configuration values" });
+      }
+      if ((sourceName === null) !== (sourceAddress === null)) {
+        return reply.code(400).send({ error: "Set both NDI source name and address, or clear both" });
+      }
+      if (fallbackPlaylistId !== null) {
+        const playlist = database.prepare("SELECT id FROM playlists WHERE id = ?")
+          .get(fallbackPlaylistId) as { id: string } | undefined;
+        if (!playlist) return reply.code(400).send({ error: "Fallback playlist does not exist" });
+      }
+
+      database.prepare(`
+        UPDATE devices
+        SET assigned_ndi_source_name = ?, assigned_ndi_source_address = ?,
+            fallback_playlist_id = ?, config_version = config_version + 1,
+            updated_at = ?
+        WHERE id = ?
+      `).run(sourceName, sourceAddress, fallbackPlaylistId, new Date().toISOString(), device.id);
+
+      const updated = database.prepare(`
+        SELECT config_version, assigned_ndi_source_name, assigned_ndi_source_address,
+               fallback_playlist_id
+        FROM devices WHERE id = ?
+      `).get(device.id) as {
+        config_version: number; assigned_ndi_source_name: string | null;
+        assigned_ndi_source_address: string | null; fallback_playlist_id: string | null;
+      };
+      return {
+        deviceId: device.id,
+        configVersion: updated.config_version,
+        ndiSourceName: updated.assigned_ndi_source_name,
+        ndiSourceAddress: updated.assigned_ndi_source_address,
+        fallbackPlaylistId: updated.fallback_playlist_id,
+      };
+    },
+  );
+
+  function authenticateReceiver(request: FastifyRequest, reply: FastifyReply): { id: string } | null {
+    const authorization = request.headers.authorization ?? "";
+    const deviceToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+    if (!deviceToken) {
+      reply.code(401).send({ error: "Device authentication required" });
+      return null;
+    }
+    const device = database.prepare(
+      "SELECT id FROM devices WHERE device_token_hash = ? AND credential_revoked_at IS NULL",
+    ).get(hashSessionToken(deviceToken)) as { id: string } | undefined;
+    if (!device) {
+      reply.code(401).send({ error: "Invalid device credential" });
+      return null;
+    }
+    return device;
+  }
+
+  app.get("/api/v1/receiver/config", async (request, reply) => {
+    const device = authenticateReceiver(request, reply);
+    if (!device) return;
+    const config = database.prepare(`
+      SELECT config_version, assigned_ndi_source_name, assigned_ndi_source_address,
+             fallback_playlist_id
+      FROM devices WHERE id = ?
+    `).get(device.id) as {
+      config_version: number; assigned_ndi_source_name: string | null;
+      assigned_ndi_source_address: string | null; fallback_playlist_id: string | null;
+    };
+    return {
+      schemaVersion: 1,
+      configVersion: config.config_version,
+      ndi: { sourceName: config.assigned_ndi_source_name, sourceAddress: config.assigned_ndi_source_address },
+      fallbackPlaylistId: config.fallback_playlist_id,
+    };
+  });
+
+  app.get("/api/v1/receiver/media-manifest", async (request, reply) => {
+    const device = authenticateReceiver(request, reply);
+    if (!device) return;
+    const assignment = database.prepare(`
+      SELECT d.config_version, d.fallback_playlist_id, p.updated_at
+      FROM devices d LEFT JOIN playlists p ON p.id = d.fallback_playlist_id
+      WHERE d.id = ?
+    `).get(device.id) as { config_version: number; fallback_playlist_id: string | null; updated_at: string | null };
+    const items = assignment.fallback_playlist_id ? database.prepare(`
+      SELECT pi.position, pi.duration_seconds, ma.id, ma.mime_type, ma.size_bytes, ma.sha256
+      FROM playlist_items pi
+      INNER JOIN media_assets ma ON ma.id = pi.media_id
+      WHERE pi.playlist_id = ?
+      ORDER BY pi.position ASC
+    `).all(assignment.fallback_playlist_id) as Array<{
+      position: number; duration_seconds: number; id: string; mime_type: string; size_bytes: number; sha256: string;
+    }> : [];
+    return {
+      schemaVersion: 1,
+      configVersion: assignment.config_version,
+      playlistId: assignment.fallback_playlist_id,
+      playlistUpdatedAt: assignment.updated_at,
+      items: items.map((item) => ({
+        mediaId: item.id,
+        position: item.position,
+        durationSeconds: item.duration_seconds,
+        mimeType: item.mime_type,
+        sizeBytes: item.size_bytes,
+        sha256: item.sha256,
+        downloadPath: `/api/v1/receiver/media/${item.id}`,
+      })),
+    };
+  });
+
+  app.get<{ Params: { mediaId: string } }>("/api/v1/receiver/media/:mediaId", async (request, reply) => {
+    const device = authenticateReceiver(request, reply);
+    if (!device) return;
+    const asset = database.prepare(`
+      SELECT ma.storage_key, ma.mime_type
+      FROM media_assets ma
+      INNER JOIN playlist_items pi ON pi.media_id = ma.id
+      INNER JOIN devices d ON d.fallback_playlist_id = pi.playlist_id
+      WHERE d.id = ? AND ma.id = ?
+      LIMIT 1
+    `).get(device.id, request.params.mediaId) as { storage_key: string; mime_type: string } | undefined;
+    if (!asset) return reply.code(404).send({ error: "Assigned media item not found" });
+    try {
+      const filePath = resolve(mediaDirectory, asset.storage_key);
+      if (dirname(filePath) !== mediaDirectory) return reply.code(404).send({ error: "Media item not found" });
+      return reply.type(asset.mime_type).header("Cache-Control", "private, no-store").send(readFileSync(filePath));
+    } catch (error) {
+      request.log.error(error, "Assigned Veyra media is missing or unreadable");
+      return reply.code(404).send({ error: "Media file is unavailable" });
+    }
   });
 
   app.delete<{ Params: { deviceId: string } }>("/api/v1/devices/:deviceId", async (request, reply) => {
@@ -853,13 +1017,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     "/api/v1/receiver/heartbeat",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request, reply) => {
-      const authorization = request.headers.authorization ?? "";
-      const deviceToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-      if (!deviceToken) return reply.code(401).send({ error: "Device authentication required" });
-
-      const device = database.prepare("SELECT id FROM devices WHERE device_token_hash = ? AND credential_revoked_at IS NULL")
-        .get(hashSessionToken(deviceToken)) as { id: string } | undefined;
-      if (!device) return reply.code(401).send({ error: "Invalid device credential" });
+      const device = authenticateReceiver(request, reply);
+      if (!device) return;
 
       const body = request.body ?? {};
       const version = typeof body.version === "string" ? body.version.trim().slice(0, 40) : "unknown";
