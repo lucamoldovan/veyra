@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 export type VeyraDatabase = Database.Database;
 
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite"): VeyraDatabase {
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
@@ -85,6 +85,47 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
           ON devices(credential_revoked_at);
       `);
       database.pragma("user_version = 2");
+    }
+
+    if (currentVersion < 3) {
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS media_assets (
+          id TEXT PRIMARY KEY,
+          display_name TEXT NOT NULL,
+          storage_key TEXT NOT NULL UNIQUE,
+          mime_type TEXT NOT NULL,
+          size_bytes INTEGER NOT NULL CHECK (size_bytes > 0),
+          sha256 TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS media_assets_created_at_idx
+          ON media_assets(created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS playlists (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS playlists_name_idx
+          ON playlists(name COLLATE NOCASE);
+
+        CREATE TABLE IF NOT EXISTS playlist_items (
+          id TEXT PRIMARY KEY,
+          playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+          media_id TEXT NOT NULL REFERENCES media_assets(id) ON DELETE RESTRICT,
+          position INTEGER NOT NULL CHECK (position >= 0),
+          duration_seconds INTEGER NOT NULL CHECK (duration_seconds BETWEEN 1 AND 3600),
+          UNIQUE (playlist_id, position)
+        );
+
+        CREATE INDEX IF NOT EXISTS playlist_items_media_id_idx
+          ON playlist_items(media_id);
+      `);
+      database.pragma("user_version = 3");
     }
   });
 
