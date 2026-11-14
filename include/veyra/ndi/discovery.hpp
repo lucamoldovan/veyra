@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <Processing.NDI.Lib.h>
 
 #include <cstdint>

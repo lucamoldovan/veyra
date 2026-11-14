@@ -64,6 +64,7 @@ if(VEYRA_BUILD_PLAYER)
     unset(VEYRA_NDI_HAS_P_NDI_RECV_NAME CACHE)
     set(CMAKE_REQUIRED_INCLUDES "${NDI_INCLUDE_DIR}")
     check_cxx_source_compiles("
+        #include <cstddef>
         #include <Processing.NDI.Lib.h>
         int main() {
             NDIlib_recv_create_v3_t settings{};
@@ -73,7 +74,8 @@ if(VEYRA_BUILD_PLAYER)
     " VEYRA_NDI_HAS_P_NDI_NAME)
     if(NOT VEYRA_NDI_HAS_P_NDI_NAME)
         check_cxx_source_compiles("
-            #include <Processing.NDI.Lib.h>
+            #include <cstddef>
+        #include <Processing.NDI.Lib.h>
             int main() {
                 NDIlib_recv_create_v3_t settings{};
                 settings.p_ndi_recv_name = \"Veyra Receiver\";

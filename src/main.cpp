@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <Processing.NDI.Lib.h>
 
 #include "veyra/config/config.hpp"
