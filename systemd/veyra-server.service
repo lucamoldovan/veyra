@@ -1,16 +1,16 @@
 [Unit]
-Description=Veyra central server and dashboard
+Description=NDIView central server and dashboard
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=veyra-server
-Group=veyra-server
-WorkingDirectory=/opt/veyra/current/server
-EnvironmentFile=/etc/veyra/server.env
+User=ndiview-server
+Group=ndiview-server
+WorkingDirectory=/opt/ndiview/current/server
+EnvironmentFile=/etc/ndiview/server.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node /opt/veyra/current/server/dist/index.js
+ExecStart=/usr/bin/node /opt/ndiview/current/server/dist/index.js
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -19,7 +19,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/veyra/server
+ReadWritePaths=/var/lib/ndiview/server
 
 [Install]
 WantedBy=multi-user.target

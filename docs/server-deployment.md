@@ -1,17 +1,17 @@
 # NDIView central server and dashboard deployment
 
-The NDIView central server and dashboard are deployed together as one immutable release. Existing server-side paths, service identifiers and `VEYRA_*` environment variables retain their legacy names for compatibility; do not rename them manually. The server serves the production Vite build from the same HTTPS origin, so operators do not run a separate Vite process in production. Refreshing the browser loads the current dashboard release.
+The NDIView central server and dashboard are deployed together as one immutable release. The central server's existing data directories, Linux service account, systemd unit name, and `/etc/veyra/server.env` location remain stable for upgrade compatibility. New deployments should use `NDIVIEW_*` environment variables; the server still accepts the previous `VEYRA_*` names as aliases. The server serves the production Vite build from the same HTTPS origin, so operators do not run a separate Vite process in production. Refreshing the browser loads the current dashboard release.
 
 ## One-time signing setup
 
 Create an Ed25519 release-signing key on a trusted build machine. Keep the private key offline and out of the repository:
 
 ```bash
-openssl genpkey -algorithm ED25519 -out veyra-release-private.pem
-openssl pkey -in veyra-release-private.pem -pubout -out veyra-release-public.pem
+openssl genpkey -algorithm ED25519 -out ndiview-release-private.pem
+openssl pkey -in ndiview-release-private.pem -pubout -out ndiview-release-public.pem
 ```
 
-Copy only the public key to the central server as `/etc/veyra/release-signing.pub`, owned by root and mode `0644`. The private key is used only when packaging releases.
+Copy only the public key to the central server as `/etc/veyra/release-signing.pub` (the existing trust-store path is retained for upgrades), owned by root and mode `0644`. The private key is used only when packaging releases.
 
 ## Prepare the central Debian 13 server
 
@@ -28,7 +28,7 @@ The installer will create the environment template on first use if it is missing
 From a clean, committed checkout on the build machine:
 
 ```bash
-export VEYRA_RELEASE_SIGNING_KEY=/secure/path/veyra-release-private.pem
+export NDIVIEW_RELEASE_SIGNING_KEY=/secure/path/ndiview-release-private.pem
 scripts/package-server-release.sh 0.2.0
 ```
 
@@ -40,11 +40,11 @@ Copy the archive, signature, SHA-256 value, and trusted CA bundle to the central
 
 ```bash
 sudo scripts/install-server-release.sh \
-  dist/releases/veyra-0.2.0.tar.gz \
+  dist/releases/ndiview-0.2.0.tar.gz \
   YOUR_64_CHARACTER_SHA256 \
-  dist/releases/veyra-0.2.0.tar.gz.sig \
+  dist/releases/ndiview-0.2.0.tar.gz.sig \
   0.2.0 \
-  https://veyra-server.local:8787/api/v1/health \
+  https://ndiview-server.local:8787/api/v1/health \
   /etc/ssl/certs/veyra-lan-ca.pem
 ```
 
@@ -62,7 +62,7 @@ The dashboard is bundled into `dashboard/dist` and served by NDIView Server. HTM
 
 ```bash
 sudo scripts/rollback-server-release.sh 0.1.0 \
-  https://veyra-server.local:8787/api/v1/health \
+  https://ndiview-server.local:8787/api/v1/health \
   /etc/ssl/certs/veyra-lan-ca.pem
 ```
 
