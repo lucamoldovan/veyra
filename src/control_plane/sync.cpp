@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
@@ -228,6 +229,7 @@ void atomicWrite(const std::filesystem::path& target, const std::string& bytes) 
     bool ok = true;
     while (offset < bytes.size()) {
         const auto written = ::write(fd, bytes.data() + offset, bytes.size() - offset);
+        if (written < 0 && errno == EINTR) continue;
         if (written <= 0) { ok = false; break; }
         offset += static_cast<std::size_t>(written);
     }
