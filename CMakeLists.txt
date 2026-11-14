@@ -20,6 +20,7 @@ if(VEYRA_BUILD_PLAYER)
     find_package(Threads REQUIRED)
     find_package(CURL REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+    pkg_check_modules(SDL2_IMAGE REQUIRED IMPORTED_TARGET SDL2_image)
 
     find_package(spdlog CONFIG REQUIRED)
 
@@ -58,6 +59,7 @@ if(VEYRA_BUILD_PLAYER)
         src/main.cpp
         src/config/config.cpp
         src/control_plane/client.cpp
+        src/control_plane/sync.cpp
         src/ndi/discovery.cpp
         src/ndi/receiver.cpp
         src/video/renderer.cpp
@@ -69,6 +71,7 @@ if(VEYRA_BUILD_PLAYER)
     )
     target_link_libraries(veyra PRIVATE
         PkgConfig::SDL2
+        PkgConfig::SDL2_IMAGE
         Threads::Threads
         spdlog::spdlog
         CURL::libcurl
@@ -107,7 +110,7 @@ if(VEYRA_BUILD_TESTS)
     target_include_directories(veyra_renderer_compile PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
-    target_link_libraries(veyra_renderer_compile PRIVATE PkgConfig::SDL2)
+    target_link_libraries(veyra_renderer_compile PRIVATE PkgConfig::SDL2 PkgConfig::SDL2_IMAGE)
     target_compile_options(veyra_renderer_compile PRIVATE
         -Wall
         -Wextra
@@ -116,9 +119,11 @@ if(VEYRA_BUILD_TESTS)
 
     find_package(Threads REQUIRED)
     find_package(CURL REQUIRED)
+    find_package(OpenSSL REQUIRED)
 
     add_library(veyra_control_plane_compile OBJECT
         src/control_plane/client.cpp
+        src/control_plane/sync.cpp
     )
     target_include_directories(veyra_control_plane_compile PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -127,6 +132,7 @@ if(VEYRA_BUILD_TESTS)
         CURL::libcurl
         Threads::Threads
         nlohmann_json::nlohmann_json
+        OpenSSL::Crypto
     )
     target_compile_options(veyra_control_plane_compile PRIVATE
         -Wall
@@ -136,6 +142,7 @@ if(VEYRA_BUILD_TESTS)
 
     add_executable(veyra_control_plane_tests
         src/control_plane/client.cpp
+        src/control_plane/sync.cpp
         tests/control_plane_tests.cpp
     )
     target_include_directories(veyra_control_plane_tests PRIVATE
@@ -145,6 +152,7 @@ if(VEYRA_BUILD_TESTS)
         CURL::libcurl
         Threads::Threads
         nlohmann_json::nlohmann_json
+        OpenSSL::Crypto
     )
     target_compile_options(veyra_control_plane_tests PRIVATE
         -Wall
