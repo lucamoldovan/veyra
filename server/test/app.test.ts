@@ -160,7 +160,7 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
     });
     assert.equal(pairingCodeResponse.statusCode, 201);
     const pairingCode = pairingCodeResponse.json().code as string;
-    assert.match(pairingCode, /^\d{8}$/);
+    assert.match(pairingCode, /^\d{12}$/);
 
     const paired = await app.inject({
       method: "POST",
