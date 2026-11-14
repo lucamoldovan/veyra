@@ -61,7 +61,9 @@ Implemented:
 - Rate-limited setup and login endpoints, plus session inspection and logout.
 - Authenticated device inventory and one-time, 12-digit pairing codes (10-minute expiry), stored as HMAC-SHA-256 verifiers using a separate 32-byte local secret file.
 - Single-use receiver pairing that returns a device ID and one-time device credential; only a hash of the credential is stored.
-- Bearer-authenticated receiver heartbeats and derived online/stale/offline state.\n- Operator-controlled device credential revocation and safe removal of revoked device records.\n- Transactional SQLite schema migrations through version 2, including a populated version-1 upgrade test.
+- Bearer-authenticated receiver heartbeats and derived online/stale/offline state.
+- Operator-controlled device credential revocation and safe removal of revoked device records.
+- Transactional SQLite schema migrations through version 2, including a populated version-1 upgrade test.
 - Configurable bind address and port, TLS-enforced non-loopback binding, security response headers, health endpoint, and graceful shutdown.
 - Automated server build and API tests in GitHub Actions.
 
