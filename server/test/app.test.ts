@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { buildApp } from "../src/app.js";
 import { openDatabase } from "../src/database.js";
@@ -261,6 +264,47 @@ test("database initializes a versioned schema", () => {
     );
   } finally {
     database.close();
+  }
+});
+
+
+test("database upgrades a populated version-one schema without losing devices", () => {
+  const directory = mkdtempSync(join(tmpdir(), "veyra-migration-"));
+  const databasePath = join(directory, "veyra.sqlite");
+
+  try {
+    const legacy = openDatabase(databasePath);
+    legacy.prepare(
+      "INSERT INTO operators (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+    ).run("operator-1", "admin", "test-hash", "2026-01-01T00:00:00.000Z");
+    legacy.prepare(`
+      INSERT INTO devices (
+        id, name, device_token_hash, platform, software_version, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run("device-1", "Lobby", "token-hash", "linux-x86_64", "0.1.0",
+      "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
+    legacy.exec("DROP INDEX devices_credential_revoked_at_idx");
+    legacy.exec("ALTER TABLE devices DROP COLUMN credential_revoked_at");
+    legacy.pragma("user_version = 1");
+    legacy.close();
+
+    const migrated = openDatabase(databasePath);
+    try {
+      assert.equal(migrated.pragma("user_version", { simple: true }), 2);
+      const device = migrated.prepare(
+        "SELECT id, name, credential_revoked_at FROM devices WHERE id = ?",
+      ).get("device-1") as { id: string; name: string; credential_revoked_at: string | null };
+      assert.deepEqual(device, {
+        id: "device-1",
+        name: "Lobby",
+        credential_revoked_at: null,
+      });
+      assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM operators").get().count, 1);
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
