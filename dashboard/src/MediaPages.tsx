@@ -223,8 +223,10 @@ export function PlaylistsPage() {
     });
   };
 
+  const hasInvalidDuration = items.some((item) => !Number.isInteger(item.durationSeconds) || item.durationSeconds < 1 || item.durationSeconds > 3600);
+
   const savePlaylist = async () => {
-    if (!activeId) return;
+    if (!activeId || hasInvalidDuration) return;
     setSaving(true);
     setError("");
     try {
@@ -299,7 +301,7 @@ export function PlaylistsPage() {
                 <div><h2>Sequence editor</h2><p>Images play in order and loop continuously.</p></div>
                 <div className="playlist-editor-actions">
                   <button className="button button-secondary" disabled={saving} onClick={() => void removePlaylist()}><Trash2 size={14} /> Delete</button>
-                  <button className="button button-dark" disabled={saving || !name.trim()} onClick={() => void savePlaylist()}>{saving ? "Saving…" : "Save changes"}</button>
+                  <button className="button button-dark" disabled={saving || !name.trim() || hasInvalidDuration} onClick={() => void savePlaylist()}>{saving ? "Saving…" : "Save changes"}</button>
                 </div>
               </div>
               <div className="playlist-fields">
@@ -323,7 +325,7 @@ export function PlaylistsPage() {
                       <div className="playlist-item-row" key={item.id ?? (item.mediaId + "-" + index)}>
                         <span className="playlist-item-number">{String(index + 1).padStart(2, "0")}</span>
                         {asset && <img src={asset.contentUrl} alt="" />}
-                        <div className="playlist-item-copy"><strong>{asset?.name ?? item.mediaName ?? "Missing image"}</strong><span>{item.durationSeconds} seconds</span></div>
+                        <div className="playlist-item-copy"><strong>{asset?.name ?? item.mediaName ?? "Missing image"}</strong><label className="playlist-item-duration"><input aria-label={"Display duration for item " + (index + 1)} type="number" min={1} max={3600} step={1} value={item.durationSeconds} onChange={(event) => { const value = Number(event.target.value); setItems((current) => current.map((entry, itemIndex) => itemIndex === index ? { ...entry, durationSeconds: value } : entry)); }} /><span>seconds</span></label></div>
                         <div className="playlist-item-controls">
                           <button className="icon-button" aria-label="Move image up" disabled={index === 0} onClick={() => moveItem(index, -1)}><ChevronUp size={16} /></button>
                           <button className="icon-button" aria-label="Move image down" disabled={index === items.length - 1} onClick={() => moveItem(index, 1)}><ChevronDown size={16} /></button>
