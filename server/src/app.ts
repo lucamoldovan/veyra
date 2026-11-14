@@ -497,6 +497,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     if (!item) return reply.code(404).send({ error: "Media item not found" });
 
     try {
+      ensurePrivateDirectory(mediaDirectory);
       const filePath = resolve(mediaDirectory, item.storage_key);
       if (dirname(filePath) !== mediaDirectory) {
         return reply.code(404).send({ error: "Media item not found" });
@@ -526,11 +527,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       return reply.code(409).send({ error: "This image is used by a playlist and cannot be deleted yet" });
     }
 
-    const filePath = resolve(mediaDirectory, item.storage_key);
-    if (dirname(filePath) !== mediaDirectory) {
-      return reply.code(500).send({ error: "Stored media path is invalid" });
-    }
     try {
+      ensurePrivateDirectory(mediaDirectory);
+      const filePath = resolve(mediaDirectory, item.storage_key);
+      if (dirname(filePath) !== mediaDirectory) {
+        return reply.code(500).send({ error: "Stored media path is invalid" });
+      }
       rmSync(filePath, { force: true });
       database.prepare("DELETE FROM media_assets WHERE id = ?").run(request.params.mediaId);
       return reply.code(204).send();
@@ -945,6 +947,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     `).get(device.id, request.params.mediaId) as { storage_key: string; mime_type: string } | undefined;
     if (!asset) return reply.code(404).send({ error: "Assigned media item not found" });
     try {
+      ensurePrivateDirectory(mediaDirectory);
       const filePath = resolve(mediaDirectory, asset.storage_key);
       if (dirname(filePath) !== mediaDirectory) return reply.code(404).send({ error: "Media item not found" });
       return reply.type(asset.mime_type).header("Cache-Control", "private, no-store").send(readFileSync(filePath));
