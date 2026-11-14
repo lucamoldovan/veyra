@@ -220,6 +220,28 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
     assert.equal(device.softwareVersion, "0.1.1");
     assert.equal(device.playbackMode, "ndi");
     assert.equal(device.ndiSourceName, "Camera 1");
+    const revoke = await app.inject({
+      method: "POST",
+      url: `/api/v1/devices/${credentials.deviceId}/revoke`,
+      headers: { cookie: operatorCookie },
+    });
+    assert.equal(revoke.statusCode, 200);
+    assert.equal(revoke.json().revoked, true);
+
+    const revokedHeartbeat = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/heartbeat",
+      headers: { authorization: `Bearer ${credentials.deviceToken}` },
+      payload: { playbackMode: "ndi" },
+    });
+    assert.equal(revokedHeartbeat.statusCode, 401);
+
+    const revokedList = await app.inject({
+      method: "GET",
+      url: "/api/v1/devices",
+      headers: { cookie: operatorCookie },
+    });
+    assert.equal(revokedList.json().devices[0].credentialStatus, "revoked");
   } finally {
     await app.close();
   }
@@ -229,7 +251,7 @@ test("database initializes a versioned schema", () => {
   const database = openDatabase(":memory:");
 
   try {
-    assert.equal(database.pragma("user_version", { simple: true }), 1);
+    assert.equal(database.pragma("user_version", { simple: true }), 2);
     const tables = database.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     ).all() as Array<{ name: string }>;
