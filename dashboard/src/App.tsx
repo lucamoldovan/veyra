@@ -174,8 +174,7 @@ function App() {
               <span className="status-dot" />
               <span>{connection === "checking" ? "Connecting" : connection === "online" ? "Server online" : "Server offline"}</span>
             </div>
-            <button className="icon-button topbar-help" aria-label="Help"><CircleHelp size={18} /></button>
-            <div className="topbar-avatar">L</div>
+              <div className="topbar-avatar">L</div>
           </div>
         </header>
 
@@ -214,11 +213,11 @@ function Overview({
       <section className="page-heading">
         <div>
           <div className="eyebrow">YOUR NETWORK AT A GLANCE</div>
-          <h1>Good morning.</h1>
+          <h1>Your network.</h1>
           <p>Here's what's happening across your Veyra network.</p>
         </div>
         <button className="button button-secondary" onClick={() => onNavigate("devices")}>
-          <Plus size={16} /> Add a device
+          <Monitor size={16} /> View devices
         </button>
       </section>
 
