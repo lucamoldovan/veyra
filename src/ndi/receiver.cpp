@@ -1,5 +1,7 @@
 #include "veyra/ndi/receiver.hpp"
 
+#include <spdlog/spdlog.h>
+
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -101,6 +103,13 @@ std::optional<VideoFrame> Receiver::capture(const std::uint32_t timeoutMs) {
             bytesPerPixel = 4;
             break;
         default:
+            if (!unsupportedFormatLogged_) {
+                spdlog::warn(
+                    "Skipping unsupported NDI video FourCC: {}",
+                    static_cast<unsigned int>(ndiFrame.FourCC)
+                );
+                unsupportedFormatLogged_ = true;
+            }
             return std::nullopt;
     }
 
