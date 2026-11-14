@@ -208,6 +208,10 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
         uptimeSeconds: 120,
         playbackMode: "ndi",
         ndiSourceName: "Camera 1",
+        ndiSources: [
+          { name: "Camera 1", url: "ndi://camera-1.local" },
+          { name: "Camera 2", url: "ndi://camera-2.local" },
+        ],
       },
     });
     assert.equal(heartbeat.statusCode, 200);
@@ -224,6 +228,19 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
     assert.equal(device.softwareVersion, "0.1.1");
     assert.equal(device.playbackMode, "ndi");
     assert.equal(device.ndiSourceName, "Camera 1");
+    const unauthenticatedSources = await app.inject({ method: "GET", url: "/api/v1/sources" });
+    assert.equal(unauthenticatedSources.statusCode, 401);
+
+    const sourceInventory = await app.inject({
+      method: "GET",
+      url: "/api/v1/sources",
+      headers: { cookie: operatorCookie },
+    });
+    assert.equal(sourceInventory.statusCode, 200);
+    assert.equal(sourceInventory.json().sources.length, 2);
+    assert.equal(sourceInventory.json().sources[0].name, "Camera 1");
+    assert.equal(sourceInventory.json().sources[0].deviceCount, 1);
+    assert.equal(sourceInventory.json().sources[0].devices[0].name, "Lobby Display");
     const unauthenticatedRevoke = await app.inject({
       method: "POST",
       url: `/api/v1/devices/${credentials.deviceId}/revoke`,
@@ -455,7 +472,7 @@ test("backup command creates a consistent database and pairing-secret backup", (
 
     const backupDatabase = openDatabase(join(backupDirectory, manifest.databaseFile));
     try {
-      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 3);
+      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 4);
     } finally {
       backupDatabase.close();
     }
@@ -528,7 +545,7 @@ test("database initializes a versioned schema", () => {
   const database = openDatabase(":memory:");
 
   try {
-    assert.equal(database.pragma("user_version", { simple: true }), 3);
+    assert.equal(database.pragma("user_version", { simple: true }), 4);
     const tables = database.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     ).all() as Array<{ name: string }>;
@@ -559,20 +576,22 @@ test("database upgrades a populated version-one schema without losing devices", 
       "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
     legacy.exec("DROP INDEX devices_credential_revoked_at_idx");
     legacy.exec("ALTER TABLE devices DROP COLUMN credential_revoked_at");
+    legacy.exec("ALTER TABLE devices DROP COLUMN discovered_sources_json");
     legacy.exec("DROP TABLE playlist_items; DROP TABLE playlists; DROP TABLE media_assets;");
     legacy.pragma("user_version = 1");
     legacy.close();
 
     const migrated = openDatabase(databasePath);
     try {
-      assert.equal(migrated.pragma("user_version", { simple: true }), 3);
+      assert.equal(migrated.pragma("user_version", { simple: true }), 4);
       const device = migrated.prepare(
-        "SELECT id, name, credential_revoked_at FROM devices WHERE id = ?",
-      ).get("device-1") as { id: string; name: string; credential_revoked_at: string | null };
+        "SELECT id, name, credential_revoked_at, discovered_sources_json FROM devices WHERE id = ?",
+      ).get("device-1") as { id: string; name: string; credential_revoked_at: string | null; discovered_sources_json: string };
       assert.deepEqual(device, {
         id: "device-1",
         name: "Lobby",
         credential_revoked_at: null,
+        discovered_sources_json: "[]",
       });
       const operatorCount = migrated.prepare("SELECT COUNT(*) AS count FROM operators").get() as { count: number };
       assert.equal(operatorCount.count, 1);
