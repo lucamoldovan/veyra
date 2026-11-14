@@ -22,11 +22,11 @@ Install the native Veyra receiver, its runtime dependencies, the official NDI SD
 Keep mutable state outside the release directory:
 - Application releases: `/opt/veyra/releases/<version>/`
 - Active release pointer: `/opt/veyra/current` (symlink)
-- Machine configuration: `/etc/veyra/veyra.json`
+- Machine configuration: `/etc/veyra/config.json`
 - Credentials and device identity: `/var/lib/veyra/identity/`
 - Download/cache/fallback media: `/var/cache/veyra/` or a dedicated persistent cache directory
 
-The exact paths must be reconciled with the current receiver's credential/cache path handling before implementation. Do not move or overwrite existing state until a migration is tested.
+The current example config defaults to `~/.local/state/veyra/device-token` for the credential and `~/.local/state/veyra/cache` for cached state/media. The proposed `/var/lib` and `/var/cache` layout is a deployment target, not the current implementation. Reconcile the service account and these paths before implementation; do not move or overwrite existing state until a migration is tested.
 
 ### Central server PC
 
