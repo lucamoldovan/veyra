@@ -537,6 +537,7 @@ function DevicesPage() {
   const [pairingCode, setPairingCode] = useState<PairingCode | null>(null);
   const [creatingCode, setCreatingCode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -634,7 +635,7 @@ function DevicesPage() {
       <section className="panel devices-panel">
         <div className="panel-heading">
           <div><h2>Registered receivers</h2><p>Live status is refreshed every 15 seconds</p></div>
-          <button className="icon-button refresh-button" aria-label="Refresh device list" onClick={() => window.location.reload()}><RefreshCw size={16} /></button>
+          <button className="icon-button refresh-button" aria-label="Refresh device list" onClick={() => setRefreshTick((tick) => tick + 1)}><RefreshCw size={16} /></button>
         </div>
 
         {loading ? (
