@@ -216,6 +216,9 @@ AppConfig load(const std::filesystem::path& path) {
     const auto credentialPath = readString(
         controlPlane, "credentialPath", "~/.local/state/veyra/device-token"
     );
+    if (credentialPath.empty()) {
+        throw std::runtime_error("controlPlane.credentialPath must not be empty");
+    }
     config.controlPlane.credentialPath = expandHome(credentialPath);
     config.controlPlane.heartbeatIntervalSeconds = readInteger(
         controlPlane, "heartbeatIntervalSeconds", 15, 5, 120
