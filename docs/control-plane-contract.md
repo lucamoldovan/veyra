@@ -76,7 +76,7 @@ A machine reboot command is intentionally not part of the initial allowlist.
 
 ## Receiver enrollment and identity
 
-Proposed first-enrollment flow:
+Implemented first-enrollment flow:
 
 1. An operator creates a short-lived, single-use pairing code in the dashboard.
 2. The receiver is given the local server address and pairing code during setup.
@@ -87,7 +87,7 @@ Proposed first-enrollment flow:
 
 The server stores only a verifier/hash of long-lived device credentials where practical. Operators can revoke a credential from the dashboard; a revoked receiver can no longer submit heartbeats. Its record can then be removed before pairing a replacement credential. A receiver must not be able to enroll itself using a predictable device name or unauthenticated LAN broadcast.
 
-Transport security for the LAN deployment, credential rotation, and recovery from a lost device credential must be settled before production use. Being on a LAN is not, by itself, authentication.
+The server refuses non-loopback binds without TLS, and the C++ client verifies the certificate chain and hostname. Production still needs a documented CA provisioning process and tested credential rotation/recovery procedures. Being on a LAN is not, by itself, authentication.
 
 ## Receiver API
 
@@ -148,7 +148,7 @@ The server should keep separate dimensions rather than one ambiguous online/offl
 
 A device can be connected to the server while its NDI source is unavailable. A device can also be disconnected from the server while continuing NDI playback or local fallback. The dashboard must represent these states independently.
 
-Heartbeat timeout thresholds are configuration, not hard-coded UI assumptions. The initial implementation should record last-seen time and derive a stale/offline state using documented thresholds.
+The current server records last-seen time and derives online at 45 seconds or less, stale after 45 seconds through 120 seconds, and offline after 120 seconds. The heartbeat interval defaults to 15 seconds. These thresholds are currently server defaults rather than operator-configurable settings.
 
 ## Configuration and media synchronization
 
@@ -160,7 +160,7 @@ Heartbeat timeout thresholds are configuration, not hard-coded UI assumptions. T
 - Media deletion is blocked while an asset is referenced by a playlist or assigned fallback, unless the operator first changes those references.
 - The receiver reports which manifest version and assets it has successfully applied.
 
-The initial fallback player supports image items with explicit order and display duration. Each receiver caches only the assets it needs for its assigned playlists and fallback.
+The planned initial fallback player will support image items with explicit order and display duration. Each receiver will cache only the assets it needs for its assigned playlists and fallback.
 
 ## Command lifecycle
 
@@ -191,14 +191,13 @@ Commands are idempotent where possible. Replaying the same command ID must not c
 
 ## Open implementation decisions
 
-These need a technical decision record before implementation:
+The following still need a technical decision record or implementation:
 
-1. Database migration strategy for the existing SQLite schema.
-2. Device credential rotation, revocation, recovery, and LAN transport security.
-3. Whether the receiver uses HTTP polling plus WebSocket, or one persistent WebSocket channel for live control.
-4. Media storage layout, quotas, backup, and restore.
-5. Pairing UX and how the receiver receives its first server URL/code.
-6. Whether heartbeat interval and stale/offline thresholds should be configurable.
-7. Playlist behavior when an item is missing or corrupted.
+1. Device credential rotation and recovery after a receiver is reset or loses its token file.
+2. Whether the receiver uses HTTP polling plus WebSocket, or one persistent WebSocket channel for live control.
+3. Media storage quotas, retention policy, and cleanup of unreferenced files.
+4. Whether heartbeat interval and stale/offline thresholds should be operator-configurable.
+5. Playlist behavior when an item is missing, corrupted, or cannot be decoded.
+6. Production CA provisioning and certificate renewal for multi-receiver deployments.
 
-Until these are resolved, this document is a contract draft and must not be mistaken for an implemented security or compatibility guarantee.
+The SQLite migration mechanism, initial pairing flow, TLS requirement for non-loopback binding, media storage, and database/media backup utility are implemented. This remains a broader contract draft; planned configuration sync, remote commands, and fallback behavior are not implemented.
