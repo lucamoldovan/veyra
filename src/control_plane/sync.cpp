@@ -22,6 +22,7 @@ namespace veyra::control_plane {
 namespace {
 using Json = nlohmann::json;
 constexpr std::size_t kMaxResponseBytes = 20U * 1024U * 1024U + 1024U * 1024U;
+constexpr std::uint64_t kMaxPlaylistBytes = 512U * 1024U * 1024U;
 
 struct Response {
     long status{0};
@@ -223,6 +224,7 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
         manifest.at("playlistRevision").is_number_integer()
         ? manifest.at("playlistRevision").get<int>() : 0;
 
+    std::uint64_t totalPlaylistBytes = 0;
     for (const auto& item : manifest["items"]) {
         const auto mediaId = item.at("mediaId").get<std::string>();
         const auto hash = item.at("sha256").get<std::string>();
@@ -231,8 +233,10 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
         const int duration = item.at("durationSeconds").get<int>();
         const auto path = item.at("downloadPath").get<std::string>();
         if (!validHash(hash) || size == 0 || size > 20U * 1024U * 1024U ||
+            size > kMaxPlaylistBytes - totalPlaylistBytes ||
             duration < 1 || duration > 3600 || path != "/api/v1/receiver/media/" + mediaId)
-            throw std::runtime_error("Receiver media manifest contains invalid asset metadata");
+            throw std::runtime_error("Receiver media manifest contains invalid metadata or exceeds the 512 MiB cache limit");
+        totalPlaylistBytes += size;
         const auto extension = extensionFor(mime);
         const auto destination = mediaRoot / (hash + extension);
         bool cached = false;
