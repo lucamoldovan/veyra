@@ -16,7 +16,7 @@ if [[ "${ID:-}" != debian || "${VERSION_ID:-}" != 13 ]]; then echo "Debian 13 is
 if [[ ! "$VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ || ! "$EXPECTED_SHA" =~ ^[a-fA-F0-9]{64}$ ]]; then
   echo "Invalid version or SHA-256 value." >&2; exit 2
 fi
-for command in node npm tar openssl sha256sum curl; do command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }; done
+for command in node npm tar openssl sha256sum curl python3; do command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }; done
 NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
 if (( NODE_MAJOR < 22 )); then echo "Node.js 22 or newer is required." >&2; exit 1; fi
 if [[ ! -f /etc/veyra/release-signing.pub ]]; then
@@ -26,9 +26,33 @@ fi
 printf '%s  %s\\n' "$EXPECTED_SHA" "$ARCHIVE" | sha256sum --check --status || { echo "Release SHA-256 mismatch." >&2; exit 1; }
 openssl pkeyutl -verify -rawin -pubin -inkey /etc/veyra/release-signing.pub -sigfile "$SIGNATURE" -in "$ARCHIVE" >/dev/null
 PREFIX="ndiview-$VERSION/"
-if ! tar -tzf "$ARCHIVE" | awk -v p="$PREFIX" 'index($0,p)!=1 || $0 ~ /(^|\\/)\\.\\.(\\/|$)/ || $0 ~ /^\\// { exit 1 }'; then
-  echo "Release archive contains an unsafe or unexpected path." >&2; exit 1
-fi
+python3 - "$ARCHIVE" "$PREFIX" <<'PY'
+import pathlib
+import sys
+import tarfile
+
+archive, prefix = sys.argv[1:]
+prefix = prefix.rstrip("/")
+seen = set()
+with tarfile.open(archive, "r:gz") as bundle:
+    members = bundle.getmembers()
+    if not members:
+        raise SystemExit("Release archive is empty")
+    for member in members:
+        name = member.name.rstrip("/")
+        path = pathlib.PurePosixPath(name)
+        if path.is_absolute() or ".." in path.parts or not (name == prefix or name.startswith(prefix + "/")):
+            raise SystemExit(f"Unsafe or unexpected release path: {member.name}")
+        if name in seen:
+            raise SystemExit(f"Duplicate release archive entry: {member.name}")
+        seen.add(name)
+        if member.issym() or member.islnk() or member.isdev() or member.isfifo():
+            raise SystemExit(f"Unsupported release archive entry: {member.name}")
+        if not (member.isfile() or member.isdir()):
+            raise SystemExit(f"Unsupported release archive entry: {member.name}")
+        if member.mode & 0o6000:
+            raise SystemExit(f"Setuid/setgid entry is not allowed: {member.name}")
+PY
 
 BASE=/opt/veyra
 RELEASES="$BASE/releases"

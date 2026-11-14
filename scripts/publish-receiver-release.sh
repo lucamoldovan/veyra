@@ -103,12 +103,12 @@ if not seen_binary:
     raise SystemExit("Archive does not contain bin/ndiview")
 PY
 
-STORE_ROOT="$(realpath -m "$STORE_ROOT")"
-mkdir -p "$STORE_ROOT"
 if [[ -L "$STORE_ROOT" ]]; then
   echo "Receiver release store must not be a symlink." >&2
   exit 1
 fi
+mkdir -p "$STORE_ROOT"
+STORE_ROOT="$(realpath "$STORE_ROOT")"
 VERSION_DIR="$STORE_ROOT/$VERSION"
 if [[ -L "$VERSION_DIR" ]]; then
   echo "Refusing to publish through a symlinked version directory." >&2

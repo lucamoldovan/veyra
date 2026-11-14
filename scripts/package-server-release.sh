@@ -13,6 +13,9 @@ if [[ -z "$SIGNING_KEY" ]]; then echo "Set NDIVIEW_RELEASE_SIGNING_KEY to the of
 if [[ ! -r "$SIGNING_KEY" ]]; then echo "Signing key is not readable." >&2; exit 1; fi
 mkdir -p "$OUTPUT_DIR"
 ARCHIVE="$OUTPUT_DIR/ndiview-$VERSION.tar.gz"
+for output in "$ARCHIVE" "$ARCHIVE.sha256" "$ARCHIVE.sig"; do
+  [[ ! -e "$output" && ! -L "$output" ]] || { echo "Refusing to overwrite immutable release artifact: $output" >&2; exit 1; }
+done
 git archive --format=tar.gz --prefix="ndiview-$VERSION/" HEAD > "$ARCHIVE"
 sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
 openssl pkeyutl -sign -rawin -inkey "$SIGNING_KEY" -in "$ARCHIVE" -out "$ARCHIVE.sig"
