@@ -292,7 +292,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
     const rows = database.prepare(`
       SELECT id, name, platform, software_version, last_seen_at, last_ip,
-             playback_mode, ndi_source_name, uptime_seconds, created_at
+             playback_mode, ndi_source_name, uptime_seconds, created_at,
+             credential_revoked_at
       FROM devices
       ORDER BY name COLLATE NOCASE ASC
     `).all() as Array<{
@@ -306,6 +307,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       ndi_source_name: string | null;
       uptime_seconds: number | null;
       created_at: string;
+      credential_revoked_at: string | null;
     }>;
 
     const now = Date.now();
@@ -325,9 +327,22 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           ndiSourceName: device.ndi_source_name,
           uptimeSeconds: device.uptime_seconds,
           createdAt: device.created_at,
+          credentialRevokedAt: device.credential_revoked_at,
         };
       }),
     };
+  });
+
+  app.delete<{ Params: { deviceId: string } }>("/api/v1/devices/:deviceId", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const result = database.prepare("DELETE FROM devices WHERE id = ?")
+      .run(request.params.deviceId);
+    if (result.changes === 0) {
+      return reply.code(404).send({ error: "Device not found" });
+    }
+    return reply.code(204).send();
   });
 
   app.post<{ Body: { code?: unknown; deviceName?: unknown; platform?: unknown; version?: unknown } }>(
@@ -394,7 +409,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       const deviceToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
       if (!deviceToken) return reply.code(401).send({ error: "Device authentication required" });
 
-      const device = database.prepare("SELECT id FROM devices WHERE device_token_hash = ?")
+      const device = database.prepare("SELECT id FROM devices WHERE device_token_hash = ? AND credential_revoked_at IS NULL")
         .get(hashSessionToken(deviceToken)) as { id: string } | undefined;
       if (!device) return reply.code(401).send({ error: "Invalid device credential" });
 
