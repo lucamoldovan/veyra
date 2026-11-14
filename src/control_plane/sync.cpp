@@ -167,6 +167,36 @@ void ensurePrivateDirectory(const std::filesystem::path& path) {
         throw std::runtime_error("Could not restrict receiver cache permissions");
 }
 
+bool validCacheFilename(const std::string& filename) {
+    if (filename.size() < 68) return false;
+    const auto hash = filename.substr(0, 64);
+    const auto extension = filename.substr(64);
+    return validHash(hash) &&
+        (extension == ".png" || extension == ".jpg" || extension == ".webp");
+}
+
+std::unordered_set<std::string> retainedStateFiles(const std::filesystem::path& statePath) {
+    std::unordered_set<std::string> files;
+    try {
+        struct stat stateInfo{};
+        if (::lstat(statePath.c_str(), &stateInfo) != 0 || !S_ISREG(stateInfo.st_mode)) return files;
+        std::ifstream input(statePath);
+        if (!input) return files;
+        Json state;
+        input >> state;
+        if (!state.contains("retainedPreviousFiles") ||
+            !state["retainedPreviousFiles"].is_array()) return files;
+        for (const auto& item : state["retainedPreviousFiles"]) {
+            if (!item.is_string()) continue;
+            const auto filename = item.get<std::string>();
+            if (validCacheFilename(filename)) files.insert(filename);
+        }
+    } catch (...) {
+        // A corrupt old manifest must not block a fresh synchronization.
+    }
+    return files;
+}
+
 void pruneUnreferencedFiles(
     const std::filesystem::path& mediaRoot,
     const std::unordered_set<std::string>& retainedFiles
@@ -280,11 +310,14 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     ensurePrivateDirectory(config_.cachePath);
     const auto statePath = config_.cachePath / "state.json";
     const auto previousFiles = previousStateFiles(statePath);
+    const auto olderRetainedFiles = retainedStateFiles(statePath);
     const auto mediaRoot = config_.cachePath / "media";
     ensurePrivateDirectory(mediaRoot);
-    // Remove leftovers from any earlier incomplete sync before starting another
-    // attempt, while keeping every file referenced by the last committed state.
-    pruneUnreferencedFiles(mediaRoot, previousFiles);
+    // Remove leftovers from earlier incomplete syncs while preserving both the
+    // active snapshot and the previous snapshot retained during its transition.
+    auto protectedFiles = previousFiles;
+    protectedFiles.insert(olderRetainedFiles.begin(), olderRetainedFiles.end());
+    pruneUnreferencedFiles(mediaRoot, protectedFiles);
 
     const auto configResponse = get(serverUrl, "/api/v1/receiver/config", deviceToken, caCertificatePath, stopToken);
     if (configResponse.status != 200) throw std::runtime_error("Receiver config request failed (HTTP " + std::to_string(configResponse.status) + ")");
@@ -360,11 +393,14 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
         snapshot.fallbackItems.push_back({mediaId, destination, duration, hash});
     }
     snapshot.hasValidCachedState = true;
+    Json retainedPrevious = Json::array();
+    for (const auto& filename : previousFiles) retainedPrevious.push_back(filename);
     Json state = {
         {"schemaVersion", 1}, {"configVersion", configVersion},
         {"ndiSourceName", sourceName}, {"ndiSourceAddress", sourceAddress},
         {"fallbackPlaylistId", snapshot.fallbackPlaylistId},
-        {"playlistRevision", snapshot.playlistRevision}, {"items", committedItems}
+        {"playlistRevision", snapshot.playlistRevision}, {"items", committedItems},
+        {"retainedPreviousFiles", retainedPrevious}
     };
     atomicWrite(statePath, state.dump(2));
 
