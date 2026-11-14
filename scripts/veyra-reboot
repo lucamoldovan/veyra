@@ -1,0 +1,8 @@
+#!/bin/sh
+# Root-owned, argument-free helper. Only this fixed reboot action is permitted.
+set -eu
+if [ "$#" -ne 0 ]; then
+  echo "This helper accepts no arguments." >&2
+  exit 64
+fi
+exec /usr/bin/systemctl reboot

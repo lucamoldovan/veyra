@@ -4,6 +4,7 @@ if [[ "${EUID}" -ne 0 ]]; then echo "Run with sudo: sudo bash scripts/uninstall-
 systemctl disable --now lightdm 2>/dev/null || true
 rm -f /etc/lightdm/lightdm.conf.d/50-veyra-kiosk.conf /usr/share/xsessions/veyra-kiosk.desktop /usr/local/libexec/veyra-kiosk-session
 rm -f /home/veyra-kiosk/.config/systemd/user/veyra.service
+rm -f /etc/sudoers.d/veyra-reboot /usr/local/libexec/veyra-reboot
 systemctl set-default graphical.target
 systemctl daemon-reload
 echo "Removed Veyra LightDM integration. Config, credentials, cache and kiosk account were preserved."

@@ -49,6 +49,9 @@ private:
     void runSync(std::stop_token stopToken, std::string deviceToken);
     [[nodiscard]] bool pair();
     [[nodiscard]] bool sendHeartbeat();
+    void processPendingCommand();
+    [[nodiscard]] bool reportCommandStatus(const std::string& commandId, const std::string& status, const std::string& message = {});
+    [[nodiscard]] bool requestSystemRestart();
     [[nodiscard]] HttpResponse postJson(
         const std::string& path,
         const std::string& body,

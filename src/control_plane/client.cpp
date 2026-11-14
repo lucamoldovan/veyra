@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace veyra::control_plane {
@@ -173,6 +174,7 @@ void Client::run(const std::stop_token stopToken) {
         }
 
         if (sendHeartbeat()) {
+            processPendingCommand();
             retryDelay = std::chrono::seconds{5};
             if (!syncWorker_.joinable()) {
                 syncWorker_ = std::jthread([this, token = deviceToken_](const std::stop_token syncStopToken) {
@@ -303,6 +305,55 @@ bool Client::sendHeartbeat() {
         std::clog << "Veyra heartbeat was rejected (HTTP " << response.status << ")\n";
     }
     return false;
+}
+
+void Client::processPendingCommand() {
+    const auto response = postJson("/api/v1/receiver/commands/poll", "{}", deviceToken_);
+    if (response.status != 200) {
+        if (response.status != 0) std::clog << "Veyra command poll returned HTTP " << response.status << '\\n';
+        return;
+    }
+    try {
+        const Json payload = Json::parse(response.body);
+        if (!payload.contains("command") || payload.at("command").is_null()) return;
+        const auto command = payload.at("command");
+        const std::string id = command.at("id").get<std::string>();
+        const std::string type = command.at("type").get<std::string>();
+        if (id.empty() || type != "restart") {
+            if (!id.empty()) (void)reportCommandStatus(id, "failed", "Unsupported command type");
+            return;
+        }
+        if (!reportCommandStatus(id, "restarting")) return;
+        if (!requestSystemRestart()) {
+            (void)reportCommandStatus(id, "failed", "Restricted reboot helper failed");
+            std::cerr << "Veyra could not execute the restricted reboot helper\\n";
+        }
+    } catch (const std::exception& error) {
+        std::clog << "Veyra command response was invalid: " << error.what() << '\\n';
+    }
+}
+
+bool Client::reportCommandStatus(const std::string& commandId, const std::string& status, const std::string& message) {
+    if (commandId.empty()) return false;
+    Json body = {{"status", status}};
+    if (!message.empty()) body["message"] = message;
+    const auto response = postJson("/api/v1/receiver/commands/" + commandId + "/status", body.dump(), deviceToken_);
+    return response.status == 200;
+}
+
+bool Client::requestSystemRestart() {
+    const pid_t child = ::fork();
+    if (child < 0) return false;
+    if (child == 0) {
+        ::execl("/usr/bin/sudo", "sudo", "-n", "/usr/local/libexec/veyra-reboot", static_cast<char*>(nullptr));
+        ::_exit(127);
+    }
+    int status = 0;
+    while (::waitpid(child, &status, 0) < 0) {
+        if (errno == EINTR) continue;
+        return false;
+    }
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
 Client::HttpResponse Client::postJson(
