@@ -330,7 +330,8 @@ void Renderer::present(const ndi::VideoFrame& frame) {
         converted = true;
     }
 
-    if (texture_ == nullptr) {
+    if (texture_ == nullptr &&
+        !createTexture(frame.width, frame.height, desiredFormat)) {
         throw sdlError("Could not create the fallback video texture");
     }
 
