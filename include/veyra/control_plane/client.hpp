@@ -46,6 +46,7 @@ private:
     };
 
     void run(std::stop_token stopToken);
+    void runSync(std::stop_token stopToken, std::string deviceToken);
     [[nodiscard]] bool pair();
     [[nodiscard]] bool sendHeartbeat();
     [[nodiscard]] HttpResponse postJson(
@@ -68,6 +69,7 @@ private:
     std::mutex snapshotMutex_;
     PlaybackSnapshot snapshot_;
     std::jthread worker_;
+    std::jthread syncWorker_;
     std::atomic_bool started_{false};
 };
 
