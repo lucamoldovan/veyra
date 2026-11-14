@@ -116,7 +116,7 @@ Then set the `controlPlane` section to the following values:
     "serverUrl": "https://ndiview-server.local:8787",
     "deviceName": "Lobby Display",
     "pairingCode": "YOUR_12_DIGIT_CODE",
-    "caCertificatePath": "/etc/ndiview/veyra-ca.pem",
+    "caCertificatePath": "/etc/ndiview/ndiview-ca.pem",
     "credentialPath": "~/.local/state/ndiview/device-token",
     "cachePath": "~/.local/state/ndiview/cache",
     "syncIntervalSeconds": 10,
