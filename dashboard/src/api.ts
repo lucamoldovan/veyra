@@ -133,3 +133,9 @@ export function createDevicePairingCode(): Promise<PairingCode> {
     method: "POST",
   });
 }
+
+export function revokeDeviceCredential(deviceId: string): Promise<{ revoked: true }> {
+  return request<{ revoked: true }>(`/api/v1/devices/${encodeURIComponent(deviceId)}/revoke`, {
+    method: "POST",
+  });
+}
