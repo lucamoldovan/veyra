@@ -8,6 +8,7 @@
 #include <array>
 #include <cerrno>
 #include <cstdio>
+#include <cstdint>
 #include <fstream>
 #include <fcntl.h>
 #include <iterator>
@@ -195,8 +196,13 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     if (remoteConfig.value("schemaVersion", 0) != 1) throw std::runtime_error("Unsupported receiver config schema");
     const int configVersion = remoteConfig.at("configVersion").get<int>();
     const auto ndi = remoteConfig.at("ndi");
-    const std::string sourceName = ndi.value("sourceName", "");
-    const std::string sourceAddress = ndi.value("sourceAddress", "");
+    const auto optionalString = [](const Json& object, const char* key) {
+        if (!object.contains(key) || object.at(key).is_null()) return std::string{};
+        if (!object.at(key).is_string()) throw std::runtime_error(std::string("Invalid string field: ") + key);
+        return object.at(key).get<std::string>();
+    };
+    const std::string sourceName = optionalString(ndi, "sourceName");
+    const std::string sourceAddress = optionalString(ndi, "sourceAddress");
     if (sourceName.empty() != sourceAddress.empty()) throw std::runtime_error("Server returned an incomplete NDI source assignment");
 
     const auto manifestResponse = get(serverUrl, "/api/v1/receiver/media-manifest", deviceToken, caCertificatePath);
@@ -212,8 +218,10 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
     snapshot.configVersion = configVersion;
     snapshot.ndiSourceName = sourceName;
     snapshot.ndiSourceAddress = sourceAddress;
-    snapshot.fallbackPlaylistId = manifest.value("playlistId", "");
-    snapshot.playlistRevision = manifest.value("playlistRevision", 0);
+    snapshot.fallbackPlaylistId = optionalString(manifest, "playlistId");
+    snapshot.playlistRevision = manifest.contains("playlistRevision") &&
+        manifest.at("playlistRevision").is_number_integer()
+        ? manifest.at("playlistRevision").get<int>() : 0;
 
     for (const auto& item : manifest["items"]) {
         const auto mediaId = item.at("mediaId").get<std::string>();
@@ -231,7 +239,10 @@ SyncSnapshot ReceiverSync::synchronize(const std::string& serverUrl, const std::
         struct stat info{};
         if (::lstat(destination.c_str(), &info) == 0 && S_ISREG(info.st_mode) &&
             static_cast<std::uint64_t>(info.st_size) == size) {
-            cached = true;
+            std::ifstream cachedFile(destination, std::ios::binary);
+            const std::string cachedBytes((std::istreambuf_iterator<char>(cachedFile)), {});
+            cached = cachedFile.good() || cachedFile.eof();
+            cached = cached && sha256(cachedBytes) == hash;
         }
         if (!cached) {
             const auto mediaResponse = get(serverUrl, path, deviceToken, caCertificatePath);
