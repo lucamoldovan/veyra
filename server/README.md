@@ -18,7 +18,7 @@ npm run dev
 
 The development server listens on `127.0.0.1:8787` by default.
 
-On first launch, the server creates a local SQLite database and prints a one-time setup key in the server terminal. Keep that key private and enter it on the dashboard to create the first administrator. The key is stored in `data/setup-key` with owner-only permissions until setup succeeds, then deleted.
+On first launch, the server creates a local SQLite database and prints a one-time setup key in the server terminal. Keep that key private and enter it on the dashboard to create the first administrator. The key is stored in `data/setup-key` with owner-only permissions until setup succeeds, then deleted. A separate 32-byte pairing secret is generated in `data/pairing-secret` with owner-only permissions and must be backed up with the database; losing it invalidates outstanding pairing codes.
 
 Check the health endpoint:
 
@@ -42,7 +42,7 @@ npm start
 | `VEYRA_PORT` | `8787` | HTTP port |
 | `LOG_LEVEL` | `info` | Fastify/Pino log level |
 | `VEYRA_DATABASE_PATH` | `data/veyra.sqlite` | SQLite database path |
-| `VEYRA_SETUP_KEY_PATH` | `data/setup-key` | First-run setup key file |
+| `VEYRA_SETUP_KEY_PATH` | `data/setup-key` | First-run setup key file |\n| `VEYRA_PAIRING_SECRET_PATH` | `data/pairing-secret` | Secret key used to HMAC pairing-code verifiers; back up securely with the database |
 | `VEYRA_TLS_CERT_PATH` | unset | PEM certificate path; required with the private key for non-loopback binds |
 | `VEYRA_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
 | `VEYRA_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
@@ -58,7 +58,7 @@ Implemented:
 - First-run administrator setup protected by a random one-time key printed to server logs.
 - Scrypt password hashing, opaque random session tokens stored as SHA-256 hashes, HttpOnly/SameSite=Strict cookies, and 30-day session expiry.
 - Rate-limited setup and login endpoints, plus session inspection and logout.
-- Authenticated device inventory and one-time, 8-digit pairing codes (10-minute expiry).
+- Authenticated device inventory and one-time, 12-digit pairing codes (10-minute expiry).
 - Single-use receiver pairing that returns a device ID and one-time device credential; only a hash of the credential is stored.
 - Bearer-authenticated receiver heartbeats and derived online/stale/offline state.
 - Configurable bind address and port, TLS-enforced non-loopback binding, security response headers, health endpoint, and graceful shutdown.
