@@ -291,3 +291,8 @@ h1 { margin-bottom: 7px; color: #202329; font: 700 27px/1.2 'Manrope', sans-seri
   .pairing-code-row code { font-size: 22px; }
   .pairing-foot { flex-direction: column; }
 }
+
+.device-last-seen { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.device-revoke-button { min-height: 26px; padding: 4px 8px; font-size: 8px; }
+.device-credential-active { color: #4b8b70 !important; }
+.device-credential-revoked { color: #b45b5b !important; }
