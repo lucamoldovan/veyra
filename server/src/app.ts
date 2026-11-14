@@ -26,11 +26,15 @@ interface LoginBody {
 
 function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key: string | null; path: string | null; generated: boolean } {
   const operatorCount = database.prepare("SELECT COUNT(*) AS count FROM operators").get() as { count: number };
-  if (operatorCount.count > 0) return { key: null, path: null, generated: false };
+  const setupKeyPath = resolve(options.setupKeyPath ?? process.env.VEYRA_SETUP_KEY_PATH ?? "data/setup-key");
+
+  if (operatorCount.count > 0) {
+    if (!options.setupKey) rmSync(setupKeyPath, { force: true });
+    return { key: null, path: null, generated: false };
+  }
 
   if (options.setupKey) return { key: options.setupKey, path: null, generated: false };
 
-  const setupKeyPath = resolve(options.setupKeyPath ?? process.env.VEYRA_SETUP_KEY_PATH ?? "data/setup-key");
   mkdirSync(dirname(setupKeyPath), { recursive: true });
 
   if (existsSync(setupKeyPath)) {
@@ -175,6 +179,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const body = request.body ?? {};
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    if (password.length === 0 || password.length > 256) {
+      return reply.code(400).send({ error: "Password must be between 1 and 256 characters" });
+    }
 
     const operator = database.prepare("SELECT id, username, password_hash FROM operators WHERE username = ?")
       .get(username) as { id: string; username: string; password_hash: string } | undefined;
