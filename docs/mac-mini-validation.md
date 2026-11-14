@@ -93,7 +93,7 @@ Start a known NDI sender on the same wired LAN. Confirm both machines are on the
 
 Record the exact source name and address. Prefer the address in `config/veyra.example.json` and create a local configuration file. Do not commit site-specific source names or addresses.
 
-## 7. Configure receiver pairing and heartbeats
+## 7. Configure receiver pairing, synchronization, and fallback
 
 The receiver includes a control-plane client for one-time pairing and periodic heartbeats. It is independent of NDI playback: if the local server is unavailable, playback continues and the client retries with bounded backoff.
 
@@ -133,15 +133,19 @@ If an operator revokes the receiver credential, stop Veyra, remove the local `de
 
 ## 8. Test playback in a controlled sequence
 
-Start windowed or on a spare display first if the current configuration allows it. Then test:
+Before testing outages, assign an NDI source and a fallback playlist to the receiver in the dashboard. Wait until the receiver logs a successful sync and confirm the cache exists under `~/.local/state/veyra/cache`. Start windowed or on a spare display first if the current configuration allows it. Then test:
 
-1. Stable 1080p30 video for at least 30 minutes.
-2. Source stop and restart.
-3. Ethernet disconnect and reconnect.
-4. Sender application restart.
-5. Display sleep/wake and XFCE session restart.
-6. Veyra process termination and systemd restart.
-7. A sustained 24-hour run only after the shorter tests are clean.
+1. Stable 1080p30 NDI video for at least 30 minutes.
+2. Stop the assigned NDI sender; verify the receiver switches to the cached image playlist and respects each image duration.
+3. Restart the sender; verify NDI video automatically resumes without restarting Veyra.
+4. Stop the local Veyra server while NDI is playing; verify playback continues.
+5. With the server still stopped, stop the NDI sender; verify the cached fallback still plays.
+6. Restart the receiver while the server is unavailable; verify it loads its last verified cache and can display fallback.
+7. Restart the server, change the assigned playlist, and verify the receiver activates the new playlist only after its assets have downloaded and passed hash verification.
+8. Ethernet disconnect and reconnect; sender application restart.
+9. Display sleep/wake and XFCE session restart.
+10. Veyra process termination and systemd restart.
+11. A sustained 24-hour run only after the shorter tests are clean.
 
 For each test, record whether the image freezes, turns black, recovers automatically, or needs a process restart. Record CPU and memory usage:
 
@@ -166,7 +170,7 @@ The initial deployment depends on an active graphical session. Unattended startu
 
 ## 10. Server and receiver pairing status
 
-The server can issue one-time pairing codes, register devices, and accept authenticated heartbeats. The C++ receiver now implements pairing, TLS-verified heartbeats, source snapshots, versioned configuration polling, SHA-256-verified media synchronization, persistent cache loading, and timed image fallback. The complete native player still requires a real NDI SDK build and physical validation.
+The server can issue one-time pairing codes, register devices, accept authenticated heartbeats, and provide per-device assignments and assigned media. The C++ receiver now implements pairing, TLS-verified heartbeats, source snapshots, versioned configuration polling on an independent worker, SHA-256-verified media synchronization, persistent cache loading, cancellable downloads, and timed image fallback. The complete native player still requires a real NDI SDK build and physical validation.
 
 Do not expose the server on the LAN until its certificate is trusted by the receiver and the actual player build has been tested. The non-loopback TLS guard is intentional; do not disable it or send bearer credentials over plaintext HTTP.
 
