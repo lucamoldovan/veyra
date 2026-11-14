@@ -1,6 +1,6 @@
 # Debian 13 kiosk installation
 
-This deployment layer configures a dedicated LightDM/Xorg session that automatically starts Veyra after boot. It does not install the proprietary NDI SDK or build the player.
+This deployment layer configures a dedicated LightDM/Xorg session that automatically starts NDIView after boot. It does not install the proprietary NDI SDK or build the player.
 
 ## Before installing
 
@@ -14,7 +14,7 @@ This deployment layer configures a dedicated LightDM/Xorg session that automatic
    cmake --build build --parallel
    sudo cmake --install build
    \`\`\`
-6. Confirm \`/usr/local/bin/veyra --list-sources\` sees the expected sender.
+6. Confirm \`/usr/local/bin/ndiview --list-sources\` sees the expected sender.
 
 ## Install
 
@@ -24,7 +24,7 @@ Run from the repository root:
 sudo bash scripts/install-kiosk-debian.sh
 \`\`\`
 
-The installer requires Debian 13, creates the unprivileged \`veyra-kiosk\` account (video/render groups only), installs LightDM/Xorg, and configures automatic login into a minimal Veyra X session. It preserves an existing \`/etc/veyra/config.json\`; if absent, it installs the example. The Veyra dashboard's operator authentication is unchanged.
+The installer requires Debian 13, creates the unprivileged \`veyra-kiosk\` account (video/render groups only), installs LightDM/Xorg, and configures automatic login into a minimal NDIView X session. It preserves an existing \`/etc/ndiview/config.json\`; if absent, it installs the example. The NDIView dashboard's operator authentication is unchanged.
 
 ## Configure
 
@@ -36,9 +36,9 @@ Edit \`/etc/veyra/config.json\` as an administrator. Keep it owned by \`root:vey
 sudo reboot
 \`\`\`
 
-Expected: Debian boots, LightDM logs into \`veyra-kiosk\`, the session disables X11 blanking/DPMS and blocks idle/sleep, then starts the systemd user service. Veyra's SDL renderer already requests fullscreen.
+Expected: Debian boots, LightDM logs into \`veyra-kiosk\`, the session disables X11 blanking/DPMS and blocks idle/sleep, then starts the systemd user service. NDIView's SDL renderer already requests fullscreen.
 
-Maintenance: press Ctrl+Alt+F3 and sign in with an administrator account. Inspect boot logs with \`journalctl -b | grep -i veyra\`. The service uses bounded restart behavior (five starts per minute) to avoid an infinite crash loop.
+Maintenance: press Ctrl+Alt+F3 and sign in with an administrator account. Inspect boot logs with \`journalctl -b | grep -i ndiview\`. The service uses bounded restart behavior (five starts per minute) to avoid an infinite crash loop.
 
 ## Uninstall
 
@@ -46,7 +46,7 @@ Maintenance: press Ctrl+Alt+F3 and sign in with an administrator account. Inspec
 sudo bash scripts/uninstall-kiosk-debian.sh
 \`\`\`
 
-This removes only Veyra's LightDM session and service file. It preserves configuration, credentials, cache and the kiosk account. Select/enable another display manager before reboot.
+This removes only NDIView's LightDM session and service file. It preserves configuration, credentials, cache and the kiosk account. Select/enable another display manager before reboot.
 
 ## Required physical validation
 
