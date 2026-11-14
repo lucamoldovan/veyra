@@ -56,7 +56,11 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Create the initial TypeScript/Fastify server workspace and development scripts
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
-- [ ] Implement local authentication and session handling
+- [x] Add SQLite database initialization with WAL and foreign keys
+- [x] Implement first-run administrator setup with a one-time setup key
+- [x] Implement scrypt password hashing and opaque database-backed sessions
+- [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
+- [x] Add setup, login, session inspection, and logout tests
 - [ ] Implement device registration and stable device identity
 - [ ] Implement heartbeat ingestion and online/offline state
 - [ ] Implement source inventory and per-device source assignment
@@ -73,8 +77,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add overview, Devices, NDI Sources, Media Library, Playlists, and System pages
 - [x] Connect live server health indicator to the local API
 - [x] Add dashboard TypeScript and production build to GitHub Actions
-- [ ] Create the dashboard workspace and shared API types
-- [ ] Implement login and session handling
+- [x] Create shared API types and client helpers
+- [x] Implement first-run setup, login, session persistence, and logout
 - [ ] Implement device overview and live status
 - [ ] Implement NDI source inventory and assignment
 - [ ] Implement media library and uploads
