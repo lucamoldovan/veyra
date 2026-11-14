@@ -9,7 +9,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Local configuration loading and validation
 - [x] Structured logging
 - [x] Clean startup/shutdown path
-- [x] SDK-independent configuration tests in GitHub Actions\n- [x] Compile the SDL renderer independently of the proprietary NDI SDK in CI
+- [x] SDK-independent configuration tests in GitHub Actions
+- [x] Compile the SDL renderer independently of the proprietary NDI SDK in CI
 
 ## Phase 2 — NDI discovery and receiving
 
@@ -56,7 +57,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 
 - [x] Create the initial TypeScript/Fastify server workspace and development scripts
 - [x] Add versioned health endpoint and graceful shutdown
-- [x] Add server type-check/build and endpoint tests to GitHub Actions\n- [x] Commit npm lockfiles and use reproducible npm ci installs in CI
+- [x] Add server type-check/build and endpoint tests to GitHub Actions
+- [x] Commit npm lockfiles and use reproducible npm ci installs in CI
 - [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 2
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
@@ -111,7 +113,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 
 ## Phase 8 — Integration and deployment
 
-- [x] Add a target Mac mini build and validation checklist\n- [ ] Build a repeatable local development environment
+- [x] Add a target Mac mini build and validation checklist
+- [ ] Build a repeatable local development environment
 - [ ] Package the server and dashboard for local-network deployment
 - [ ] Package and install the receiver as a managed service
 - [ ] Provide backup and restore for server configuration and media
