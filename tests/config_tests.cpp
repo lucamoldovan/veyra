@@ -51,6 +51,9 @@ int main() {
     check(defaults.display.targetFps == 30, "missing config uses 30 FPS");
     check(defaults.display.fullscreen, "fullscreen defaults to true");
     check(defaults.display.vsync, "vsync defaults to true");
+    check(defaults.controlPlane.serverUrl.empty(), "control-plane integration is disabled by default");
+    check(defaults.controlPlane.heartbeatIntervalSeconds == 15, "heartbeat defaults to 15 seconds");
+    check(defaults.controlPlane.credentialPath.is_absolute(), "default device credential path expands to an absolute home path");
 
     writeFile(
         configPath,
@@ -98,6 +101,55 @@ int main() {
     check(
         throws([&] { (void)veyra::config::load(configPath); }),
         "rejects an output frame rate above 120 FPS"
+    );
+
+
+    writeFile(
+        configPath,
+        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://veyra.local:8787","deviceName":"Lobby Display","pairingCode":"123456789012","caCertificatePath":"/etc/veyra/ca.pem","credentialPath":"/var/lib/veyra/device-token","heartbeatIntervalSeconds":20}})"
+    );
+    const controlPlane = veyra::config::load(configPath).controlPlane;
+    check(controlPlane.serverUrl == "https://veyra.local:8787", "loads HTTPS control-plane URL");
+    check(controlPlane.deviceName == "Lobby Display", "loads receiver device name");
+    check(controlPlane.pairingCode == "123456789012", "loads a twelve-digit pairing code");
+    check(controlPlane.caCertificatePath == "/etc/veyra/ca.pem", "loads custom CA certificate path");
+    check(controlPlane.credentialPath == "/var/lib/veyra/device-token", "loads device credential path");
+    check(controlPlane.heartbeatIntervalSeconds == 20, "loads heartbeat interval");
+
+    writeFile(
+        configPath,
+        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"http://127.0.0.1:8787"}})"
+    );
+    check(
+        veyra::config::load(configPath).controlPlane.serverUrl == "http://127.0.0.1:8787",
+        "allows plain HTTP only for loopback development"
+    );
+
+    writeFile(
+        configPath,
+        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"http://192.168.1.10:8787"}})"
+    );
+    check(
+        throws([&] { (void)veyra::config::load(configPath); }),
+        "rejects plain HTTP to a LAN host"
+    );
+
+    writeFile(
+        configPath,
+        R"({"schemaVersion":1,"controlPlane":{"pairingCode":"1234"}})"
+    );
+    check(
+        throws([&] { (void)veyra::config::load(configPath); }),
+        "rejects pairing codes that are not exactly twelve digits"
+    );
+
+    writeFile(
+        configPath,
+        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://operator:secret@veyra.local"}})"
+    );
+    check(
+        throws([&] { (void)veyra::config::load(configPath); }),
+        "rejects credentials embedded in the control-plane URL"
     );
 
     writeFile(
