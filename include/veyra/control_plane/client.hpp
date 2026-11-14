@@ -65,6 +65,7 @@ private:
     std::string deviceToken_;
     std::string deviceId_;
     int heartbeatIntervalSeconds_{15};
+    std::uint64_t syncGeneration_{0};
     std::chrono::steady_clock::time_point startedAt_;
     std::mutex snapshotMutex_;
     PlaybackSnapshot snapshot_;
