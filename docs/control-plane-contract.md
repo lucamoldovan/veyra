@@ -40,7 +40,9 @@ Implemented endpoints:
 | POST | `/api/v1/auth/session` | Create an operator session |
 | DELETE | `/api/v1/auth/session` | End the current operator session |
 | GET | `/api/v1/devices` | List registered receivers and their reported state (authenticated operator only) |
-| POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |\n| POST | `/api/v1/devices/{deviceId}/revoke` | Revoke a receiver credential (authenticated operator only) |\n| DELETE | `/api/v1/devices/{deviceId}` | Remove a receiver record after its credential has been revoked (authenticated operator only) |
+| POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |
+| POST | `/api/v1/devices/{deviceId}/revoke` | Revoke a receiver credential (authenticated operator only) |
+| DELETE | `/api/v1/devices/{deviceId}` | Remove a receiver record after its credential has been revoked (authenticated operator only) |
 
 Remaining planned management endpoints:
 
