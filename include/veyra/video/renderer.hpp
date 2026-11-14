@@ -51,6 +51,7 @@ private:
     int imageWidth_{0};
     int imageHeight_{0};
     bool imageInitialized_{false};
+    bool imageNeedsPresentation_{true};
     int textureWidth_{0};
     int textureHeight_{0};
     Uint32 textureFormat_{SDL_PIXELFORMAT_UNKNOWN};
