@@ -4,8 +4,10 @@
 #include "veyra/video/frame.hpp"
 
 #include <SDL.h>
+#include <SDL_image.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <vector>
 
 namespace veyra::video {
@@ -23,6 +25,7 @@ public:
 
     [[nodiscard]] bool pollEvents();
     void present(const VideoFrame& frame);
+    void presentImage(const std::filesystem::path& path);
     void clear();
 
 private:
@@ -43,6 +46,11 @@ private:
     SDL_Window* window_{nullptr};
     SDL_Renderer* renderer_{nullptr};
     SDL_Texture* texture_{nullptr};
+    SDL_Texture* imageTexture_{nullptr};
+    std::filesystem::path imagePath_;
+    int imageWidth_{0};
+    int imageHeight_{0};
+    bool imageInitialized_{false};
     int textureWidth_{0};
     int textureHeight_{0};
     Uint32 textureFormat_{SDL_PIXELFORMAT_UNKNOWN};
