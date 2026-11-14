@@ -76,6 +76,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Implement playlist CRUD, ordered items, and validated display durations
 - [x] Implement per-device fallback playlist assignment API
 - [x] Implement versioned configuration and assigned-media manifest endpoints
+- [x] Keep heartbeat reporting independent from large media downloads and cancel sync on shutdown
 - [ ] Implement live WebSocket events and narrowly scoped remote commands
 - [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, credential revocation, media uploads, playlist editing, and backups
 - [x] Add a populated legacy database migration test
