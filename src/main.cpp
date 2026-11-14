@@ -171,7 +171,7 @@ int main(int argc, char* argv[]) {
                 const auto sources = discovery.currentSources();
                 const bool automaticSelectionReady =
                     std::chrono::steady_clock::now() - discoveryStartedAt >=
-                    std::chrono::seconds(3);
+                    std::chrono::seconds(5);
                 const auto selected = selectSource(
                     sources,
                     config.ndi,
