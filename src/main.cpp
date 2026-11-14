@@ -175,6 +175,7 @@ int main(int argc, char* argv[]) {
         auto fallbackSlideStartedAt = std::chrono::steady_clock::now();
         int appliedConfigVersion = -1;
         int appliedPlaylistRevision = -1;
+        std::uint64_t appliedSyncGeneration = 0;
         std::string appliedFallbackSignature;
         veyra::config::NdiConfig activeNdiConfig = config.ndi;
         std::vector<veyra::control_plane::CachedMediaItem> fallbackItems;
@@ -270,11 +271,14 @@ int main(int argc, char* argv[]) {
                     fallbackSignature += std::to_string(item.durationSeconds);
                     fallbackSignature.push_back('\0');
                 }
+                const bool repairedFallbackCache =
+                    synchronized.syncGeneration != appliedSyncGeneration &&
+                    fallbackItems.size() != synchronized.fallbackItems.size();
                 if (synchronized.hasValidCachedState &&
                     (synchronized.configVersion != appliedConfigVersion ||
                      synchronized.playlistRevision != appliedPlaylistRevision ||
                      fallbackSignature != appliedFallbackSignature ||
-                     fallbackItems.size() != synchronized.fallbackItems.size())) {
+                     repairedFallbackCache)) {
                     const bool sourceChanged =
                         activeNdiConfig.sourceName != synchronized.ndiSourceName ||
                         activeNdiConfig.sourceAddress != synchronized.ndiSourceAddress;
@@ -285,6 +289,7 @@ int main(int argc, char* argv[]) {
                     fallbackVisible = false;
                     appliedConfigVersion = synchronized.configVersion;
                     appliedPlaylistRevision = synchronized.playlistRevision;
+                    appliedSyncGeneration = synchronized.syncGeneration;
                     appliedFallbackSignature = std::move(fallbackSignature);
                     spdlog::info("Applied receiver config v{} and {} cached fallback image(s)",
                                  appliedConfigVersion, fallbackItems.size());
