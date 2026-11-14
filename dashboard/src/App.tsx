@@ -416,6 +416,38 @@ function Overview({
   lastChecked: Date | null;
   onNavigate: (page: Page) => void;
 }) {
+  const [deviceCount, setDeviceCount] = useState<number | null>(null);
+  const [onlineCount, setOnlineCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let controller: AbortController | null = null;
+
+    const refreshDevices = async () => {
+      controller?.abort();
+      const currentController = new AbortController();
+      controller = currentController;
+      try {
+        const result = await getDevices(currentController.signal);
+        if (!active) return;
+        setDeviceCount(result.devices.length);
+        setOnlineCount(result.devices.filter((device) => device.status === "online").length);
+      } catch {
+        if (!active || currentController.signal.aborted) return;
+        setDeviceCount(null);
+        setOnlineCount(null);
+      }
+    };
+
+    void refreshDevices();
+    const interval = window.setInterval(() => void refreshDevices(), 15000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      controller?.abort();
+    };
+  }, []);
+
   return (
     <>
       <section className="page-heading">
@@ -430,8 +462,8 @@ function Overview({
       </section>
 
       <section className="stat-grid" aria-label="Network summary">
-        <StatCard label="Total devices" value="0" detail="No receivers registered" icon={Monitor} />
-        <StatCard label="Online now" value="0" detail="Waiting for first receiver" icon={Wifi} />
+        <StatCard label="Total devices" value={deviceCount === null ? "—" : String(deviceCount)} detail={deviceCount === null ? "Device status unavailable" : deviceCount === 0 ? "No receivers registered" : "Registered receivers"} icon={Monitor} />
+        <StatCard label="Online now" value={onlineCount === null ? "—" : String(onlineCount)} detail={onlineCount === null ? "Device status unavailable" : "Reporting a recent heartbeat"} icon={Wifi} />
         <StatCard label="NDI sources" value="—" detail="Source discovery not connected" icon={Radio} />
         <StatCard label="Media assets" value="0" detail="Your library is empty" icon={Image} />
       </section>
@@ -459,7 +491,7 @@ function Overview({
             <div className="network-node network-node-receivers">
               <div className="network-node-icon receiver-icon"><MonitorPlay size={22} /></div>
               <div><strong>Receivers</strong><span>Waiting for devices to pair</span></div>
-              <span className="node-count">0</span>
+              <span className="node-count">{deviceCount === null ? "—" : deviceCount}</span>
             </div>
           </div>
 
@@ -773,15 +805,15 @@ function SystemPage({
         <div className="panel system-card">
           <div className="system-card-icon"><Wifi size={19} /></div>
           <div className="system-card-label">RECEIVER NETWORK</div>
-          <h2>Not connected</h2>
-          <p>Device registration and heartbeat monitoring are not implemented yet.</p>
-          <div className="system-card-foot"><span className="status-dot dot-pending" />Awaiting first receiver</div>
+          <h2>Awaiting receiver client</h2>
+          <p>Server-side pairing and heartbeat APIs are ready. The native receiver client still needs to be connected.</p>
+          <div className="system-card-foot"><span className="status-dot dot-pending" />Server APIs ready · receiver integration pending</div>
         </div>
         <div className="panel system-card">
           <div className="system-card-icon"><ShieldCheck size={19} /></div>
           <div className="system-card-label">SECURITY</div>
           <h2>Operator authentication</h2>
-          <p>First-run setup keys, scrypt password hashes and HttpOnly sessions are implemented.</p>
+          <p>First-run setup keys, scrypt password hashes and HttpOnly sessions are implemented. Non-loopback binding requires TLS.</p>
           <div className="system-card-foot"><span className="status-dot dot-pending" />LAN access disabled by default</div>
         </div>
       </section>
