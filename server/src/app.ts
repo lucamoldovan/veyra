@@ -760,7 +760,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
              (SELECT c.id FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_id,
              (SELECT c.status FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_status,
              (SELECT c.created_at FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_created_at,
-             (SELECT c.result_message FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_message
+             (SELECT c.result_message FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_message,
+             (SELECT c.id FROM device_commands c WHERE c.device_id=d.id AND c.command_type='reboot' ORDER BY c.created_at DESC LIMIT 1) AS reboot_command_id,
+             (SELECT c.status FROM device_commands c WHERE c.device_id=d.id AND c.command_type='reboot' ORDER BY c.created_at DESC LIMIT 1) AS reboot_command_status,
+             (SELECT c.created_at FROM device_commands c WHERE c.device_id=d.id AND c.command_type='reboot' ORDER BY c.created_at DESC LIMIT 1) AS reboot_command_created_at,
+             (SELECT c.result_message FROM device_commands c WHERE c.device_id=d.id AND c.command_type='reboot' ORDER BY c.created_at DESC LIMIT 1) AS reboot_command_message
       FROM devices d
       ORDER BY d.name COLLATE NOCASE ASC
     `).all() as Array<{
@@ -783,6 +787,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       restart_command_status: string | null;
       restart_command_created_at: string | null;
       restart_command_message: string | null;
+      reboot_command_id: string | null;
+      reboot_command_status: string | null;
+      reboot_command_created_at: string | null;
+      reboot_command_message: string | null;
     }>;
 
     const now = Date.now();
@@ -812,6 +820,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           assignedNdiSourceAddress: device.assigned_ndi_source_address,
           fallbackPlaylistId: device.fallback_playlist_id,
           restartCommand: device.restart_command_id ? { id: device.restart_command_id, status: device.restart_command_status, createdAt: device.restart_command_created_at, message: device.restart_command_message } : null,
+          rebootCommand: device.reboot_command_id ? { id: device.reboot_command_id, status: device.reboot_command_status, createdAt: device.reboot_command_created_at, message: device.reboot_command_message } : null,
         };
       }),
     };
