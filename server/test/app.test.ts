@@ -628,6 +628,24 @@ test("pairing secret is generated with restrictive permissions and remains stabl
   }
 });
 
+test("database files and containing directory are private", () => {
+  const directory = mkdtempSync(join(tmpdir(), "veyra-private-db-"));
+  const databaseDirectory = join(directory, "private-data");
+  const databasePath = join(databaseDirectory, "veyra.sqlite");
+
+  try {
+    const database = openDatabase(databasePath);
+    try {
+      assert.equal(statSync(databaseDirectory).mode & 0o777, 0o700);
+      assert.equal(statSync(databasePath).mode & 0o777, 0o600);
+    } finally {
+      database.close();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("database initializes a versioned schema", () => {
   const database = openDatabase(":memory:");
 
