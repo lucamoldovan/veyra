@@ -976,13 +976,34 @@ test("receiver action timeout uses claim time even when the receiver keeps heart
     await app.close();
     const database = openDatabase(databasePath);
     try {
-      const old = new Date(Date.now() - 240_000).toISOString();
-      database.prepare("UPDATE device_commands SET created_at = ?, claimed_at = ? WHERE id = ?")
-        .run(old, old, commandId);
-      database.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?")
-        .run(new Date().toISOString(), credentials.deviceId);
+      database.prepare("UPDATE device_commands SET expires_at = ? WHERE id = ?")
+        .run(new Date(Date.now() - 1_000).toISOString(), commandId);
     } finally {
       database.close();
+    }
+
+    app = buildApp({
+      databasePath,
+      setupKey: "test-setup-key",
+      pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
+    });
+    const overlappingRequest = await app.inject({
+      method: "POST",
+      url: "/api/v1/devices/" + credentials.deviceId + "/reboot",
+      headers: { cookie },
+    });
+    assert.equal(overlappingRequest.statusCode, 409);
+
+    await app.close();
+    const timeoutDatabase = openDatabase(databasePath);
+    try {
+      const old = new Date(Date.now() - 240_000).toISOString();
+      timeoutDatabase.prepare("UPDATE device_commands SET created_at = ?, claimed_at = ? WHERE id = ?")
+        .run(old, old, commandId);
+      timeoutDatabase.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?")
+        .run(new Date().toISOString(), credentials.deviceId);
+    } finally {
+      timeoutDatabase.close();
     }
 
     app = buildApp({
