@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
@@ -67,7 +67,7 @@ function getSessionOperator(database: VeyraDatabase, token: string | undefined):
   return { id: row.id, username: row.username };
 }
 
-function setSessionCookie(reply: Parameters<Parameters<FastifyInstance["post"]>[1]>[1], token: string): void {
+function setSessionCookie(reply: FastifyReply, token: string): void {
   reply.setCookie(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.VEYRA_COOKIE_SECURE === "true",
@@ -136,9 +136,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const passwordHash = await hashPassword(password);
 
     try {
-      database.prepare("INSERT INTO operators (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)")
-        .run(operatorId, username, passwordHash, createdAt);
+      const createOperator = database.transaction(() => {
+        const currentCount = database.prepare("SELECT COUNT(*) AS count FROM operators").get() as { count: number };
+        if (currentCount.count > 0) throw new Error("SETUP_ALREADY_COMPLETED");
+        database.prepare("INSERT INTO operators (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)")
+          .run(operatorId, username, passwordHash, createdAt);
+      });
+      createOperator();
     } catch (error) {
+      if (error instanceof Error && error.message === "SETUP_ALREADY_COMPLETED") {
+        return reply.code(409).send({ error: "Initial setup has already been completed" });
+      }
       request.log.error(error, "Could not create initial Veyra operator");
       return reply.code(409).send({ error: "Initial setup could not be completed" });
     }
