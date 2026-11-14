@@ -45,7 +45,7 @@ npm run backup -- /path/to/secure-backup-directory
 
 The command uses SQLite's online backup API and copies the pairing secret alongside the database. It creates owner-only backup files and a small manifest. Store the backup directory somewhere protected; the pairing secret is sensitive and must not be published or committed.
 
-To restore, stop the Veyra server first, then restore the database file to `VEYRA_DATABASE_PATH` and the matching pairing-secret file to `VEYRA_PAIRING_SECRET_PATH`. Keep the database and pairing secret from the same backup together. The current backup utility covers the server database and pairing secret; once media storage is implemented, media assets will need to be included in the backup set as well.
+To restore, stop the Veyra server first, then restore the database file to `VEYRA_DATABASE_PATH` and the matching pairing-secret file to `VEYRA_PAIRING_SECRET_PATH`. Keep the database and pairing secret from the same backup together. The backup utility includes the server database, matching pairing secret, and the local media directory. Restore all three from the same backup set.
 
 ## Configuration
 
@@ -56,7 +56,7 @@ To restore, stop the Veyra server first, then restore the database file to `VEYR
 | `LOG_LEVEL` | `info` | Fastify/Pino log level |
 | `VEYRA_DATABASE_PATH` | `data/veyra.sqlite` | SQLite database path |
 | `VEYRA_SETUP_KEY_PATH` | `data/setup-key` | First-run setup key file |
-| `VEYRA_PAIRING_SECRET_PATH` | `data/pairing-secret` | Secret key used to HMAC pairing-code verifiers; back up securely with the database |
+| `VEYRA_PAIRING_SECRET_PATH` | `data/pairing-secret` | Secret key used to HMAC pairing-code verifiers; back up securely with the database |\n| `VEYRA_MEDIA_DIRECTORY` | `data/media` | Local image asset directory |
 | `VEYRA_TLS_CERT_PATH` | unset | PEM certificate path; required with the private key for non-loopback binds |
 | `VEYRA_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
 | `VEYRA_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
@@ -76,8 +76,8 @@ Implemented:
 - Single-use receiver pairing that returns a device ID and one-time device credential; only a hash of the credential is stored.
 - Bearer-authenticated receiver heartbeats and derived online/stale/offline state.
 - Operator-controlled device credential revocation and safe removal of revoked device records.
-- Transactional SQLite schema migrations through version 2, including a populated version-1 upgrade test.
+- Transactional SQLite schema migrations through version 3, including a populated version-1 upgrade test.\n- Authenticated local image uploads for PNG, JPEG, and WebP, with content-signature checks, a 20 MB limit, SHA-256 metadata, and owner-only file storage.\n- Authenticated media listing, inline content delivery, and safe deletion blocked while a playlist references the asset.\n- Playlist CRUD with ordered image items and validated per-item display durations from 1 to 3600 seconds.
 - Configurable bind address and port, TLS-enforced non-loopback binding, security response headers, health endpoint, and graceful shutdown.
 - Automated server build and API tests in GitHub Actions.
 
-Not implemented yet: the native receiver enrollment/heartbeat client, source inventory, WebSocket events, media storage, playlists, remote commands, and production dashboard serving.
+Not implemented yet: the native receiver enrollment/heartbeat client, source inventory, WebSocket events, device playlist assignment, remote commands, and production dashboard serving.
