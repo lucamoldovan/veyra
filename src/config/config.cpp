@@ -81,7 +81,7 @@ int readInteger(
 std::filesystem::path expandHome(const std::string& value) {
     if (value == "~" || value.starts_with("~/")) {
         const char* home = std::getenv("HOME");
-        if (home == nullptr || *home == '\\0') {
+        if (home == nullptr || *home == '\0') {
             throw std::runtime_error("HOME is not set; configure an absolute credentialPath");
         }
         if (value == "~") return std::filesystem::path(home);
