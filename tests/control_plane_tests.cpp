@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
@@ -101,7 +102,7 @@ int main() {
     std::mutex requestsMutex;
     std::condition_variable requestsChanged;
     std::vector<std::string> requests;
-    bool serverFailed = false;
+    std::atomic_bool serverFailed{false};
     const std::string token(43, 't');
 
     std::thread mockServer([&] {
