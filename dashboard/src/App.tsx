@@ -489,7 +489,7 @@ function Overview({
             <div className="network-connector"><span /></div>
             <div className="network-node network-node-receivers">
               <div className="network-node-icon receiver-icon"><MonitorPlay size={22} /></div>
-              <div><strong>Receivers</strong><span>Waiting for devices to pair</span></div>
+              <div><strong>Receivers</strong><span>{deviceCount === 0 ? "Waiting for devices to pair" : `${deviceCount} registered receiver${deviceCount === 1 ? "" : "s"}`}</span></div>
               <span className="node-count">{deviceCount === null ? "—" : deviceCount}</span>
             </div>
           </div>
@@ -503,8 +503,8 @@ function Overview({
         <div className="panel setup-panel">
           <div className="setup-topline"><span className="setup-kicker">GETTING STARTED</span><span className="setup-step">01 / 04</span></div>
           <div className="setup-icon"><Network size={22} /></div>
-          <h2>Let's get your network connected.</h2>
-          <p>Veyra is ready for its first receiver. Once paired, you'll be able to manage its source, playback and fallback right here.</p>
+          <h2>{deviceCount === null ? "Checking your network." : deviceCount === 0 ? "Let's get your network connected." : "Your receivers are registered."}</h2>
+          <p>{deviceCount === null ? "Device inventory is temporarily unavailable. Check the server connection and try again." : deviceCount === 0 ? "Veyra is ready for its first receiver. Generate a pairing code to begin enrollment." : "Your devices are registered. Receiver-side enrollment and playback reporting are the next integration steps."}</p>
           <div className="setup-progress"><span /></div>
           <div className="setup-progress-label"><span>Platform setup</span><strong>Just getting started</strong></div>
           <button className="button button-dark button-full" onClick={() => onNavigate("devices")}>
@@ -521,8 +521,8 @@ function Overview({
           </div>
           <div className="empty-table">
             <div className="empty-icon"><Monitor size={20} /></div>
-            <strong>No devices yet</strong>
-            <span>Paired receivers will appear here with their live playback status.</span>
+            <strong>{deviceCount === null ? "Device inventory unavailable" : deviceCount === 0 ? "No devices yet" : `${deviceCount} receiver${deviceCount === 1 ? "" : "s"} registered`}</strong>
+            <span>{deviceCount === null ? "The dashboard could not retrieve the protected device inventory." : deviceCount === 0 ? "Paired receivers will appear here with their live playback status." : "Open Devices to inspect receiver status, playback mode and last heartbeat."}</span>
           </div>
         </div>
 
