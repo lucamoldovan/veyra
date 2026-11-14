@@ -104,6 +104,13 @@ function detectImageMime(buffer: Buffer): "image/png" | "image/jpeg" | "image/we
   return null;
 }
 
+function stripControlCharacters(value: string): string {
+  return [...value].filter((character) => {
+    const code = character.charCodeAt(0);
+    return code >= 0x20 && code !== 0x7f;
+  }).join("");
+}
+
 function safeDisplayName(rawName: string | undefined): string {
   let decoded = "";
   if (rawName) {
