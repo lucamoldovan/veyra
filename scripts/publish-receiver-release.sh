@@ -10,6 +10,8 @@ MANIFEST="$(realpath "$2")"
 SIGNATURE="$(realpath "$3")"
 PUBLIC_KEY="${NDIVIEW_RELEASE_VERIFY_KEY:-/etc/ndiview/receiver-release-signing.pub}"
 STORE_ROOT="${NDIVIEW_RECEIVER_RELEASES_DIR:-/var/lib/veyra/server/receiver-releases}"
+MAX_ARTIFACT_BYTES="${NDIVIEW_MAX_RECEIVER_ARTIFACT_BYTES:-104857600}"
+if [[ ! "$MAX_ARTIFACT_BYTES" =~ ^[0-9]+$ ]]; then echo "Invalid maximum receiver artifact size." >&2; exit 2; fi
 
 for file in "$ARCHIVE" "$MANIFEST" "$SIGNATURE" "$PUBLIC_KEY"; do
   [[ -f "$file" && ! -L "$file" ]] || { echo "Required release input is missing or is not a regular file: $file" >&2; exit 1; }
@@ -20,6 +22,7 @@ done
 
 openssl pkeyutl -verify -rawin -pubin -inkey "$PUBLIC_KEY" -sigfile "$SIGNATURE" -in "$MANIFEST" >/dev/null
 
+export MAX_ARTIFACT_BYTES
 mapfile -t META < <(python3 - "$MANIFEST" "$ARCHIVE" <<'PY'
 import json
 import os
@@ -44,6 +47,8 @@ if not re.fullmatch(r"[a-fA-F0-9]{64}", value.get("artifactSha256", "")):
     raise SystemExit("Invalid artifact SHA-256")
 if not isinstance(value.get("artifactSizeBytes"), int) or value["artifactSizeBytes"] <= 0:
     raise SystemExit("Invalid artifact size")
+if value["artifactSizeBytes"] > int(os.environ.get("MAX_ARTIFACT_BYTES", "104857600")):
+    raise SystemExit("Receiver artifact exceeds the configured size limit")
 if not isinstance(value.get("configSchemaVersion"), int) or value["configSchemaVersion"] < 1:
     raise SystemExit("Invalid config schema version")
 print(version)
@@ -98,7 +103,12 @@ if not seen_binary:
     raise SystemExit("Archive does not contain bin/ndiview")
 PY
 
-mkdir -p "$STORE_ROOT/$VERSION"
+STORE_ROOT="$(realpath -m "$STORE_ROOT")"
+mkdir -p "$STORE_ROOT"
+if [[ -L "$STORE_ROOT" ]]; then
+  echo "Receiver release store must not be a symlink." >&2
+  exit 1
+fi
 VERSION_DIR="$STORE_ROOT/$VERSION"
 if [[ -L "$VERSION_DIR" ]]; then
   echo "Refusing to publish through a symlinked version directory." >&2
