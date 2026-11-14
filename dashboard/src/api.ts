@@ -141,3 +141,9 @@ export function revokeDeviceCredential(deviceId: string): Promise<{ revoked: tru
     method: "POST",
   });
 }
+
+export function removeRevokedDevice(deviceId: string): Promise<void> {
+  return request<void>(`/api/v1/devices/${encodeURIComponent(deviceId)}`, {
+    method: "DELETE",
+  });
+}
