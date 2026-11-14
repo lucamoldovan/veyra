@@ -184,7 +184,7 @@ export async function uploadMedia(file: File): Promise<MediaAsset> {
     method: "POST",
     headers: {
       "Content-Type": file.type,
-      "X-Veyra-Filename": encodeURIComponent(file.name),
+      "X-NDIView-Filename": encodeURIComponent(file.name),
       Accept: "application/json",
     },
     body: file,
