@@ -104,6 +104,8 @@ function setSessionCookie(reply: FastifyReply, token: string, secureCookies: boo
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const database = openDatabase(options.databasePath);
   const setup = readSetupKey(database, options);
+  const secureCookies = Boolean(options.https) || options.secureCookies === true ||
+    process.env.VEYRA_COOKIE_SECURE === "true";
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
@@ -191,7 +193,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
 
     const session = createSession(database, operatorId);
-    setSessionCookie(reply, session.token, options.secureCookies ?? process.env.VEYRA_COOKIE_SECURE === "true");
+    setSessionCookie(reply, session.token, secureCookies);
     return reply.code(201).send({ authenticated: true, operator: { id: operatorId, username } });
   });
 
