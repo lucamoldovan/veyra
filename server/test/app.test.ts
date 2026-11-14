@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -417,11 +417,14 @@ test("backup command creates a consistent database and pairing-secret backup", (
   const databasePath = join(directory, "source.sqlite");
   const pairingSecretPath = join(directory, "pairing-secret");
   const backupDirectory = join(directory, "backups");
+  const mediaDirectory = join(directory, "media");
 
   try {
     const source = openDatabase(databasePath);
     source.close();
     writeFileSync(pairingSecretPath, "a".repeat(64) + "\n", { mode: 0o600 });
+    mkdirSync(mediaDirectory, { mode: 0o700 });
+    writeFileSync(join(mediaDirectory, "asset.bin"), Buffer.from([1, 2, 3, 4]), { mode: 0o600 });
 
     const result = spawnSync(
       process.execPath,
@@ -433,6 +436,7 @@ test("backup command creates a consistent database and pairing-secret backup", (
           ...process.env,
           VEYRA_DATABASE_PATH: databasePath,
           VEYRA_PAIRING_SECRET_PATH: pairingSecretPath,
+          VEYRA_MEDIA_DIRECTORY: mediaDirectory,
         },
       },
     );
@@ -444,6 +448,9 @@ test("backup command creates a consistent database and pairing-secret backup", (
     const manifest = JSON.parse(readFileSync(join(backupDirectory, manifestName), "utf8")) as {
       databaseFile: string;
       pairingSecretFile: string;
+      mediaDirectory: string;
+      mediaFileCount: number;
+      mediaBytes: number;
     };
 
     const backupDatabase = openDatabase(join(backupDirectory, manifest.databaseFile));
@@ -458,6 +465,12 @@ test("backup command creates a consistent database and pairing-secret backup", (
     );
     assert.equal(statSync(join(backupDirectory, manifest.databaseFile)).mode & 0o777, 0o600);
     assert.equal(statSync(join(backupDirectory, manifest.pairingSecretFile)).mode & 0o777, 0o600);
+    assert.equal(manifest.mediaFileCount, 1);
+    assert.equal(manifest.mediaBytes, 4);
+    assert.deepEqual(
+      readFileSync(join(backupDirectory, manifest.mediaDirectory, "asset.bin")),
+      Buffer.from([1, 2, 3, 4]),
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
