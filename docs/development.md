@@ -118,7 +118,9 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Continue from the last verified local cache when the local server is unavailable
 - [x] Resume NDI automatically when the selected source returns
 - [x] Retry synchronization and apply the latest state after server connectivity returns
-- [ ] Test partial downloads, interrupted updates, stale commands, and version mismatches
+- [x] Test that a failed media download leaves the previous verified cache snapshot active
+- [x] Test that corrupted cached assets are rejected and can be re-fetched
+- [ ] Test broader interruption timing, stale commands, and version mismatches
 
 ## Phase 8 — Integration and deployment
 
