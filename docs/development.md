@@ -50,14 +50,14 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Specify playlist schema, ordering, durations, and per-device assignment
 - [ ] Specify command acknowledgement, timeout, and retry behavior
 - [x] Define initial database schema version and transactional migration mechanism
-- [ ] Add forward migration and legacy-database upgrade tests
+- [x] Add forward migration and populated version-1 database upgrade test
 
 ## Phase 5 — Local server
 
 - [x] Create the initial TypeScript/Fastify server workspace and development scripts
 - [x] Add versioned health endpoint and graceful shutdown
 - [x] Add server type-check/build and endpoint tests to GitHub Actions
-- [x] Add SQLite database initialization with WAL, foreign keys, and schema version 1 migrations
+- [x] Add SQLite database initialization with WAL, foreign keys, and transactional schema migrations through version 2
 - [x] Implement first-run administrator setup with a one-time setup key
 - [x] Implement scrypt password hashing and opaque database-backed sessions
 - [x] Add HttpOnly, SameSite=Strict session cookies and login rate limiting
@@ -71,8 +71,8 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [ ] Implement playlist and device assignment APIs
 - [ ] Implement versioned configuration distribution
 - [ ] Implement live WebSocket events and narrowly scoped remote commands
-- [x] Add server tests for pairing, one-time code use, protected inventory, and heartbeat updates
-- [ ] Add database migration tests and broader API contract tests
+- [x] Add server tests for pairing, one-time code use, protected inventory, heartbeat updates, and credential revocation
+- [x] Add a populated legacy database migration test\n- [x] Add credential revocation and safe removal API tests\n- [ ] Add broader API contract and abuse-case tests
 
 ## Phase 6 — Dashboard
 
@@ -83,7 +83,7 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 - [x] Add dashboard TypeScript and production build to GitHub Actions
 - [x] Create shared API types and client helpers
 - [x] Implement first-run setup, login, session persistence, and logout
-- [x] Implement protected device inventory with 15-second refresh and live status
+- [x] Implement protected device inventory with 15-second refresh and live status\n- [x] Add receiver credential status, revocation, and removal controls
 - [ ] Implement NDI source inventory and assignment
 - [ ] Implement media library and uploads
 - [ ] Implement playlist editor with ordering and image durations
