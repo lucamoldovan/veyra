@@ -14,7 +14,7 @@ Terminal 1 — start the local server:
 
 ```bash
 cd server
-npm install
+npm ci
 npm run dev
 ```
 
@@ -22,7 +22,7 @@ Terminal 2 — start the dashboard:
 
 ```bash
 cd dashboard
-npm install
+npm ci
 npm run dev
 ```
 
