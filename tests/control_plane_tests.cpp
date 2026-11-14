@@ -63,7 +63,7 @@ bool sendAll(const int socket, const std::string& response) {
             socket,
             response.data() + sent,
             response.size() - sent,
-            0
+            MSG_NOSIGNAL
         );
         if (count <= 0) return false;
         sent += static_cast<std::size_t>(count);
