@@ -170,6 +170,13 @@ int main(int argc, char* argv[]) {
         bool displayIsClear = true;
         bool connectionWasActive = false;
         bool playbackWasActive = false;
+        bool fallbackVisible = false;
+        std::size_t fallbackIndex = 0;
+        auto fallbackSlideStartedAt = std::chrono::steady_clock::now();
+        int appliedConfigVersion = -1;
+        int appliedPlaylistRevision = -1;
+        veyra::config::NdiConfig activeNdiConfig = config.ndi;
+        std::vector<veyra::control_plane::CachedMediaItem> fallbackItems;
         std::string activeSourceName;
         std::vector<veyra::ndi::Source> currentSources;
         const auto frameInterval =
@@ -184,6 +191,32 @@ int main(int argc, char* argv[]) {
         auto lastDiscoveryLog = lastFrameAt;
         auto lastSourceSnapshotAt = discoveryStartedAt;
         auto lastControlPlaneReportAt = discoveryStartedAt;
+
+        const auto renderFallback = [&](const std::chrono::steady_clock::time_point now) -> bool {
+            if (fallbackItems.empty()) return false;
+            if (fallbackVisible &&
+                now - fallbackSlideStartedAt <
+                    std::chrono::seconds(fallbackItems[fallbackIndex].durationSeconds)) {
+                return true;
+            }
+            for (std::size_t attempt = 0; attempt < fallbackItems.size(); ++attempt) {
+                fallbackIndex %= fallbackItems.size();
+                try {
+                    renderer.presentImage(fallbackItems[fallbackIndex].path);
+                    fallbackSlideStartedAt = now;
+                    fallbackVisible = true;
+                    displayIsClear = false;
+                    return true;
+                } catch (const std::exception& error) {
+                    spdlog::error("Skipping invalid fallback image '{}': {}",
+                                  fallbackItems[fallbackIndex].path.string(), error.what());
+                    fallbackIndex = (fallbackIndex + 1) % fallbackItems.size();
+                }
+            }
+            fallbackItems.clear();
+            fallbackVisible = false;
+            return false;
+        };
 
         const auto reportControlPlaneStatus = [&]() {
             if (!controlPlane) return;
@@ -214,6 +247,46 @@ int main(int argc, char* argv[]) {
 
         while (shutdownRequested == 0 && renderer.pollEvents()) {
             const auto loopNow = std::chrono::steady_clock::now();
+            if (controlPlane) {
+                const auto synchronized = controlPlane->syncSnapshot();
+                if (synchronized.hasValidCachedState &&
+                    (synchronized.configVersion != appliedConfigVersion ||
+                     synchronized.playlistRevision != appliedPlaylistRevision)) {
+                    const bool sourceChanged =
+                        activeNdiConfig.sourceName != synchronized.ndiSourceName ||
+                        activeNdiConfig.sourceAddress != synchronized.ndiSourceAddress;
+                    activeNdiConfig.sourceName = synchronized.ndiSourceName;
+                    activeNdiConfig.sourceAddress = synchronized.ndiSourceAddress;
+                    fallbackItems = synchronized.fallbackItems;
+                    fallbackIndex = 0;
+                    fallbackVisible = false;
+                    appliedConfigVersion = synchronized.configVersion;
+                    appliedPlaylistRevision = synchronized.playlistRevision;
+                    spdlog::info("Applied receiver config v{} and {} cached fallback image(s)",
+                                 appliedConfigVersion, fallbackItems.size());
+                    if (sourceChanged && receiver) {
+                        if (captureThread.joinable()) {
+                            captureThread.request_stop();
+                            captureThread.join();
+                        }
+                        receiver.reset();
+                        {
+                            std::lock_guard lock(latestFrameMutex);
+                            latestFrame.reset();
+                        }
+                        sourceConnected.store(false);
+                        activeSourceName.clear();
+                        playbackWasActive = false;
+                        connectionWasActive = false;
+                        if (!displayIsClear) {
+                            renderer.clear();
+                            displayIsClear = true;
+                        }
+                        sourceSetStableSince = loopNow;
+                        sourceSetSignature.clear();
+                    }
+                }
+            }
             if (receiver && loopNow - lastSourceSnapshotAt >= std::chrono::seconds(5)) {
                 currentSources = discovery.currentSources();
                 lastSourceSnapshotAt = loopNow;
@@ -246,7 +319,7 @@ int main(int argc, char* argv[]) {
                         std::chrono::seconds(2);
                 const auto selected = selectSource(
                     sources,
-                    config.ndi,
+                    activeNdiConfig,
                     automaticSelectionReady
                 );
 
@@ -317,7 +390,7 @@ int main(int argc, char* argv[]) {
                     lastDiscoveryLog = now;
                 }
 
-                if (!displayIsClear) {
+                if (!renderFallback(now) && !displayIsClear) {
                     renderer.clear();
                     displayIsClear = true;
                 }
@@ -342,6 +415,7 @@ int main(int argc, char* argv[]) {
                 nextPresentationAt = now + frameInterval;
                 renderer.present(*frame);
                 displayIsClear = false;
+                fallbackVisible = false;
 
                 if (!playbackWasActive) {
                     spdlog::info(
@@ -377,7 +451,7 @@ int main(int argc, char* argv[]) {
                     playbackWasActive = false;
                 }
 
-                if (!displayIsClear) {
+                if (!renderFallback(statusTime) && !displayIsClear) {
                     renderer.clear();
                     displayIsClear = true;
                 }
