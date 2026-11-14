@@ -99,7 +99,15 @@ The receiver includes a control-plane client for one-time pairing and periodic h
 
 1. Start the Veyra server with HTTPS enabled and make its certificate chain trusted by the Mac mini. The server intentionally refuses non-loopback HTTP.
 2. In the dashboard, create a fresh receiver pairing code. It is 12 digits and expires after 10 minutes.
-3. Copy `config/veyra.example.json` to the configured receiver path and set:
+3. Install the example config at the default path and edit it:
+
+```bash
+sudo install -d -m 700 /etc/veyra
+sudo install -m 600 config/veyra.example.json /etc/veyra/config.json
+sudo nano /etc/veyra/config.json
+```
+
+Then set the `controlPlane` section to the following values:
 
 ```json
 {
