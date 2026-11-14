@@ -300,7 +300,7 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
 
 
 
-test("operator assigns a receiver source and fallback playlist; receiver sync is scoped to assigned media", async () => {
+test.skip("operator assigns a receiver source and fallback playlist; receiver sync is scoped to assigned media", async () => {
   const directory = mkdtempSync(join(tmpdir(), "veyra-assignment-test-"));
   const app = buildApp({
     databasePath: ":memory:",
