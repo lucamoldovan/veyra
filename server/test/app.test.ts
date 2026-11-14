@@ -245,6 +245,7 @@ test("secure cookie policy can be enforced by the HTTPS deployment", async () =>
   const app = buildApp({
     databasePath: ":memory:",
     setupKey: "test-setup-key",
+    pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
     secureCookies: true,
   });
 
