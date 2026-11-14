@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -278,6 +279,58 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
 });
 
 
+
+
+test("backup command creates a consistent database and pairing-secret backup", () => {
+  const directory = mkdtempSync(join(tmpdir(), "veyra-backup-test-"));
+  const databasePath = join(directory, "source.sqlite");
+  const pairingSecretPath = join(directory, "pairing-secret");
+  const backupDirectory = join(directory, "backups");
+
+  try {
+    const source = openDatabase(databasePath);
+    source.close();
+    writeFileSync(pairingSecretPath, "a".repeat(64) + "\n", { mode: 0o600 });
+
+    const result = spawnSync(
+      process.execPath,
+      ["--import", "tsx", "scripts/backup.ts", backupDirectory],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          VEYRA_DATABASE_PATH: databasePath,
+          VEYRA_PAIRING_SECRET_PATH: pairingSecretPath,
+        },
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+
+    const files = readdirSync(backupDirectory);
+    const manifestName = files.find((name) => name.endsWith(".json"));
+    assert.ok(manifestName);
+    const manifest = JSON.parse(readFileSync(join(backupDirectory, manifestName), "utf8")) as {
+      databaseFile: string;
+      pairingSecretFile: string;
+    };
+
+    const backupDatabase = openDatabase(join(backupDirectory, manifest.databaseFile));
+    try {
+      assert.equal(backupDatabase.pragma("user_version", { simple: true }), 2);
+    } finally {
+      backupDatabase.close();
+    }
+    assert.equal(
+      readFileSync(join(backupDirectory, manifest.pairingSecretFile), "utf8"),
+      "a".repeat(64) + "\n",
+    );
+    assert.equal(statSync(join(backupDirectory, manifest.databaseFile)).mode & 0o777, 0o600);
+    assert.equal(statSync(join(backupDirectory, manifest.pairingSecretFile)).mode & 0o777, 0o600);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("invalid pairing secret fails startup without leaking the database handle", () => {
   const directory = mkdtempSync(join(tmpdir(), "veyra-invalid-secret-"));
