@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 export type VeyraDatabase = Database.Database;
 
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
 
 export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite"): VeyraDatabase {
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
@@ -76,6 +76,15 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
         CREATE INDEX IF NOT EXISTS devices_last_seen_at_idx ON devices(last_seen_at);
       `);
       database.pragma("user_version = 1");
+    }
+
+    if (currentVersion < 2) {
+      database.exec(`
+        ALTER TABLE devices ADD COLUMN credential_revoked_at TEXT;
+        CREATE INDEX IF NOT EXISTS devices_credential_revoked_at_idx
+          ON devices(credential_revoked_at);
+      `);
+      database.pragma("user_version = 2");
     }
   });
 
