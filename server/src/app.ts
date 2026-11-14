@@ -1,7 +1,7 @@
-import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
-import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { openDatabase, type VeyraDatabase } from "./database.js";
@@ -69,6 +69,15 @@ function getSessionOperator(database: VeyraDatabase, token: string | undefined):
   }
 
   return { id: row.id, username: row.username };
+}
+
+function getAuthenticatedOperator(database: VeyraDatabase, request: FastifyRequest, reply: FastifyReply): { id: string; username: string } | null {
+  const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE]);
+  if (!operator) {
+    reply.code(401).send({ error: "Authentication required" });
+    return null;
+  }
+  return operator;
 }
 
 function setSessionCookie(reply: FastifyReply, token: string): void {
@@ -201,6 +210,163 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
     return { authenticated: false };
   });
+
+  app.post("/api/v1/devices/pairing-codes", {
+    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+  }, async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const code = randomInt(0, 100_000_000).toString().padStart(8, "0");
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
+
+    database.prepare(`
+      INSERT INTO pairing_codes (id, code_hash, created_by, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(randomUUID(), hashSessionToken(code), operator.id, expiresAt, now.toISOString());
+
+    return reply.code(201).send({ code, expiresAt });
+  });
+
+  app.get("/api/v1/devices", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const rows = database.prepare(`
+      SELECT id, name, platform, software_version, last_seen_at, last_ip,
+             playback_mode, ndi_source_name, uptime_seconds, created_at
+      FROM devices
+      ORDER BY name COLLATE NOCASE ASC
+    `).all() as Array<{
+      id: string;
+      name: string;
+      platform: string;
+      software_version: string;
+      last_seen_at: string | null;
+      last_ip: string | null;
+      playback_mode: string;
+      ndi_source_name: string | null;
+      uptime_seconds: number | null;
+      created_at: string;
+    }>;
+
+    const now = Date.now();
+    return {
+      devices: rows.map((device) => {
+        const age = device.last_seen_at ? now - Date.parse(device.last_seen_at) : Number.POSITIVE_INFINITY;
+        const status = age <= 45_000 ? "online" : age <= 120_000 ? "stale" : "offline";
+        return {
+          id: device.id,
+          name: device.name,
+          status,
+          platform: device.platform,
+          softwareVersion: device.software_version,
+          lastSeenAt: device.last_seen_at,
+          lastIp: device.last_ip,
+          playbackMode: device.playback_mode,
+          ndiSourceName: device.ndi_source_name,
+          uptimeSeconds: device.uptime_seconds,
+          createdAt: device.created_at,
+        };
+      }),
+    };
+  });
+
+  app.post<{ Body: { code?: unknown; deviceName?: unknown; platform?: unknown; version?: unknown } }>(
+    "/api/v1/receiver/pair",
+    { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const body = request.body ?? {};
+      const code = typeof body.code === "string" ? body.code.trim() : "";
+      const deviceName = typeof body.deviceName === "string" ? body.deviceName.trim() : "";
+      const platform = typeof body.platform === "string" ? body.platform.trim().slice(0, 80) : "unknown";
+      const version = typeof body.version === "string" ? body.version.trim().slice(0, 40) : "unknown";
+
+      if (!/^\d{8}$/.test(code)) {
+        return reply.code(400).send({ error: "Pairing code must contain 8 digits" });
+      }
+      if (deviceName.length < 1 || deviceName.length > 64) {
+        return reply.code(400).send({ error: "Device name must be between 1 and 64 characters" });
+      }
+
+      const deviceId = randomUUID();
+      const deviceToken = randomBytes(32).toString("base64url");
+      const now = new Date().toISOString();
+
+      const pairDevice = database.transaction(() => {
+        const pairing = database.prepare(`
+          SELECT id, expires_at, used_at
+          FROM pairing_codes
+          WHERE code_hash = ?
+        `).get(hashSessionToken(code)) as { id: string; expires_at: string; used_at: string | null } | undefined;
+
+        if (!pairing || pairing.used_at || Date.parse(pairing.expires_at) <= Date.now()) return false;
+
+        const used = database.prepare("UPDATE pairing_codes SET used_at = ? WHERE id = ? AND used_at IS NULL")
+          .run(now, pairing.id);
+        if (used.changes !== 1) return false;
+
+        database.prepare(`
+          INSERT INTO devices (
+            id, name, device_token_hash, platform, software_version,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(deviceId, deviceName, hashSessionToken(deviceToken), platform || "unknown", version || "unknown", now, now);
+
+        return true;
+      });
+
+      if (!pairDevice()) {
+        return reply.code(403).send({ error: "Pairing code is invalid, expired, or already used" });
+      }
+
+      return reply.code(201).send({
+        deviceId,
+        deviceToken,
+        heartbeatIntervalSeconds: 15,
+      });
+    },
+  );
+
+  app.post<{ Body: { version?: unknown; platform?: unknown; uptimeSeconds?: unknown; playbackMode?: unknown; ndiSourceName?: unknown } }>(
+    "/api/v1/receiver/heartbeat",
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const authorization = request.headers.authorization ?? "";
+      const deviceToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+      if (!deviceToken) return reply.code(401).send({ error: "Device authentication required" });
+
+      const device = database.prepare("SELECT id FROM devices WHERE device_token_hash = ?")
+        .get(hashSessionToken(deviceToken)) as { id: string } | undefined;
+      if (!device) return reply.code(401).send({ error: "Invalid device credential" });
+
+      const body = request.body ?? {};
+      const version = typeof body.version === "string" ? body.version.trim().slice(0, 40) : "unknown";
+      const platform = typeof body.platform === "string" ? body.platform.trim().slice(0, 80) : "unknown";
+      const uptimeSeconds = typeof body.uptimeSeconds === "number" &&
+        Number.isSafeInteger(body.uptimeSeconds) && body.uptimeSeconds >= 0
+        ? body.uptimeSeconds
+        : null;
+      const allowedModes = new Set(["ndi", "fallback", "idle", "error", "unknown"]);
+      const playbackMode = typeof body.playbackMode === "string" && allowedModes.has(body.playbackMode)
+        ? body.playbackMode
+        : "unknown";
+      const ndiSourceName = typeof body.ndiSourceName === "string"
+        ? body.ndiSourceName.slice(0, 160)
+        : null;
+      const now = new Date().toISOString();
+
+      database.prepare(`
+        UPDATE devices
+        SET last_seen_at = ?, last_ip = ?, software_version = ?, platform = ?,
+            playback_mode = ?, ndi_source_name = ?, uptime_seconds = ?, updated_at = ?
+        WHERE id = ?
+      `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, now, device.id);
+
+      return { accepted: true, serverTime: now };
+    },
+  );
 
   return app;
 }
