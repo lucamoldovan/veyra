@@ -310,6 +310,317 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return { authenticated: false };
   });
 
+  app.post("/api/v1/media", {
+    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+  }, async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    if (!Buffer.isBuffer(request.body) || request.body.length === 0) {
+      return reply.code(400).send({ error: "An image file is required" });
+    }
+    const image = request.body as Buffer;
+    if (image.length > MAX_MEDIA_BYTES) {
+      return reply.code(413).send({ error: "Image exceeds the 20 MB upload limit" });
+    }
+
+    const detectedMime = detectImageMime(image);
+    const declaredMime = (request.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+    if (!detectedMime || detectedMime !== declaredMime) {
+      return reply.code(415).send({ error: "Only valid PNG, JPEG, and WebP images are supported" });
+    }
+
+    const extension = detectedMime === "image/png" ? "png" : detectedMime === "image/jpeg" ? "jpg" : "webp";
+    const id = randomUUID();
+    const storageKey = `${id}.${extension}`;
+    const displayName = safeDisplayName(request.headers["x-veyra-filename"]);
+    const createdAt = new Date().toISOString();
+    const sha256 = createHash("sha256").update(image).digest("hex");
+
+    mkdirSync(mediaDirectory, { recursive: true, mode: 0o700 });
+    chmodSync(mediaDirectory, 0o700);
+    const filePath = join(mediaDirectory, storageKey);
+    try {
+      writeFileSync(filePath, image, { flag: "wx", mode: 0o600 });
+      database.prepare(`
+        INSERT INTO media_assets (id, display_name, storage_key, mime_type, size_bytes, sha256, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, displayName, storageKey, detectedMime, image.length, sha256, createdAt);
+    } catch (error) {
+      rmSync(filePath, { force: true });
+      request.log.error(error, "Could not store uploaded Veyra media");
+      return reply.code(500).send({ error: "Image could not be stored" });
+    }
+
+    return reply.code(201).send({
+      id,
+      name: displayName,
+      mimeType: detectedMime,
+      sizeBytes: image.length,
+      sha256,
+      createdAt,
+      contentUrl: `/api/v1/media/${id}/content`,
+    });
+  });
+
+  app.get("/api/v1/media", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const media = database.prepare(`
+      SELECT id, display_name, mime_type, size_bytes, sha256, created_at
+      FROM media_assets
+      ORDER BY created_at DESC
+    `).all() as Array<{
+      id: string;
+      display_name: string;
+      mime_type: string;
+      size_bytes: number;
+      sha256: string;
+      created_at: string;
+    }>;
+
+    return {
+      media: media.map((item) => ({
+        id: item.id,
+        name: item.display_name,
+        mimeType: item.mime_type,
+        sizeBytes: item.size_bytes,
+        sha256: item.sha256,
+        createdAt: item.created_at,
+        contentUrl: `/api/v1/media/${item.id}/content`,
+      })),
+    };
+  });
+
+  app.get<{ Params: { mediaId: string } }>("/api/v1/media/:mediaId/content", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const item = database.prepare("SELECT storage_key, mime_type FROM media_assets WHERE id = ?")
+      .get(request.params.mediaId) as { storage_key: string; mime_type: string } | undefined;
+    if (!item) return reply.code(404).send({ error: "Media item not found" });
+
+    try {
+      const filePath = resolve(mediaDirectory, item.storage_key);
+      if (dirname(filePath) !== mediaDirectory) {
+        return reply.code(404).send({ error: "Media item not found" });
+      }
+      const content = readFileSync(filePath);
+      return reply
+        .type(item.mime_type)
+        .header("Content-Disposition", "inline")
+        .send(content);
+    } catch (error) {
+      request.log.error(error, "Stored Veyra media file is missing or unreadable");
+      return reply.code(404).send({ error: "Media file is unavailable" });
+    }
+  });
+
+  app.delete<{ Params: { mediaId: string } }>("/api/v1/media/:mediaId", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const item = database.prepare("SELECT storage_key FROM media_assets WHERE id = ?")
+      .get(request.params.mediaId) as { storage_key: string } | undefined;
+    if (!item) return reply.code(404).send({ error: "Media item not found" });
+
+    const references = database.prepare("SELECT COUNT(*) AS count FROM playlist_items WHERE media_id = ?")
+      .get(request.params.mediaId) as { count: number };
+    if (references.count > 0) {
+      return reply.code(409).send({ error: "This image is used by a playlist and cannot be deleted yet" });
+    }
+
+    const filePath = resolve(mediaDirectory, item.storage_key);
+    if (dirname(filePath) !== mediaDirectory) {
+      return reply.code(500).send({ error: "Stored media path is invalid" });
+    }
+    try {
+      rmSync(filePath, { force: true });
+      database.prepare("DELETE FROM media_assets WHERE id = ?").run(request.params.mediaId);
+      return reply.code(204).send();
+    } catch (error) {
+      request.log.error(error, "Could not delete Veyra media");
+      return reply.code(500).send({ error: "Image could not be deleted" });
+    }
+  });
+
+  app.get("/api/v1/playlists", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const playlists = database.prepare(`
+      SELECT playlists.id, playlists.name, playlists.description, playlists.created_at,
+             playlists.updated_at, COUNT(playlist_items.id) AS item_count
+      FROM playlists
+      LEFT JOIN playlist_items ON playlist_items.playlist_id = playlists.id
+      GROUP BY playlists.id
+      ORDER BY playlists.updated_at DESC
+    `).all() as Array<{
+      id: string;
+      name: string;
+      description: string;
+      created_at: string;
+      updated_at: string;
+      item_count: number;
+    }>;
+
+    return {
+      playlists: playlists.map((playlist) => ({
+        id: playlist.id,
+        name: playlist.name,
+        description: playlist.description,
+        itemCount: playlist.item_count,
+        createdAt: playlist.created_at,
+        updatedAt: playlist.updated_at,
+      })),
+    };
+  });
+
+  app.post<{ Body: { name?: unknown; description?: unknown } }>("/api/v1/playlists", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const body = request.body ?? {};
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const description = typeof body.description === "string" ? body.description.trim() : "";
+    if (name.length < 1 || name.length > 80) {
+      return reply.code(400).send({ error: "Playlist name must be between 1 and 80 characters" });
+    }
+    if (description.length > 500) {
+      return reply.code(400).send({ error: "Playlist description cannot exceed 500 characters" });
+    }
+
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    database.prepare("INSERT INTO playlists (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run(id, name, description, now, now);
+    return reply.code(201).send({ id, name, description, itemCount: 0, createdAt: now, updatedAt: now });
+  });
+
+  app.get<{ Params: { playlistId: string } }>("/api/v1/playlists/:playlistId", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const playlist = database.prepare("SELECT id, name, description, created_at, updated_at FROM playlists WHERE id = ?")
+      .get(request.params.playlistId) as {
+        id: string; name: string; description: string; created_at: string; updated_at: string;
+      } | undefined;
+    if (!playlist) return reply.code(404).send({ error: "Playlist not found" });
+
+    const items = database.prepare(`
+      SELECT playlist_items.id, playlist_items.media_id, playlist_items.position,
+             playlist_items.duration_seconds, media_assets.display_name, media_assets.mime_type,
+             media_assets.size_bytes
+      FROM playlist_items
+      INNER JOIN media_assets ON media_assets.id = playlist_items.media_id
+      WHERE playlist_items.playlist_id = ?
+      ORDER BY playlist_items.position ASC
+    `).all(playlist.id) as Array<{
+      id: string; media_id: string; position: number; duration_seconds: number;
+      display_name: string; mime_type: string; size_bytes: number;
+    }>;
+
+    return {
+      id: playlist.id,
+      name: playlist.name,
+      description: playlist.description,
+      createdAt: playlist.created_at,
+      updatedAt: playlist.updated_at,
+      items: items.map((item) => ({
+        id: item.id,
+        mediaId: item.media_id,
+        position: item.position,
+        durationSeconds: item.duration_seconds,
+        mediaName: item.display_name,
+        mimeType: item.mime_type,
+        sizeBytes: item.size_bytes,
+        contentUrl: `/api/v1/media/${item.media_id}/content`,
+      })),
+    };
+  });
+
+  app.put<{ Params: { playlistId: string }; Body: { name?: unknown; description?: unknown; items?: unknown } }>(
+    "/api/v1/playlists/:playlistId",
+    async (request, reply) => {
+      const operator = getAuthenticatedOperator(database, request, reply);
+      if (!operator) return;
+
+      const existing = database.prepare("SELECT id FROM playlists WHERE id = ?")
+        .get(request.params.playlistId) as { id: string } | undefined;
+      if (!existing) return reply.code(404).send({ error: "Playlist not found" });
+
+      const body = request.body ?? {};
+      const name = typeof body.name === "string" ? body.name.trim() : "";
+      const description = typeof body.description === "string" ? body.description.trim() : "";
+      if (name.length < 1 || name.length > 80) {
+        return reply.code(400).send({ error: "Playlist name must be between 1 and 80 characters" });
+      }
+      if (description.length > 500) {
+        return reply.code(400).send({ error: "Playlist description cannot exceed 500 characters" });
+      }
+      if (!Array.isArray(body.items) || body.items.length > 200) {
+        return reply.code(400).send({ error: "Playlist items must be an array containing at most 200 images" });
+      }
+
+      const items: Array<{ mediaId: string; durationSeconds: number }> = [];
+      for (const rawItem of body.items) {
+        if (typeof rawItem !== "object" || rawItem === null) {
+          return reply.code(400).send({ error: "Each playlist item must be an object" });
+        }
+        const item = rawItem as { mediaId?: unknown; durationSeconds?: unknown };
+        if (typeof item.mediaId !== "string" || item.mediaId.length < 1 ||
+            typeof item.durationSeconds !== "number" || !Number.isInteger(item.durationSeconds) ||
+            item.durationSeconds < 1 || item.durationSeconds > 3600) {
+          return reply.code(400).send({ error: "Each item needs a media ID and a duration from 1 to 3600 seconds" });
+        }
+        items.push({ mediaId: item.mediaId, durationSeconds: item.durationSeconds });
+      }
+
+      const uniqueMediaIds = [...new Set(items.map((item) => item.mediaId))];
+      if (uniqueMediaIds.length > 0) {
+        const placeholders = uniqueMediaIds.map(() => "?").join(",");
+        const found = database.prepare(`SELECT COUNT(*) AS count FROM media_assets WHERE id IN (${placeholders})`)
+          .get(...uniqueMediaIds) as { count: number };
+        if (found.count !== uniqueMediaIds.length) {
+          return reply.code(400).send({ error: "One or more playlist images do not exist in the media library" });
+        }
+      }
+
+      const now = new Date().toISOString();
+      const replaceItems = database.transaction(() => {
+        database.prepare("UPDATE playlists SET name = ?, description = ?, updated_at = ? WHERE id = ?")
+          .run(name, description, now, request.params.playlistId);
+        database.prepare("DELETE FROM playlist_items WHERE playlist_id = ?").run(request.params.playlistId);
+        const insert = database.prepare(`
+          INSERT INTO playlist_items (id, playlist_id, media_id, position, duration_seconds)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+        items.forEach((item, position) => {
+          insert.run(randomUUID(), request.params.playlistId, item.mediaId, position, item.durationSeconds);
+        });
+      });
+      replaceItems();
+
+      return {
+        id: request.params.playlistId,
+        name,
+        description,
+        itemCount: items.length,
+        updatedAt: now,
+      };
+    },
+  );
+
+  app.delete<{ Params: { playlistId: string } }>("/api/v1/playlists/:playlistId", async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply);
+    if (!operator) return;
+
+    const result = database.prepare("DELETE FROM playlists WHERE id = ?").run(request.params.playlistId);
+    if (result.changes === 0) return reply.code(404).send({ error: "Playlist not found" });
+    return reply.code(204).send();
+  });
+
   app.post("/api/v1/devices/pairing-codes", {
     config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
   }, async (request, reply) => {
