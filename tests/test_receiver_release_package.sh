@@ -34,5 +34,15 @@ assert manifest["artifactSha256"] == hashlib.sha256(archive).hexdigest()
 assert manifest["artifactSizeBytes"] == len(archive)
 assert manifest["signingKeyId"] == "test-key"
 PY
-tar -tzf "$ARCHIVE" | grep -Eq '^\./bin/ndiview$'
-echo "Receiver release packaging test passed."
+tar -tzf "$ARCHIVE" | grep -Eq '^\./bin/ndiview
+
+NDIVIEW_RELEASE_VERIFY_KEY="$TEMP/public.pem" \
+NDIVIEW_RECEIVER_RELEASES_DIR="$TEMP/store" \
+bash "$ROOT/scripts/publish-receiver-release.sh" "$ARCHIVE" "$MANIFEST" "$SIGNATURE"
+cmp "$ARCHIVE" "$TEMP/store/0.0.1-test/linux-x86_64/artifact.tar.gz"
+cmp "$MANIFEST" "$TEMP/store/0.0.1-test/linux-x86_64/manifest.json"
+if NDIVIEW_RELEASE_VERIFY_KEY="$TEMP/public.pem" NDIVIEW_RECEIVER_RELEASES_DIR="$TEMP/store" bash "$ROOT/scripts/publish-receiver-release.sh" "$ARCHIVE" "$MANIFEST" "$SIGNATURE"; then
+  echo "Publisher accepted a duplicate immutable release." >&2
+  exit 1
+fi
+echo "Receiver release packaging and publication test passed."
