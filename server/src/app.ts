@@ -752,12 +752,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     if (!operator) return;
 
     const rows = database.prepare(`
-      SELECT id, name, platform, software_version, last_seen_at, last_ip,
-             playback_mode, ndi_source_name, uptime_seconds, created_at,
-             credential_revoked_at, config_version, assigned_ndi_source_name,
-             assigned_ndi_source_address, fallback_playlist_id
-      FROM devices
-      ORDER BY name COLLATE NOCASE ASC
+      SELECT d.id, d.name, d.platform, d.software_version, d.last_seen_at, d.last_ip,
+             d.playback_mode, d.ndi_source_name, d.uptime_seconds, d.created_at,
+             d.credential_revoked_at, d.config_version, d.assigned_ndi_source_name,
+             d.assigned_ndi_source_address, d.fallback_playlist_id,
+             (SELECT c.id FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_id,
+             (SELECT c.status FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_status,
+             (SELECT c.created_at FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_created_at,
+             (SELECT c.result_message FROM device_commands c WHERE c.device_id=d.id AND c.command_type='restart' ORDER BY c.created_at DESC LIMIT 1) AS restart_command_message
+      FROM devices d
+      ORDER BY d.name COLLATE NOCASE ASC
     `).all() as Array<{
       id: string;
       name: string;
@@ -774,9 +778,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       assigned_ndi_source_name: string | null;
       assigned_ndi_source_address: string | null;
       fallback_playlist_id: string | null;
+      restart_command_id: string | null;
+      restart_command_status: string | null;
+      restart_command_created_at: string | null;
+      restart_command_message: string | null;
     }>;
 
     const now = Date.now();
+    const isoNow = new Date(now).toISOString();
+    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Receiver did not reconnect after restart' WHERE status='restarting' AND created_at <= ? AND device_id IN (SELECT id FROM devices WHERE last_seen_at IS NULL OR last_seen_at <= device_commands.created_at)").run(isoNow, new Date(now-180_000).toISOString());
+    database.prepare("UPDATE device_commands SET status='timed_out', completed_at=?, result_message='Command expired before delivery' WHERE status IN ('queued','claimed') AND expires_at <= ?").run(isoNow, isoNow);
     return {
       devices: rows.map((device) => {
         const age = device.last_seen_at ? now - Date.parse(device.last_seen_at) : Number.POSITIVE_INFINITY;
@@ -799,12 +810,28 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           assignedNdiSourceName: device.assigned_ndi_source_name,
           assignedNdiSourceAddress: device.assigned_ndi_source_address,
           fallbackPlaylistId: device.fallback_playlist_id,
+          restartCommand: device.restart_command_id ? { id: device.restart_command_id, status: device.restart_command_status, createdAt: device.restart_command_created_at, message: device.restart_command_message } : null,
         };
       }),
     };
   });
 
 
+  app.post<{ Params: { deviceId: string } }>("/api/v1/devices/:deviceId/restart", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const operator = getAuthenticatedOperator(database, request, reply); if (!operator) return;
+    const now = new Date(); const nowIso = now.toISOString();
+    const device = database.prepare("SELECT id, last_seen_at FROM devices WHERE id = ? AND credential_revoked_at IS NULL").get(request.params.deviceId) as { id: string; last_seen_at: string | null } | undefined;
+    if (!device) return reply.code(404).send({ error: "Active receiver not found" });
+    if (!device.last_seen_at || now.getTime() - Date.parse(device.last_seen_at) > 45_000) return reply.code(409).send({ error: "Receiver must be online before it can be restarted" });
+    const active = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type='restart' AND status IN ('queued','claimed','restarting') AND expires_at>? LIMIT 1").get(device.id, nowIso) as { id: string } | undefined;
+    if (active) return reply.code(409).send({ error: "A restart request is already active for this receiver" });
+    const recent = database.prepare("SELECT id FROM device_commands WHERE device_id=? AND command_type='restart' AND created_at>? LIMIT 1").get(device.id, new Date(now.getTime()-120_000).toISOString()) as { id: string } | undefined;
+    if (recent) return reply.code(429).send({ error: "Please wait two minutes between restart requests" });
+    const id = randomUUID(); const expiresAt = new Date(now.getTime()+90_000).toISOString();
+    database.prepare("INSERT INTO device_commands (id,device_id,command_type,status,requested_by,created_at,expires_at) VALUES (?, ?, 'restart', 'queued', ?, ?, ?)").run(id,device.id,operator.id,nowIso,expiresAt);
+    request.log.info({commandId:id,deviceId:device.id,operatorId:operator.id},"Receiver restart requested");
+    return reply.code(201).send({id,status:"queued",createdAt:nowIso,expiresAt});
+  });
   app.put<{ Params: { deviceId: string }; Body: { ndiSourceName?: unknown; ndiSourceAddress?: unknown; fallbackPlaylistId?: unknown } }>(
     "/api/v1/devices/:deviceId/config",
     async (request, reply) => {
@@ -884,6 +911,27 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return device;
   }
 
+  app.post("/api/v1/receiver/commands/poll", async (request, reply) => {
+    const device = authenticateReceiver(request, reply); if (!device) return;
+    const now = new Date().toISOString();
+    const claim = database.transaction(() => {
+      const row = database.prepare("SELECT id,command_type FROM device_commands WHERE device_id=? AND status='queued' AND expires_at>? ORDER BY created_at ASC LIMIT 1").get(device.id,now) as {id:string;command_type:string}|undefined;
+      if (!row) return null;
+      const result = database.prepare("UPDATE device_commands SET status='claimed',claimed_at=? WHERE id=? AND device_id=? AND status='queued' AND expires_at>?").run(now,row.id,device.id,now);
+      return result.changes===1 ? {id:row.id,type:row.command_type} : null;
+    });
+    return {command:claim()};
+  });
+  app.post<{Params:{commandId:string};Body:{status?:unknown;message?:unknown}}>("/api/v1/receiver/commands/:commandId/status", async (request,reply) => {
+    const device=authenticateReceiver(request,reply); if(!device)return;
+    const status=request.body?.status;
+    const message=typeof request.body?.message==="string"?stripControlCharacters(request.body.message).slice(0,240):null;
+    if(status!=="restarting"&&status!=="failed")return reply.code(400).send({error:"Command status must be restarting or failed"});
+    const now=new Date().toISOString();
+    const result=database.prepare("UPDATE device_commands SET status=?,completed_at=?,result_message=? WHERE id=? AND device_id=? AND status IN ('claimed','restarting') AND expires_at>?").run(status,status==="failed"?now:null,message,request.params.commandId,device.id,now);
+    if(result.changes!==1)return reply.code(404).send({error:"Command is unavailable, expired, or does not belong to this receiver"});
+    return {accepted:true,status};
+  });
   app.get("/api/v1/receiver/config", async (request, reply) => {
     const device = authenticateReceiver(request, reply);
     if (!device) return;
@@ -1102,6 +1150,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             discovered_sources_json = COALESCE(?, discovered_sources_json), updated_at = ?
         WHERE id = ?
       `).run(now, request.ip, version || "unknown", platform || "unknown", playbackMode, ndiSourceName, uptimeSeconds, discoveredSourcesJson, now, device.id);
+      database.prepare("UPDATE device_commands SET status='completed', completed_at=?, result_message='Receiver reconnected after restart' WHERE device_id=? AND status='restarting'").run(now,device.id);
 
       return { accepted: true, serverTime: now };
     },

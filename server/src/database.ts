@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 export type VeyraDatabase = Database.Database;
 
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 7;
 
 export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite"): VeyraDatabase {
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
@@ -191,6 +191,21 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
         END;
       `);
       database.pragma("user_version = 6");
+    }
+    if (currentVersion < 7) {
+      database.exec(`
+        CREATE TABLE device_commands (
+          id TEXT PRIMARY KEY,
+          device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+          command_type TEXT NOT NULL CHECK (command_type IN ('restart')),
+          status TEXT NOT NULL CHECK (status IN ('queued', 'claimed', 'restarting', 'completed', 'failed', 'timed_out')),
+          requested_by TEXT NOT NULL REFERENCES operators(id) ON DELETE RESTRICT,
+          created_at TEXT NOT NULL, expires_at TEXT NOT NULL, claimed_at TEXT, completed_at TEXT, result_message TEXT
+        );
+        CREATE INDEX device_commands_device_created_idx ON device_commands(device_id, created_at DESC);
+        CREATE INDEX device_commands_pending_idx ON device_commands(status, expires_at);
+      `);
+      database.pragma("user_version = 7");
     }
   });
 
