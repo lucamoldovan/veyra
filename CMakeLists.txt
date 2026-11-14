@@ -26,12 +26,19 @@ find_path(NDI_INCLUDE_DIR Processing.NDI.Lib.h
         "${NDI_SDK_DIR}/include"
         "${NDI_SDK_DIR}/Include"
 )
+# Linux SDK packages may expose either an unversioned development symlink
+# (libndi.so) or only a versioned runtime library (for example libndi.so.6).
 find_library(NDI_LIBRARY
-    NAMES ndi
+    NAMES
+        ndi
+        libndi.so.6
+        libndi.so.5
     HINTS
         "${NDI_SDK_DIR}/lib"
         "${NDI_SDK_DIR}/Lib"
         "${NDI_SDK_DIR}/lib/x86_64-linux-gnu"
+        "${NDI_SDK_DIR}/lib/linux"
+        "${NDI_SDK_DIR}/lib/linux-x86_64"
 )
 
 if(NOT NDI_INCLUDE_DIR OR NOT NDI_LIBRARY)
