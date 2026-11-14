@@ -9,6 +9,9 @@
 #include <cerrno>
 #include <cstdio>
 #include <fstream>
+#include <fcntl.h>
+#include <iterator>
+#include <utility>
 #include <stdexcept>
 #include <string_view>
 #include <sys/stat.h>
