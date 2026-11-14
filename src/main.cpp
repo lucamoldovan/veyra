@@ -151,6 +151,7 @@ int main(int argc, char* argv[]) {
         std::mutex latestFrameMutex;
         std::optional<veyra::ndi::VideoFrame> latestFrame;
         std::atomic_bool captureFailed{false};
+        std::atomic_bool sourceConnected{false};
         std::jthread captureThread;
 
         bool displayIsClear = true;
@@ -207,10 +208,15 @@ int main(int argc, char* argv[]) {
                     auto* activeReceiver = receiver.get();
                     captureThread = std::jthread(
                         [activeReceiver, &latestFrameMutex, &latestFrame,
-                         &captureFailed](const std::stop_token stopToken) {
+                         &captureFailed, &sourceConnected](
+                            const std::stop_token stopToken
+                        ) {
                             try {
                                 while (!stopToken.stop_requested()) {
                                     auto captured = activeReceiver->capture(100);
+                                    sourceConnected.store(
+                                        activeReceiver->isConnected()
+                                    );
                                     if (captured.has_value()) {
                                         std::lock_guard lock(latestFrameMutex);
                                         latestFrame = std::move(*captured);
@@ -295,10 +301,11 @@ int main(int argc, char* argv[]) {
             }
 
             const auto statusTime = std::chrono::steady_clock::now();
+            const bool connected = sourceConnected.load();
             const bool frameIsStale =
                 statusTime - lastFrameAt > std::chrono::seconds(2);
 
-            if (frameIsStale) {
+            if (!connected || frameIsStale) {
                 if (playbackWasActive) {
                     spdlog::warn(
                         "NDI video stopped; waiting for the source to recover"
