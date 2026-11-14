@@ -201,7 +201,7 @@ AppConfig load(const std::filesystem::path& path) {
     validateServerUrl(config.controlPlane.serverUrl);
     config.controlPlane.deviceName = readString(controlPlane, "deviceName", "Veyra Receiver");
     if (config.controlPlane.deviceName.empty() || config.controlPlane.deviceName.size() > 64) {
-        throw std::runtime_error("controlPlane.deviceName must contain 1 to 80 characters");
+        throw std::runtime_error("controlPlane.deviceName must contain 1 to 64 characters");
     }
     config.controlPlane.pairingCode = readString(controlPlane, "pairingCode", "");
     if (!config.controlPlane.pairingCode.empty() &&
