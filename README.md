@@ -18,7 +18,9 @@ NDI audio is intentionally not captured or played.
 
 ## Current implementation status
 
-The repository currently contains the **native receiver foundation**:
+The repository currently contains the **native receiver foundation** and an initial local-server scaffold. The server is a separate TypeScript/Fastify application with a versioned health endpoint, graceful shutdown, and independent build/test checks. It currently binds to loopback by default and does not yet expose device-management routes.
+
+The native receiver foundation includes:
 
 - Discovers NDI sources on the local network.
 - Selects a source using its NDI address, or its name as a fallback.
