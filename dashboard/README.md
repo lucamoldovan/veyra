@@ -43,8 +43,10 @@ Implemented:
 - Local username/password sign-in and sign-out using HttpOnly session cookies.
 - Responsive application shell and workspace navigation.
 - Overview with honest empty states for unregistered devices and media.
+- Protected receiver inventory with online/stale/offline state and heartbeat details.
+- One-time receiver pairing-code generation with copy-to-clipboard and expiry display.
 - Live local-server health indicator, polled every 15 seconds.
 - System status page showing server, database, receiver network, and security implementation state.
 - Dedicated Devices, NDI Sources, Media Library, and Playlists sections that explain their next integration steps.
 
-Not implemented yet: device pairing, live device/source data, media uploads, playlist editing, and remote commands. The UI does not fabricate devices, sources, activity, or server health.
+Not implemented yet: the receiver-side enrollment client, live NDI source discovery, media uploads, playlist editing, and remote commands. The UI does not fabricate devices, sources, activity, or server health.
