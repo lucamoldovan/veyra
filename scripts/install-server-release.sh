@@ -79,7 +79,7 @@ fi
 chown root:veyra-server "$ENV_FILE"
 chmod 0640 "$ENV_FILE"
 chown -R veyra-server:veyra-server "$DATA"
-install -m 0644 systemd/veyra-server.service "$UNIT"
+install -m 0644 systemd/ndiview-server.service "$UNIT"
 systemctl daemon-reload
 systemctl enable veyra-server.service
 
