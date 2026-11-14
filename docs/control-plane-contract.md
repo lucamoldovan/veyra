@@ -1,13 +1,13 @@
-# Veyra control-plane contract (draft)
+# NDIView control-plane contract (draft)
 
-This document defines the intended communication contract for the Veyra local server, dashboard, and receiver agents. The operator setup/session routes, device inventory, receiver pairing, heartbeat endpoints, per-device assignments, receiver configuration polling, assigned-media manifests, and media downloads listed as implemented below exist today. Remote commands, WebSocket messages, and detailed health workflows remain design targets. Treat this as an evolving contract and keep it aligned with tested implementation.
+This document defines the intended communication contract for the NDIView local server, dashboard, and receiver agents. The operator setup/session routes, device inventory, receiver pairing, heartbeat endpoints, per-device assignments, receiver configuration polling, assigned-media manifests, and media downloads listed as implemented below exist today. Receiver restart and full-device reboot commands are implemented; WebSocket messages and detailed health workflows remain design targets. Treat this as an evolving contract and keep it aligned with tested implementation.
 
 ## Design principles
 
 1. The server is the authority for shared device assignments, media, playlists, and operator accounts. Receivers poll versioned configuration and media manifests, and activate only fully downloaded, SHA-256-verified cache snapshots.
 2. A receiver is authoritative for what is actually happening on its own display.
 3. A receiver must keep playing without an active server connection.
-4. NDI discovery and video transport are independent of the Veyra management channel.
+4. NDI discovery and video transport are independent of the NDIView management channel.
 5. Every command has an ID, expiry, acknowledgement, and final outcome.
 6. Every configuration and media manifest has a version.
 7. A failed or partial update must never overwrite the last known-good local state.
@@ -204,4 +204,4 @@ The following still need a technical decision record or implementation:
 5. Playlist behavior when an item is missing, corrupted, or cannot be decoded.
 6. Production CA provisioning and certificate renewal for multi-receiver deployments.
 
-The SQLite migration mechanism (schema v6), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, verified local cache, and timed image fallback are implemented. Remote commands and WebSocket events remain in progress. The complete player still needs an official NDI SDK build and target-hardware validation.
+The SQLite migration mechanism (schema v8), initial pairing flow, TLS requirement for non-loopback binding, media storage, per-device source/fallback assignment, versioned receiver configuration, assigned-media manifests, receiver-authenticated asset downloads, verified local cache, and timed image fallback are implemented. Receiver restart and device reboot commands are implemented; WebSocket events remain in progress. The complete player still needs an official NDI SDK build and target-hardware validation.

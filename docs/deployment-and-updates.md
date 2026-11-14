@@ -1,13 +1,13 @@
 # Deployment, fullscreen and update architecture
 
 Status: implementation and validation tracker for `feature/deployment-and-updates`.
-The kiosk deployment, allowlisted receiver restart, production dashboard serving, and signed central-server release workflow have code and CI coverage. Native receiver update distribution and physical Mac mini validation remain pending.
+The kiosk deployment, allowlisted receiver restart and device reboot, production dashboard serving, and signed central-server release workflow have code and CI coverage. Native receiver update distribution and physical Mac mini validation remain pending. The dashboard distinguishes an application-only receiver restart from a full device reboot.
 
 ## Goals
 
 - Preserve the working `main` branch. All work in this document belongs on `feature/deployment-and-updates`.
 - Deploy the receiver to Intel x86_64 Mac mini hardware without rebuilding or reinstalling the operating system for normal application updates.
-- Run the central Veyra server and dashboard on a separate always-on PC.
+- Run the central NDIView server and dashboard on a separate always-on PC.
 - Support frequent development updates now and safe, controlled production updates later.
 - Keep device identity, pairing credentials, configuration, and cached fallback media separate from replaceable application binaries.
 - Make the receiver start in fullscreen after boot and recover from ordinary application/display failures.
@@ -17,7 +17,7 @@ The kiosk deployment, allowlisted receiver restart, production dashboard serving
 ### Receiver Mac mini
 
 Target OS: Debian 13 x86_64, subject to a hardware validation pass on the exact Mac mini model.
-Install the native Veyra receiver, its runtime dependencies, the official NDI SDK runtime/library, Avahi, and a dedicated non-admin kiosk account.
+Install the native NDIView receiver, its runtime dependencies, the official NDI SDK runtime/library, Avahi, and a dedicated non-admin kiosk account.
 
 Keep mutable state outside the release directory:
 - Application releases: `/opt/veyra/releases/<version>/`
@@ -30,7 +30,7 @@ The current example config defaults to `~/.local/state/veyra/device-token` for t
 
 ### Central server PC
 
-Run Debian 13 x86_64 (or another explicitly tested Linux server OS), Node.js 22+, the Veyra server, SQLite, and the dashboard's production build. Give the server a stable LAN address or DNS name.
+Run Debian 13 x86_64 (or another explicitly tested Linux server OS), Node.js 22+, the NDIView server, SQLite, and the dashboard's production build. Give the server a stable LAN address or DNS name.
 
 The server must be configured with TLS before listening on a LAN interface. Do not expose the current development server or authenticated device APIs over plaintext LAN. Receivers must validate the server certificate using a configured CA/certificate trust path.
 
@@ -68,7 +68,7 @@ The dashboard is a web application, so receivers do not need a dashboard updater
 
 Recommended first production model:
 1. Build the dashboard as part of a versioned central-server release.
-2. Package the built static assets with that server release and serve them from the Veyra server's production HTTP origin.
+2. Package the built static assets with that server release and serve them from the NDIView server's production HTTP origin.
 3. Update the central server using a separate updater/deployment service or operator-controlled package step. Do not have the running Node process overwrite its own executable files.
 4. Keep the previous server release available and use the same staged activation/health-check/rollback approach.
 5. On activation, the server serves the new dashboard assets. Browsers fetch the new HTML on next navigation/refresh; hashed asset filenames avoid stale JS/CSS collisions. Set HTML to revalidate/no-cache and hashed assets to long-lived immutable caching.
@@ -88,15 +88,15 @@ The dashboard should expose:
 
 ## Fullscreen, boot and recovery
 
-Target behavior: power is applied -> Linux boots -> graphical display session becomes ready -> Veyra receiver launches automatically -> receiver renders fullscreen -> it reconnects to the configured NDI source and control server when available.
+Target behavior: power is applied -> Linux boots -> graphical display session becomes ready -> NDIView receiver launches automatically -> receiver renders fullscreen -> it reconnects to the configured NDI source and control server when available.
 
 Implementation work:
 1. Validate Debian 13 on the exact Intel Mac mini: boot, Ethernet, Wi-Fi if needed, HDMI/DisplayPort output, resolution/refresh rates, Intel graphics driver, audio not required, and NDI performance.
 2. Choose and test a lightweight Xorg-based kiosk session first for SDL2 compatibility. Do not assume Wayland/DRM behavior until tested. Disable screen blanking, DPMS sleep, screensaver, desktop notifications, and power-saving behaviors that interrupt output.
 3. Create a dedicated unprivileged `veyra` account. Do not run the receiver as root.
-4. Configure display-manager automatic login directly into the dedicated kiosk account/session. This removes the local desktop login prompt only; it does not disable the Veyra dashboard's operator authentication or create an administrator session.
-5. Start a minimal Xorg session and launch Veyra automatically once the display server and target output are ready. Prefer a dedicated kiosk session with no general-purpose desktop shell, panels, notifications, or terminal shortcuts exposed to viewers. Keep an authorized maintenance path (for example, a documented keyboard shortcut requiring local access or a separate admin TTY).
-6. Run Veyra as an unprivileged user. Use a systemd user service or a system service explicitly attached to the graphical session; do not start SDL before DISPLAY/Xauthority and the output are ready. Set restart-on-failure with a sensible delay and rate limit. Avoid rapid crash loops. Add structured logs and a local health signal.
+4. Configure display-manager automatic login directly into the dedicated kiosk account/session. This removes the local desktop login prompt only; it does not disable the NDIView dashboard's operator authentication or create an administrator session.
+5. Start a minimal Xorg session and launch NDIView automatically once the display server and target output are ready. Prefer a dedicated kiosk session with no general-purpose desktop shell, panels, notifications, or terminal shortcuts exposed to viewers. Keep an authorized maintenance path (for example, a documented keyboard shortcut requiring local access or a separate admin TTY).
+6. Run NDIView as an unprivileged user. Use a systemd user service or a system service explicitly attached to the graphical session; do not start SDL before DISPLAY/Xauthority and the output are ready. Set restart-on-failure with a sensible delay and rate limit. Avoid rapid crash loops. Add structured logs and a local health signal.
 7. Disable X11 screen blanking, DPMS monitor sleep, desktop screensaver, suspend/hibernate, and lid/power policies that could interrupt signage. Test whether firmware/BIOS restores power after AC loss; configure it if the Mac mini firmware offers that option.
 8. Verify fullscreen is truly borderless/fullscreen at the target output resolution and survives unplug/replug, display mode changes, source loss/reappearance, and application restart. SDL already requests `SDL_WINDOW_FULLSCREEN_DESKTOP` when `display.fullscreen` is true and hides the cursor/disables the screensaver while running; this does not configure autologin, Xorg, DPMS, or boot startup.
 9. Add a maintenance escape path for authorized local maintenance without exposing normal desktop controls to viewers.

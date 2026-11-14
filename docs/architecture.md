@@ -1,10 +1,10 @@
-# Veyra architecture
+# NDIView architecture
 
 ## Product vision
 
-**Veyra — Network video. Simplified.**
+**NDIView — Network video. Simplified.**
 
-Veyra is a local-network video and display platform. Its first deployment environment is churches, but the product is general-purpose and is not defined by that environment.
+NDIView is a local-network video and display platform. Its first deployment environment is churches, but the product is general-purpose and is not defined by that environment.
 
 The platform combines:
 
@@ -37,7 +37,7 @@ The dashboard and server are part of the product scope. The repository now inclu
   |       |                                              |
   |       v                                              |
   |  +--------------------+      +-------------------+  |
-  |  | Veyra Dashboard    |<---->| Veyra Local Server|  |
+  |  | NDIView Dashboard    |<---->| NDIView Local Server|  |
   |  | Devices / Sources  | API  | Auth / Database   |  |
   |  | Media / Playlists  | WS   | Sync / Commands   |  |
   |  | System / Logs      |      | Device registry   |  |
@@ -60,7 +60,7 @@ The dashboard is the operator interface. The local server owns shared configurat
 
 ## Main components
 
-### 1. Veyra Receiver
+### 1. NDIView Receiver
 
 A small native Linux process responsible for reliable display output.
 
@@ -89,7 +89,7 @@ Remaining receiver work:
 
 The receiver must not require the dashboard or server to remain running for normal playback.
 
-### 2. Veyra Local Server
+### 2. NDIView Local Server
 
 A service running on the customer's local network. It is the management authority, not part of the critical video-rendering path.
 
@@ -105,13 +105,13 @@ Responsibilities:
 - Remote commands, including changing source, selecting a playlist, requesting a resync, and restarting the receiver process.
 - Playback state, health metrics, logs, and diagnostics.
 
-The server exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, authenticated heartbeats with source snapshots, an aggregated NDI source inventory endpoint, local image upload/storage, playlist CRUD, device credential revocation, per-device source and fallback assignments, versioned receiver configuration, assigned-media manifests, and receiver-authenticated asset downloads. The C++ client verifies TLS, stores its bearer credential locally, synchronizes the assigned state, and caches fallback images. Remote commands and WebSocket events remain planned.
+The server exposes a versioned health endpoint, local operator setup/session routes, protected device inventory, one-time receiver pairing, authenticated heartbeats with source snapshots, an aggregated NDI source inventory endpoint, local image upload/storage, playlist CRUD, device credential revocation, per-device source and fallback assignments, versioned receiver configuration, assigned-media manifests, and receiver-authenticated asset downloads. The C++ client verifies TLS, stores its bearer credential locally, synchronizes the assigned state, and caches fallback images. Receiver restart and device reboot commands are implemented; WebSocket events remain planned.
 
-The server currently uses a local SQLite database in WAL mode with versioned migrations through schema version 6. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
+The server currently uses a local SQLite database in WAL mode with versioned migrations through schema version 8. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
 
-### 3. Veyra Dashboard
+### 3. NDIView Dashboard
 
-A browser-based operator interface that communicates with the local server. The current development build runs through Vite. The NDI Sources page displays receiver-reported source inventory; the Media Library and Playlists pages use the local server for image uploads, content previews, ordered playlist editing, and per-image durations; production static serving is still to be implemented.
+A browser-based operator interface that communicates with the local server. The current development build runs through Vite. The NDI Sources page displays receiver-reported source inventory; the Media Library and Playlists pages use the local server for image uploads, content previews, ordered playlist editing, and per-image durations; production static serving is implemented.
 
 Current sections:
 
@@ -122,7 +122,7 @@ Current sections:
 - **System:** local server health and storage state.
 - **System:** server health, receiver diagnostics, logs, and platform settings.
 
-Per-device actions currently include assigning the NDI source and fallback playlist. Planned actions include restarting the Veyra receiver process, requesting manual resynchronization, and viewing detailed device logs.
+Per-device actions currently include assigning the NDI source and fallback playlist. Planned actions include restarting the NDIView receiver process, requesting manual resynchronization, and viewing detailed device logs.
 
 The dashboard should make the state of each device understandable at a glance. It must distinguish server reachability from receiver playback state; an offline server does not necessarily mean a receiver is offline.
 
@@ -159,7 +159,7 @@ The initial fallback content scope includes image-based sequences with explicit 
 - Receiver-to-server traffic stays on the LAN.
 - NDI discovery and video transport remain separate from the management API.
 - The receiver's playback loop must not block on server requests.
-- Device identity and authentication are implemented for pairing and heartbeats; remote commands still need a narrow, versioned contract.
+- Device identity and authentication are implemented for pairing and heartbeats; receiver restart and device reboot commands use an authenticated, allowlisted command contract.
 - Remote commands need acknowledgements, timeouts, and observable outcomes.
 - Configuration and media updates should be versioned and applied atomically so a partial download cannot corrupt the last working state.
 
@@ -194,4 +194,4 @@ The full NDI player has not yet been built against an installed official NDI SDK
 
 ## Third-party licensing
 
-The official NDI SDK is proprietary. Keep its headers and binaries out of the repository unless the applicable license explicitly permits redistribution. Review all third-party licenses before packaging Veyra for distribution.
+The official NDI SDK is proprietary. Keep its headers and binaries out of the repository unless the applicable license explicitly permits redistribution. Review all third-party licenses before packaging NDIView for distribution.
