@@ -325,7 +325,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
 
     const detectedMime = detectImageMime(image);
-    const declaredMime = (request.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+    const declaredMime = ((request.headers["content-type"] ?? "").split(";")[0] ?? "").trim().toLowerCase();
     if (!detectedMime || detectedMime !== declaredMime) {
       return reply.code(415).send({ error: "Only valid PNG, JPEG, and WebP images are supported" });
     }
