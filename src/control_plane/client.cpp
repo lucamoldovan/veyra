@@ -2,7 +2,7 @@
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
+#include <iostream>
 
 #include <algorithm>
 #include <array>
@@ -110,12 +110,12 @@ void Client::run(const std::stop_token stopToken) {
     try {
         deviceToken_ = loadCredential();
     } catch (const std::exception& error) {
-        spdlog::error("Veyra device credential could not be loaded: {}", error.what());
+        std::cerr << "Veyra device credential could not be loaded: " << error.what() << '\n';
         return;
     }
 
     if (deviceToken_.empty() && config_.pairingCode.empty()) {
-        spdlog::info("Veyra control plane is configured but no pairing code or device credential is available");
+        std::clog << "Veyra control plane is configured but no pairing code or device credential is available\n";
         return;
     }
 
@@ -150,9 +150,9 @@ bool Client::pair() {
     const auto response = postJson("/api/v1/receiver/pair", body.dump());
     if (response.status != 201) {
         if (!response.error.empty()) {
-            spdlog::warn("Veyra receiver pairing request failed: {}", response.error);
+            std::clog << "Veyra receiver pairing request failed: " << response.error << '\n';
         } else {
-            spdlog::warn("Veyra receiver pairing was rejected (HTTP {})", response.status);
+            std::clog << "Veyra receiver pairing was rejected (HTTP " << response.status << ")\n";
         }
         return false;
     }
@@ -162,7 +162,7 @@ bool Client::pair() {
         const std::string token = result.at("deviceToken").get<std::string>();
         const std::string id = result.at("deviceId").get<std::string>();
         if (token.size() < 32 || token.size() > 512 || id.empty()) {
-            spdlog::error("Veyra server returned an invalid receiver credential");
+            std::cerr << "Veyra server returned an invalid receiver credential\n";
             return false;
         }
 
@@ -176,10 +176,10 @@ bool Client::pair() {
                 heartbeatIntervalSeconds_ = interval;
             }
         }
-        spdlog::info("Veyra receiver paired successfully (device ID {})", deviceId_);
+        std::clog << "Veyra receiver paired successfully (device ID " << deviceId_ << ")\n";
         return true;
     } catch (const std::exception& error) {
-        spdlog::error("Veyra pairing response was invalid: {}", error.what());
+        std::cerr << "Veyra pairing response was invalid: " << error.what() << '\n';
         return false;
     }
 }
@@ -224,14 +224,11 @@ bool Client::sendHeartbeat() {
         return true;
     }
     if (response.status == 401) {
-        spdlog::error(
-            "Veyra receiver credential was rejected. Revoke/remove this device, "
-            "then clear the local credential and pair it again."
-        );
+        std::cerr << "Veyra receiver credential was rejected. Revoke/remove this device, then clear the local credential and pair it again.\n";
     } else if (!response.error.empty()) {
-        spdlog::warn("Veyra heartbeat failed: {}", response.error);
+        std::clog << "Veyra heartbeat failed: " << response.error << '\n';
     } else {
-        spdlog::warn("Veyra heartbeat was rejected (HTTP {})", response.status);
+        std::clog << "Veyra heartbeat was rejected (HTTP " << response.status << ")\n";
     }
     return false;
 }
