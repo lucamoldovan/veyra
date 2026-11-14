@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   Activity,
   ArrowDownRight,
@@ -11,10 +11,12 @@ import {
   HardDrive,
   Image,
   LayoutDashboard,
+  LoaderCircle,
+  LockKeyhole,
+  LogOut,
   Menu,
   Monitor,
   MonitorPlay,
-  MoreHorizontal,
   Network,
   Radio,
   Server,
@@ -23,9 +25,10 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { getServerHealth, type ConnectionState, type ServerHealth } from "./api";
+import { createInitialOperator, getAuthSession, getServerHealth, getSetupStatus, login, logout, type ConnectionState, type Operator, type ServerHealth } from "./api";
 
 type Page = "overview" | "devices" | "sources" | "media" | "playlists" | "system";
+type AuthState = "checking" | "setup" | "login" | "authenticated" | "unavailable";
 
 const navigation: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -41,6 +44,8 @@ function App() {
   const [connection, setConnection] = useState<ConnectionState>("checking");
   const [health, setHealth] = useState<ServerHealth | null>(null);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [authState, setAuthState] = useState<AuthState>("checking");
+  const [operator, setOperator] = useState<Operator | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -75,12 +80,63 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadAuthentication = async () => {
+      try {
+        const [setupStatus, session] = await Promise.all([
+          getSetupStatus(),
+          getAuthSession(),
+        ]);
+        if (!active) return;
+
+        if (session.authenticated && session.operator) {
+          setOperator(session.operator);
+          setAuthState("authenticated");
+        } else {
+          setAuthState(setupStatus.setupRequired ? "setup" : "login");
+        }
+      } catch {
+        if (active) setAuthState("unavailable");
+      }
+    };
+
+    void loadAuthentication();
+    return () => { active = false; };
+  }, []);
+
+  const handleAuthenticated = (nextOperator: Operator) => {
+    setOperator(nextOperator);
+    setAuthState("authenticated");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setOperator(null);
+      setAuthState("login");
+    } catch {
+      setAuthState("unavailable");
+    }
+  };
+
   const navigate = (nextPage: Page) => {
     setPage(nextPage);
     setMobileNavOpen(false);
   };
 
   const pageTitle = navigation.find((item) => item.id === page)?.label ?? "System";
+
+  if (authState !== "authenticated" || !operator) {
+    return (
+      <AuthScreen
+        mode={authState}
+        onAuthenticated={handleAuthenticated}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -174,7 +230,7 @@ function App() {
               <span className="status-dot" />
               <span>{connection === "checking" ? "Connecting" : connection === "online" ? "Server online" : "Server offline"}</span>
             </div>
-              <div className="topbar-avatar">L</div>
+              <div className="topbar-avatar">{operator.username.slice(0, 1).toUpperCase()}</div>
           </div>
         </header>
 
@@ -196,6 +252,156 @@ function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+
+function AuthScreen({
+  mode,
+  onAuthenticated,
+  onRetry,
+}: {
+  mode: AuthState;
+  onAuthenticated: (operator: Operator) => void;
+  onRetry: () => void;
+}) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [setupKey, setSetupKey] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const isSetup = mode === "setup";
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+
+    if (isSetup && password !== confirmPassword) {
+      setError("The passwords do not match.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = isSetup
+        ? await createInitialOperator({ setupKey, username, password })
+        : await login({ username, password });
+
+      if (!result.authenticated || !result.operator) {
+        throw new Error("Authentication did not complete. Please try again.");
+      }
+      onAuthenticated(result.operator);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="auth-shell">
+      <div className="auth-card">
+        <div className="auth-brand">
+          <div className="brand-mark"><AudioWaveform size={21} strokeWidth={2.2} /></div>
+          <div className="brand-copy"><span className="brand-name">veyra</span><span className="brand-caption">NETWORK VIDEO</span></div>
+        </div>
+
+        {mode === "checking" && (
+          <div className="auth-message">
+            <LoaderCircle className="auth-spinner" size={25} />
+            <h1>Connecting to Veyra</h1>
+            <p>Checking your local workspace…</p>
+          </div>
+        )}
+
+        {mode === "unavailable" && (
+          <div className="auth-message">
+            <div className="auth-symbol auth-symbol-error"><Server size={23} /></div>
+            <h1>Server unavailable</h1>
+            <p>Start the Veyra server, then try connecting again. Your dashboard and data stay on your local network.</p>
+            <button className="button button-dark button-full" onClick={onRetry}>Try again <ArrowRight size={15} /></button>
+          </div>
+        )}
+
+        {(mode === "setup" || mode === "login") && (
+          <>
+            <div className="auth-heading">
+              <div className="auth-symbol"><LockKeyhole size={21} /></div>
+              <div className="eyebrow">{isSetup ? "FIRST-TIME SETUP" : "LOCAL WORKSPACE"}</div>
+              <h1>{isSetup ? "Create your workspace." : "Welcome back."}</h1>
+              <p>{isSetup ? "Create the administrator account for this Veyra installation." : "Sign in to manage your network video system."}</p>
+            </div>
+
+            <form className="auth-form" onSubmit={(event) => void submit(event)}>
+              {isSetup && (
+                <label className="field-label">
+                  Setup key
+                  <input
+                    autoComplete="off"
+                    required
+                    value={setupKey}
+                    onChange={(event) => setSetupKey(event.target.value)}
+                    placeholder="Paste the key from the server terminal"
+                  />
+                  <span className="field-hint">The first-run key is printed once in the Veyra server logs.</span>
+                </label>
+              )}
+              <label className="field-label">
+                Username
+                <input
+                  autoComplete="username"
+                  minLength={3}
+                  maxLength={32}
+                  pattern="[a-zA-Z0-9_-]{3,32}"
+                  required
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="Your username"
+                />
+              </label>
+              <label className="field-label">
+                Password
+                <input
+                  autoComplete={isSetup ? "new-password" : "current-password"}
+                  minLength={isSetup ? 12 : 1}
+                  maxLength={256}
+                  required
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={isSetup ? "At least 12 characters" : "Your password"}
+                />
+              </label>
+              {isSetup && (
+                <label className="field-label">
+                  Confirm password
+                  <input
+                    autoComplete="new-password"
+                    minLength={12}
+                    maxLength={256}
+                    required
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    placeholder="Enter your password again"
+                  />
+                </label>
+              )}
+              {error && <div className="auth-error" role="alert">{error}</div>}
+              <button className="button button-dark button-full auth-submit" type="submit" disabled={submitting}>
+                {submitting ? <LoaderCircle size={16} className="auth-spinner" /> : null}
+                {submitting ? "Please wait…" : isSetup ? "Create administrator" : "Sign in"}
+                {!submitting && <ArrowRight size={15} />}
+              </button>
+            </form>
+            <div className="auth-foot"><ShieldCheck size={14} /> Local authentication · No cloud account required</div>
+          </>
+        )}
+      </div>
+      <div className="auth-background-mark">VEYRA</div>
+    </main>
   );
 }
 
