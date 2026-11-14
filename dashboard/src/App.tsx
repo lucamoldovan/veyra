@@ -4,7 +4,6 @@ import {
   ArrowDownRight,
   ArrowRight,
   AudioWaveform,
-  Check,
   ChevronDown,
   CircleHelp,
   Command,
@@ -19,8 +18,6 @@ import {
   Network,
   Plus,
   Radio,
-  RefreshCw,
-  Search,
   Server,
   Settings,
   ShieldCheck,
@@ -186,7 +183,6 @@ function App() {
           {page === "overview" && (
             <Overview
               connection={connection}
-              health={health}
               lastChecked={lastChecked}
               onNavigate={navigate}
             />
@@ -206,12 +202,10 @@ function App() {
 
 function Overview({
   connection,
-  health,
   lastChecked,
   onNavigate,
 }: {
   connection: ConnectionState;
-  health: ServerHealth | null;
   lastChecked: Date | null;
   onNavigate: (page: Page) => void;
 }) {
