@@ -49,7 +49,19 @@ bash scripts/package-receiver-release.sh 0.1.0 dist/receiver-releases stable
 
 The script produces an immutable-by-convention tarball, a JSON manifest containing the SHA-256 digest and compatibility metadata, and an Ed25519 signature over that manifest. The private signing key must remain offline; install only the corresponding public key on trusted receivers and the server. CI generates a temporary test key and verifies the package signature and digest.
 
-This is only the artifact-building stage. Central release publishing, authenticated artifact distribution, per-device rollout, receiver-side signature verification and installation, health confirmation, and rollback are still outstanding. Do not deploy these packages to receivers yet.
+Publish a package on the central server after installing the matching public key at `/etc/ndiview/receiver-release-signing.pub`:
+
+```bash
+sudo NDIVIEW_RELEASE_VERIFY_KEY=/etc/ndiview/receiver-release-signing.pub \
+  bash scripts/publish-receiver-release.sh \
+  dist/receiver-releases/ndiview-0.1.0-linux-x86_64.tar.gz \
+  dist/receiver-releases/ndiview-0.1.0-linux-x86_64.manifest.json \
+  dist/receiver-releases/ndiview-0.1.0-linux-x86_64.manifest.json.sig
+```
+
+The publisher verifies the Ed25519 manifest signature, artifact digest and size, enforces a default 100 MiB limit, rejects unsafe archive paths and link/special entries, and stores immutable release files under `/var/lib/veyra/server/receiver-releases/<version>/linux-x86_64/` (override with `NDIVIEW_RECEIVER_RELEASES_DIR`). CI tests packaging, signature verification, local publication and duplicate-release rejection.
+
+The files are now packaged and can be published to the server's local release store. They are **not yet exposed through an authenticated HTTP release API**. Per-device rollout, receiver polling/download, receiver-side signature verification and installation, health confirmation, rollback, and dashboard update controls are still outstanding. Do not deploy these packages to receivers yet.
  
 ## Update channels and release model
 
