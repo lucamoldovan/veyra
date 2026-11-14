@@ -135,6 +135,12 @@ bool Renderer::pollEvents() {
             return false;
         }
 
+        if (event.type == SDL_WINDOWEVENT &&
+            (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
+             event.window.event == SDL_WINDOWEVENT_RESIZED)) {
+            imageNeedsPresentation_ = true;
+        }
+
         if (event.type == SDL_RENDER_DEVICE_RESET ||
             event.type == SDL_RENDER_TARGETS_RESET) {
             destroyTexture();
