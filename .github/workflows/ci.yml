@@ -23,8 +23,8 @@ jobs:
       - name: Configure
         run: >
           cmake -S . -B build -G Ninja
-          -DVEYRA_BUILD_PLAYER=OFF
-          -DVEYRA_BUILD_TESTS=ON
+          -DNDIVIEW_BUILD_PLAYER=OFF
+          -DNDIVIEW_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build --parallel

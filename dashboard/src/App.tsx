@@ -164,7 +164,7 @@ function App() {
         </div>
 
         <div className="workspace-switcher">
-          <div className="workspace-avatar">V</div>
+          <div className="workspace-avatar">N</div>
           <div className="workspace-copy">
             <strong>Local workspace</strong>
             <span>Private network</span>

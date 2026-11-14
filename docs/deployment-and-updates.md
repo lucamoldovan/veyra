@@ -26,7 +26,7 @@ Keep mutable state outside the release directory:
 - Credentials and device identity: `/var/lib/ndiview/identity/`
 - Download/cache/fallback media: `/var/cache/ndiview/` or a dedicated persistent cache directory
 
-The current example config defaults to `~/.local/state/ndiview/device-token` for the credential and `~/.local/state/ndiview/cache` for cached state/media. The example config now uses the `ndiview` state directory. The installer still runs under the historical `veyra-kiosk` Linux account so existing deployments remain compatible; do not rename that account or move existing credentials/cache until an explicit migration is tested.
+The current example config stores receiver credentials and cached state under `~/.local/state/ndiview/`. The installer still runs under the historical `veyra-kiosk` Linux account so existing deployments remain compatible; do not rename that account or move existing credentials/cache until an explicit migration is tested.
 
 ### Central server PC
 
@@ -120,7 +120,7 @@ Target behavior: power is applied -> Linux boots -> graphical display session be
 Implementation work:
 1. Validate Debian 13 on the exact Intel Mac mini: boot, Ethernet, Wi-Fi if needed, HDMI/DisplayPort output, resolution/refresh rates, Intel graphics driver, audio not required, and NDI performance.
 2. Choose and test a lightweight Xorg-based kiosk session first for SDL2 compatibility. Do not assume Wayland/DRM behavior until tested. Disable screen blanking, DPMS sleep, screensaver, desktop notifications, and power-saving behaviors that interrupt output.
-3. The current installer uses the dedicated unprivileged `veyra-kiosk` account (a legacy OS account identifier retained for compatibility). Do not run the receiver as root. Do not run the receiver as root.
+3. The current installer uses the dedicated unprivileged `veyra-kiosk` account (a legacy OS account identifier retained for compatibility). Do not run the receiver as root.
 4. Configure display-manager automatic login directly into the dedicated kiosk account/session. This removes the local desktop login prompt only; it does not disable the NDIView dashboard's operator authentication or create an administrator session.
 5. Start a minimal Xorg session and launch NDIView automatically once the display server and target output are ready. Prefer a dedicated kiosk session with no general-purpose desktop shell, panels, notifications, or terminal shortcuts exposed to viewers. Keep an authorized maintenance path (for example, a documented keyboard shortcut requiring local access or a separate admin TTY).
 6. Run NDIView as an unprivileged user. Use a systemd user service or a system service explicitly attached to the graphical session; do not start SDL before DISPLAY/Xauthority and the output are ready. Set restart-on-failure with a sensible delay and rate limit. Avoid rapid crash loops. Add structured logs and a local health signal.
