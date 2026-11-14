@@ -138,6 +138,12 @@ bool Renderer::pollEvents() {
         if (event.type == SDL_RENDER_DEVICE_RESET ||
             event.type == SDL_RENDER_TARGETS_RESET) {
             destroyTexture();
+            if (imageTexture_ != nullptr) {
+                SDL_DestroyTexture(imageTexture_);
+                imageTexture_ = nullptr;
+            }
+            imagePath_.clear();
+            imageNeedsPresentation_ = true;
         }
     }
     return true;
@@ -301,6 +307,7 @@ void Renderer::convertUyvyToBgra(const VideoFrame& frame) {
 }
 
 void Renderer::present(const VideoFrame& frame) {
+    imageNeedsPresentation_ = true;
     if (frame.width <= 0 || frame.height <= 0 || frame.stride <= 0 ||
         frame.pixels.empty()) {
         throw std::runtime_error("Renderer received an invalid video frame");
@@ -443,6 +450,7 @@ void Renderer::present(const VideoFrame& frame) {
 
 void Renderer::presentImage(const std::filesystem::path& path) {
     if (path.empty()) throw std::runtime_error("Fallback image path is empty");
+    if (path == imagePath_ && imageTexture_ != nullptr && !imageNeedsPresentation_) return;
     if (path != imagePath_ || imageTexture_ == nullptr) {
         SDL_Texture* replacement = IMG_LoadTexture(renderer_, path.c_str());
         if (replacement == nullptr) {
@@ -482,9 +490,11 @@ void Renderer::presentImage(const std::filesystem::path& path) {
         throw sdlError("Could not render fallback image");
     }
     SDL_RenderPresent(renderer_);
+    imageNeedsPresentation_ = false;
 }
 
 void Renderer::clear() {
+    imageNeedsPresentation_ = true;
     if (SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255) != 0 ||
         SDL_RenderClear(renderer_) != 0) {
         throw sdlError("Could not clear the display");
