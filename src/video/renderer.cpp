@@ -280,20 +280,20 @@ void Renderer::convertUyvyToBgra(const VideoFrame& frame) {
     }
 }
 
-void Renderer::present(const ndi::VideoFrame& frame) {
+void Renderer::present(const VideoFrame& frame) {
     if (frame.width <= 0 || frame.height <= 0 || frame.stride <= 0 ||
         frame.pixels.empty()) {
         throw std::runtime_error("Renderer received an invalid video frame");
     }
 
-    if (frame.format != ndi::PixelFormat::UYVY &&
-        frame.format != ndi::PixelFormat::BGRA) {
+    if (frame.format != PixelFormat::UYVY &&
+        frame.format != PixelFormat::BGRA) {
         throw std::runtime_error("Renderer received an unsupported pixel format");
     }
 
     const int bytesPerPixel =
-        frame.format == ndi::PixelFormat::UYVY ? 2 : 4;
-    if (frame.format == ndi::PixelFormat::UYVY && (frame.width % 2) != 0) {
+        frame.format == PixelFormat::UYVY ? 2 : 4;
+    if (frame.format == PixelFormat::UYVY && (frame.width % 2) != 0) {
         throw std::runtime_error("UYVY video width must be even");
     }
 
@@ -311,12 +311,12 @@ void Renderer::present(const ndi::VideoFrame& frame) {
     }
 
     const int rowBytes = static_cast<int>(rowBytes64);
-    Uint32 desiredFormat = frame.format == ndi::PixelFormat::UYVY
+    Uint32 desiredFormat = frame.format == PixelFormat::UYVY
         ? SDL_PIXELFORMAT_UYVY
         : SDL_PIXELFORMAT_BGRA32;
 
     bool converted =
-        frame.format == ndi::PixelFormat::UYVY && uyvyTextureUnavailable_;
+        frame.format == PixelFormat::UYVY && uyvyTextureUnavailable_;
 
     if (converted) {
         convertUyvyToBgra(frame);
@@ -324,7 +324,7 @@ void Renderer::present(const ndi::VideoFrame& frame) {
     }
 
     if (!createTexture(frame.width, frame.height, desiredFormat)) {
-        if (frame.format != ndi::PixelFormat::UYVY || converted) {
+        if (frame.format != PixelFormat::UYVY || converted) {
             throw sdlError("Could not create the video texture");
         }
 
@@ -357,7 +357,7 @@ void Renderer::present(const ndi::VideoFrame& frame) {
     }
 
     if (!uploaded) {
-        if (frame.format != ndi::PixelFormat::UYVY || converted) {
+        if (frame.format != PixelFormat::UYVY || converted) {
             throw sdlError("Could not upload the video frame");
         }
 
