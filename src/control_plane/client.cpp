@@ -427,6 +427,19 @@ void Client::storeCredential(const std::string& token) const {
     if (::chmod(config_.credentialPath.c_str(), S_IRUSR | S_IWUSR) != 0) {
         throw std::runtime_error("could not restrict device credential file permissions");
     }
+
+    const auto directoryPath = parent.empty() ? std::filesystem::path(".") : parent;
+    const int directory = ::open(
+        directoryPath.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC
+    );
+    if (directory < 0) {
+        throw std::runtime_error("could not open device credential directory for synchronization");
+    }
+    const bool directorySynced = ::fsync(directory) == 0;
+    const bool directoryClosed = ::close(directory) == 0;
+    if (!directorySynced || !directoryClosed) {
+        throw std::runtime_error("could not synchronize device credential directory metadata");
+    }
 }
 
 void Client::waitFor(
