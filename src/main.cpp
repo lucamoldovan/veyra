@@ -273,7 +273,8 @@ int main(int argc, char* argv[]) {
                 if (synchronized.hasValidCachedState &&
                     (synchronized.configVersion != appliedConfigVersion ||
                      synchronized.playlistRevision != appliedPlaylistRevision ||
-                     fallbackSignature != appliedFallbackSignature)) {
+                     fallbackSignature != appliedFallbackSignature ||
+                     fallbackItems.size() != synchronized.fallbackItems.size())) {
                     const bool sourceChanged =
                         activeNdiConfig.sourceName != synchronized.ndiSourceName ||
                         activeNdiConfig.sourceAddress != synchronized.ndiSourceAddress;
