@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -274,6 +274,36 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
     assert.equal(afterRemoval.json().devices.length, 0);
   } finally {
     await app.close();
+  }
+});
+
+
+test("pairing secret is generated with restrictive permissions and remains stable", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "veyra-pairing-secret-"));
+  const databasePath = join(directory, "veyra.sqlite");
+  const pairingSecretPath = join(directory, "pairing-secret");
+
+  try {
+    const firstApp = buildApp({
+      databasePath,
+      setupKey: "test-setup-key",
+      pairingSecretPath,
+    });
+    await firstApp.close();
+
+    const firstSecret = readFileSync(pairingSecretPath, "utf8");
+    assert.match(firstSecret.trim(), /^[a-f0-9]{64}$/i);
+    assert.equal(statSync(pairingSecretPath).mode & 0o777, 0o600);
+
+    const secondApp = buildApp({
+      databasePath,
+      setupKey: "test-setup-key",
+      pairingSecretPath,
+    });
+    await secondApp.close();
+    assert.equal(readFileSync(pairingSecretPath, "utf8"), firstSecret);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
