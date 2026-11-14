@@ -127,6 +127,10 @@ function safeDisplayName(rawName: string | undefined): string {
 
 function ensurePrivateDirectory(path: string): void {
   const absolutePath = resolve(path);
+  const homeDirectory = process.env.HOME ? resolve(process.env.HOME) : "";
+  if (absolutePath === process.cwd() || (homeDirectory && absolutePath === homeDirectory)) {
+    throw new Error("Veyra media storage must use a dedicated subdirectory");
+  }
   const unsafeTargets = new Set([
     "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
     "/etc", "/usr", "/opt", "/run", "/mnt", "/media", "/dev", "/proc",
