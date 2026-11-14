@@ -4,7 +4,6 @@ import {
   ArrowDownRight,
   ArrowRight,
   AudioWaveform,
-  ChevronDown,
   CircleHelp,
   Command,
   Disc3,
@@ -166,7 +165,6 @@ function App() {
             <strong>Local workspace</strong>
             <span>Private network</span>
           </div>
-          <ChevronDown size={15} className="muted-icon" />
         </div>
 
         <div className="nav-label">WORKSPACE</div>
@@ -202,7 +200,7 @@ function App() {
             <div className="help-icon"><CircleHelp size={17} /></div>
             <div>
               <strong>Need a hand?</strong>
-              <span>Read the setup guide</span>
+              <span>Hosted on your local network</span>
             </div>
             <ArrowRight size={15} />
           </div>
@@ -475,7 +473,7 @@ function Overview({
           <div className="setup-progress"><span /></div>
           <div className="setup-progress-label"><span>Platform setup</span><strong>Just getting started</strong></div>
           <button className="button button-dark button-full" onClick={() => onNavigate("devices")}>
-            Set up your first device <ArrowRight size={16} />
+            Explore receiver management <ArrowRight size={16} />
           </button>
         </div>
       </section>
@@ -621,9 +619,9 @@ function SystemPage({
         <div className="panel system-card">
           <div className="system-card-icon"><HardDrive size={19} /></div>
           <div className="system-card-label">DATABASE</div>
-          <h2>Not configured</h2>
-          <p>Persistent storage has not been connected to the server yet.</p>
-          <div className="system-card-foot"><span className="status-dot dot-pending" />Next server milestone</div>
+          <h2>SQLite · WAL enabled</h2>
+          <p>Persistent local storage is initialized by the Veyra server.</p>
+          <div className="system-card-foot"><span className="status-dot dot-online" />Database ready</div>
         </div>
         <div className="panel system-card">
           <div className="system-card-icon"><Wifi size={19} /></div>
@@ -635,8 +633,8 @@ function SystemPage({
         <div className="panel system-card">
           <div className="system-card-icon"><ShieldCheck size={19} /></div>
           <div className="system-card-label">SECURITY</div>
-          <h2>Local development</h2>
-          <p>The server currently binds to loopback. Authentication is required before LAN exposure.</p>
+          <h2>Operator authentication</h2>
+          <p>First-run setup keys, scrypt password hashes and HttpOnly sessions are implemented.</p>
           <div className="system-card-foot"><span className="status-dot dot-pending" />LAN access disabled by default</div>
         </div>
       </section>
