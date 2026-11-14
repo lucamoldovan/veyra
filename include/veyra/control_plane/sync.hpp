@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <string>
+#include <cstdint>
 #include <stop_token>
 #include <vector>
 
@@ -18,6 +19,7 @@ struct CachedMediaItem {
 
 struct SyncSnapshot {
     int configVersion{0};
+    std::uint64_t syncGeneration{0};
     std::string ndiSourceName;
     std::string ndiSourceAddress;
     std::string fallbackPlaylistId;
