@@ -1,6 +1,7 @@
 #include "veyra/control_plane/client.hpp"
 
 #include <iostream>
+#include <utility>
 
 int main() {
     veyra::config::ControlPlaneConfig config;
