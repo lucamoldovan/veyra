@@ -131,5 +131,6 @@ ctest --test-dir build-tests --output-on-failure
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Control-plane contract (draft)](docs/control-plane-contract.md)
 - [Development plan](docs/development.md)
 - [Third-party licensing](LICENSE-THIRD-PARTY.md)
