@@ -1,0 +1,17 @@
+[Unit]
+Description=NDIView NDI video receiver
+After=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Environment=SDL_VIDEODRIVER=x11
+ExecStart=/usr/local/bin/ndiview --config /etc/ndiview/config.json
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,27 @@
+/build/
+/build-tests/
+/cmake-build-*/
+/.cache/
+*.o
+*.a
+*.so
+*.so.*
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Veyra local server
+/server/node_modules/
+/server/dist/
+/server/data/
+/server/.env
+/server/.env.*
+!/server/.env.example
+
+# Veyra dashboard
+/dashboard/node_modules/
+/dashboard/dist/
+/dashboard/.env
+/dashboard/.env.*
+!/dashboard/.env.example
