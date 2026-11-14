@@ -85,4 +85,4 @@ Implemented:
 - Configurable bind address and port, TLS-enforced non-loopback binding, security response headers, health endpoint, and graceful shutdown.
 - Automated server build and API tests in GitHub Actions.
 
-Not implemented yet: the native receiver enrollment/heartbeat client, receiver-side NDI discovery reporting, WebSocket events, device playlist assignment, remote commands, and production dashboard serving.
+The C++ receiver client now implements one-time pairing, TLS-verified bearer heartbeats, discovery snapshots, bounded retry/backoff, and owner-only credential storage. It is compiled and tested independently of the NDI SDK in CI, but the complete native player has not yet been built against the official NDI SDK.\n\nNot implemented yet: receiver configuration/media synchronization, WebSocket events, device playlist assignment, remote commands, and production dashboard serving.
