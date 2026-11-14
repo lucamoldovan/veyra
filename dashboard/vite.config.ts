@@ -9,7 +9,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8787",
+        target: process.env.VEYRA_API_TARGET ?? "http://127.0.0.1:8787",
         changeOrigin: true,
       },
     },
