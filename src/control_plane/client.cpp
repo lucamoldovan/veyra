@@ -101,6 +101,10 @@ void Client::stop() {
         worker_.request_stop();
         worker_.join();
     }
+    if (syncWorker_.joinable()) {
+        syncWorker_.request_stop();
+        syncWorker_.join();
+    }
 }
 
 void Client::updateStatus(PlaybackSnapshot snapshot) {
@@ -118,7 +122,6 @@ void Client::run(const std::stop_token stopToken) {
         std::lock_guard lock(syncMutex_);
         syncSnapshot_ = sync_.loadCached();
     }
-    auto nextSyncAt = std::chrono::steady_clock::now();
     try {
         deviceToken_ = loadCredential();
     } catch (const std::exception& error) {
@@ -144,24 +147,33 @@ void Client::run(const std::stop_token stopToken) {
 
         if (sendHeartbeat()) {
             retryDelay = std::chrono::seconds{5};
-            if (std::chrono::steady_clock::now() >= nextSyncAt) {
-                try {
-                    auto synced = sync_.synchronize(config_.serverUrl, deviceToken_, config_.caCertificatePath);
-                    {
-                        std::lock_guard lock(syncMutex_);
-                        syncSnapshot_ = std::move(synced);
-                    }
-                    std::clog << "Veyra receiver configuration and fallback cache synchronized" << '\n';
-                } catch (const std::exception& error) {
-                    std::clog << "Veyra receiver sync deferred: " << error.what() << '\n';
-                }
-                nextSyncAt = std::chrono::steady_clock::now() + std::chrono::seconds{config_.syncIntervalSeconds};
+            if (!syncWorker_.joinable()) {
+                syncWorker_ = std::jthread([this, token = deviceToken_](const std::stop_token syncStopToken) {
+                    runSync(syncStopToken, token);
+                });
             }
             waitFor(stopToken, std::chrono::seconds{heartbeatIntervalSeconds_});
         } else {
             waitFor(stopToken, retryDelay);
             retryDelay = std::min(retryDelay * 2, std::chrono::seconds{60});
         }
+    }
+}
+
+
+void Client::runSync(const std::stop_token stopToken, std::string deviceToken) {
+    while (!stopToken.stop_requested()) {
+        try {
+            auto synced = sync_.synchronize(config_.serverUrl, deviceToken, config_.caCertificatePath);
+            {
+                std::lock_guard lock(syncMutex_);
+                syncSnapshot_ = std::move(synced);
+            }
+            std::clog << "Veyra receiver configuration and fallback cache synchronized" << '\n';
+        } catch (const std::exception& error) {
+            std::clog << "Veyra receiver sync deferred: " << error.what() << '\n';
+        }
+        waitFor(stopToken, std::chrono::seconds{config_.syncIntervalSeconds});
     }
 }
 
