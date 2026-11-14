@@ -155,4 +155,5 @@ ctest --test-dir build-tests --output-on-failure
 - [Architecture](docs/architecture.md)
 - [Control-plane contract (draft)](docs/control-plane-contract.md)
 - [Development plan](docs/development.md)
+- [Target Mac mini validation checklist](docs/mac-mini-validation.md)
 - [Third-party licensing](LICENSE-THIRD-PARTY.md)
