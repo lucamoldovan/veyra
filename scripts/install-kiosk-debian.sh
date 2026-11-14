@@ -32,6 +32,9 @@ apt-get install --yes lightdm xserver-xorg x11-xserver-utils dbus-x11 unclutter 
 install -d -m 0755 /usr/local/libexec /usr/share/xsessions /etc/lightdm/lightdm.conf.d /home/veyra-kiosk/.config/systemd/user
 install -m 0755 scripts/ndiview-kiosk-session /usr/local/libexec/ndiview-kiosk-session
 install -o root -g root -m 0755 scripts/ndiview-action /usr/local/libexec/ndiview-action
+# Remove obsolete Veyra kiosk hooks and the old reboot-only privilege entry.
+rm -f /etc/sudoers.d/veyra-reboot /usr/local/libexec/veyra-reboot
+rm -f /etc/lightdm/lightdm.conf.d/50-veyra-kiosk.conf /usr/share/xsessions/veyra-kiosk.desktop
 printf '%s\n' 'veyra-kiosk ALL=(root) NOPASSWD: /usr/local/libexec/ndiview-action restart, /usr/local/libexec/ndiview-action reboot' > /etc/sudoers.d/ndiview-action
 chmod 0440 /etc/sudoers.d/ndiview-action
 visudo -cf /etc/sudoers.d/ndiview-action
