@@ -68,6 +68,11 @@ This roadmap covers the complete Veyra platform. Checkboxes describe repository 
 
 ## Phase 6 — Dashboard
 
+- [x] Create the React/TypeScript/Vite dashboard workspace
+- [x] Add responsive application shell and primary workspace navigation
+- [x] Add overview, Devices, NDI Sources, Media Library, Playlists, and System pages
+- [x] Connect live server health indicator to the local API
+- [x] Add dashboard TypeScript and production build to GitHub Actions
 - [ ] Create the dashboard workspace and shared API types
 - [ ] Implement login and session handling
 - [ ] Implement device overview and live status
