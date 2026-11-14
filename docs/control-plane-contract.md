@@ -43,6 +43,7 @@ Implemented endpoints:
 | POST | `/api/v1/devices/pairing-codes` | Create a one-time 12-digit receiver pairing code (authenticated operator only) |
 | POST | `/api/v1/devices/{deviceId}/revoke` | Revoke a receiver credential (authenticated operator only) |
 | DELETE | `/api/v1/devices/{deviceId}` | Remove a receiver record after its credential has been revoked (authenticated operator only) |
+| GET | `/api/v1/sources` | List NDI sources reported by active receivers (authenticated operator only) |
 | GET | `/api/v1/media` | List local media assets (authenticated operator only) |
 | POST | `/api/v1/media` | Upload a PNG, JPEG, or WebP image (authenticated operator only) |
 | GET | `/api/v1/media/{mediaId}/content` | Read an uploaded image (authenticated operator only) |
@@ -60,7 +61,6 @@ Remaining planned management endpoints:
 | GET | `/api/v1/devices/{deviceId}` | Read device details and assignments |
 | PATCH | `/api/v1/devices/{deviceId}` | Update server-managed device settings |
 | POST | `/api/v1/devices/{deviceId}/commands` | Queue an allowlisted device command |
-| GET | `/api/v1/sources` | List known NDI sources |
 | GET | `/api/v1/system/health` | Read detailed local server health |
 | GET | `/api/v1/devices/{deviceId}/logs` | Read retained receiver diagnostics |
 
@@ -96,7 +96,7 @@ Implemented endpoints:
 | Method | Route | Purpose |
 |---|---|---|
 | POST | `/api/v1/receiver/pair` | Exchange a one-time pairing code for a device ID and device credential |
-| POST | `/api/v1/receiver/heartbeat` | Submit a bearer-authenticated heartbeat and current playback state |
+| POST | `/api/v1/receiver/heartbeat` | Submit a bearer-authenticated heartbeat, current playback state, and optional discovered NDI source snapshot |
 
 Planned endpoints:
 
