@@ -148,6 +148,7 @@ sudo cmake --install build
 mkdir -p ~/.config/systemd/user
 cp systemd/ndiview.service ~/.config/systemd/user/ndiview.service
 systemctl --user daemon-reload
+systemctl --user import-environment DISPLAY XAUTHORITY XDG_SESSION_TYPE
 systemctl --user enable --now ndiview.service
 
 systemctl --user status ndiview.service
