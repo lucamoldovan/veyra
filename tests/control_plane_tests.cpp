@@ -106,7 +106,7 @@ int main() {
     const std::string token(43, 't');
 
     std::thread mockServer([&] {
-        for (int index = 0; index < 2; ++index) {
+        for (int index = 0; index < 5; ++index) {
             pollfd descriptor{listener, POLLIN, 0};
             if (::poll(&descriptor, 1, 7000) <= 0) {
                 serverFailed = true;
@@ -125,15 +125,28 @@ int main() {
             }
             requestsChanged.notify_all();
 
-            const std::string responseBody = index == 0
-                ? "{\"deviceId\":\"device-test\",\"deviceToken\":\"" + token +
-                    "\",\"heartbeatIntervalSeconds\":5}"
-                : "{}";
+            const std::string asset = "veyra-cache-test";
+            const std::string assetHash = "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
+            std::string responseBody;
+            std::string contentType = "application/json";
             const int status = index == 0 ? 201 : 200;
             const std::string reason = index == 0 ? "Created" : "OK";
+            if (index == 0) {
+                responseBody = "{\"deviceId\":\"device-test\",\"deviceToken\":\"" + token +
+                    "\",\"heartbeatIntervalSeconds\":5}";
+            } else if (index == 1) {
+                responseBody = "{}";
+            } else if (index == 2) {
+                responseBody = "{\"schemaVersion\":1,\"configVersion\":2,\"ndi\":{\"sourceName\":\"Camera 1\",\"sourceAddress\":\"ndi://camera-1.local\"},\"fallbackPlaylistId\":\"fallback-1\"}";
+            } else if (index == 3) {
+                responseBody = "{\"schemaVersion\":1,\"configVersion\":2,\"playlistId\":\"fallback-1\",\"playlistRevision\":3,\"items\":[{\"mediaId\":\"media-1\",\"position\":0,\"durationSeconds\":12,\"mimeType\":\"image/png\",\"sizeBytes\":16,\"sha256\":\"" + assetHash + "\",\"downloadPath\":\"/api/v1/receiver/media/media-1\"}]}";
+            } else {
+                responseBody = asset;
+                contentType = "image/png";
+            }
             const std::string response =
                 "HTTP/1.1 " + std::to_string(status) + " " + reason + "\r\n" +
-                "Content-Type: application/json\r\n" +
+                "Content-Type: " + contentType + "\r\n" +
                 "Content-Length: " + std::to_string(responseBody.size()) + "\r\n" +
                 "Connection: close\r\n\r\n" + responseBody;
             if (!sendAll(clientSocket, response)) serverFailed = true;
@@ -155,6 +168,8 @@ int main() {
         config.pairingCode = "123456789012";
         config.credentialPath = credentialPath;
         config.heartbeatIntervalSeconds = 5;
+        config.syncIntervalSeconds = 5;
+        config.cachePath = temporaryRoot / "cache";
 
         veyra::control_plane::Client client(config);
         veyra::control_plane::PlaybackSnapshot snapshot;
@@ -168,7 +183,7 @@ int main() {
         {
             std::unique_lock lock(requestsMutex);
             requestsChanged.wait_for(lock, std::chrono::seconds(8), [&] {
-                return requests.size() >= 2 || serverFailed;
+                return requests.size() >= 5 || serverFailed;
             });
         }
 
@@ -198,7 +213,24 @@ int main() {
             requests[1].find("Camera 1") != std::string::npos &&
             requests[1].find("\"playbackMode\":\"ndi\"") != std::string::npos;
 
+        const bool configRequestOk = requests.size() >= 3 &&
+            requests[2].find("GET /api/v1/receiver/config ") != std::string::npos;
+        const bool manifestRequestOk = requests.size() >= 4 &&
+            requests[3].find("GET /api/v1/receiver/media-manifest ") != std::string::npos;
+        const bool assetRequestOk = requests.size() >= 5 &&
+            requests[4].find("GET /api/v1/receiver/media/media-1 ") != std::string::npos;
+        const auto synced = client.syncSnapshot();
+        bool cachedAssetOk = false;
+        if (synced.hasValidCachedState && synced.fallbackItems.size() == 1) {
+            std::ifstream cached(synced.fallbackItems[0].path, std::ios::binary);
+            const std::string bytes((std::istreambuf_iterator<char>(cached)), {});
+            cachedAssetOk = bytes == "veyra-cache-test" &&
+                synced.fallbackItems[0].durationSeconds == 12 &&
+                synced.ndiSourceName == "Camera 1";
+        }
+
         success = !serverFailed && pairRequestOk && heartbeatRequestOk &&
+            configRequestOk && manifestRequestOk && assetRequestOk && cachedAssetOk &&
             storedToken == token && fileModeOk && directoryModeOk;
     }
 
@@ -207,10 +239,10 @@ int main() {
     std::filesystem::remove_all(temporaryRoot);
 
     if (!success) {
-        std::cerr << "Control-plane pairing, heartbeat, or credential persistence test failed\n";
+        std::cerr << "Control-plane pairing, heartbeat, sync, cache integrity, or credential persistence test failed\n";
         return 1;
     }
 
-    std::cout << "Control-plane pairing, heartbeat, and credential persistence test passed\n";
+    std::cout << "Control-plane pairing, verified media sync, and credential persistence test passed\n";
     return 0;
 }
