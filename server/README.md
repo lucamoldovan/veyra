@@ -43,7 +43,7 @@ With the server database and pairing secret in their configured locations, creat
 npm run backup -- /path/to/secure-backup-directory
 ```
 
-The command uses SQLite's online backup API and copies the pairing secret alongside the database. It creates owner-only backup files and a small manifest. Store the backup directory somewhere protected; the pairing secret is sensitive and must not be published or committed.
+The command uses SQLite's online backup API and copies the pairing secret and media directory alongside the database. It creates owner-only backup files and a small manifest. Store the backup directory somewhere protected; the pairing secret is sensitive and must not be published or committed.
 
 To restore, stop the Veyra server first, then restore the database file to `VEYRA_DATABASE_PATH` and the matching pairing-secret file to `VEYRA_PAIRING_SECRET_PATH`. Keep the database and pairing secret from the same backup together. The backup utility includes the server database, matching pairing secret, and the local media directory. Restore all three from the same backup set.
 
