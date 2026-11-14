@@ -1,13 +1,73 @@
 #include <Processing.NDI.Lib.h>
 
+#include "veyra/config/config.hpp"
 #include "veyra/ndi/discovery.hpp"
+#include "veyra/ndi/receiver.hpp"
+#include "veyra/video/renderer.hpp"
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
 
-int main() {
+namespace {
+
+std::optional<veyra::ndi::Source> selectSource(
+    const std::vector<veyra::ndi::Source>& sources,
+    const veyra::config::NdiConfig& config
+) {
+    if (!config.sourceAddress.empty()) {
+        for (const auto& source : sources) {
+            if (source.url == config.sourceAddress) {
+                return source;
+            }
+        }
+        return std::nullopt;
+    }
+
+    if (!config.sourceName.empty()) {
+        for (const auto& source : sources) {
+            if (source.name == config.sourceName) {
+                return source;
+            }
+        }
+        return std::nullopt;
+    }
+
+    if (sources.size() == 1) {
+        return sources.front();
+    }
+
+    return std::nullopt;
+}
+
+}  // namespace
+
+int main(int argc, char* argv[]) {
+    std::filesystem::path configPath = "/etc/veyra/config.json";
+
+    for (int index = 1; index < argc; ++index) {
+        const std::string argument = argv[index];
+        if (argument == "--help" || argument == "-h") {
+            spdlog::info("Usage: veyra [--config /path/to/config.json]");
+            return EXIT_SUCCESS;
+        }
+
+        if (argument == "--config" && index + 1 < argc) {
+            configPath = argv[++index];
+            continue;
+        }
+
+        spdlog::error("Unknown or incomplete argument: {}", argument);
+        spdlog::info("Usage: veyra [--config /path/to/config.json]");
+        return EXIT_FAILURE;
+    }
+
     spdlog::info("Veyra {} starting", "0.1.0");
 
     if (!NDIlib_initialize()) {
@@ -17,29 +77,119 @@ int main() {
 
     int exitCode = EXIT_SUCCESS;
     try {
+        const auto config = veyra::config::load(configPath);
+        if (!std::filesystem::exists(configPath)) {
+            spdlog::warn(
+                "Configuration file '{}' was not found; using defaults",
+                configPath.string()
+            );
+        }
+
+        veyra::video::Renderer renderer(config.display);
         veyra::ndi::Discovery discovery;
+        std::unique_ptr<veyra::ndi::Receiver> receiver;
 
-        // NDI discovery is asynchronous; give mDNS a moment to populate
-        // the initial source list before taking the first snapshot.
-        (void)discovery.waitForChanges(3000);
+        bool displayIsClear = true;
+        bool playbackWasActive = false;
+        auto lastStatusLog = std::chrono::steady_clock::now();
 
-        const auto sources = discovery.currentSources();
-        if (sources.empty()) {
-            spdlog::warn("No NDI sources found on the local network");
-        } else {
-            spdlog::info("Discovered {} NDI source(s)", sources.size());
-            for (const auto& source : sources) {
-                spdlog::info("NDI source: {} [{}]", source.name, source.identity());
+        spdlog::info("Waiting for the configured NDI source");
+
+        while (renderer.pollEvents()) {
+            if (!receiver) {
+                (void)discovery.waitForChanges(250);
+                const auto sources = discovery.currentSources();
+                const auto selected = selectSource(sources, config.ndi);
+
+                if (selected.has_value()) {
+                    spdlog::info(
+                        "Connecting to NDI source '{}' [{}]",
+                        selected->name,
+                        selected->identity()
+                    );
+                    receiver =
+                        std::make_unique<veyra::ndi::Receiver>(*selected);
+                    lastStatusLog = std::chrono::steady_clock::now();
+                    continue;
+                }
+
+                const auto now = std::chrono::steady_clock::now();
+                if (now - lastStatusLog >= std::chrono::seconds(5)) {
+                    if (sources.empty()) {
+                        spdlog::info("No NDI sources are currently available");
+                    } else if (config.ndi.sourceName.empty() &&
+                               config.ndi.sourceAddress.empty()) {
+                        spdlog::warn(
+                            "Found {} NDI sources; configure sourceName or "
+                            "sourceAddress to choose one",
+                            sources.size()
+                        );
+                        for (const auto& source : sources) {
+                            spdlog::info(
+                                "Available source: {} [{}]",
+                                source.name,
+                                source.identity()
+                            );
+                        }
+                    } else {
+                        spdlog::info(
+                            "Configured NDI source is not currently available"
+                        );
+                    }
+                    lastStatusLog = now;
+                }
+
+                if (!displayIsClear) {
+                    renderer.clear();
+                    displayIsClear = true;
+                }
+                continue;
+            }
+
+            auto frame = receiver->capture(50);
+            if (frame.has_value()) {
+                renderer.present(*frame);
+                displayIsClear = false;
+
+                if (!playbackWasActive) {
+                    spdlog::info(
+                        "Video playback started: {}x{}",
+                        frame->width,
+                        frame->height
+                    );
+                    playbackWasActive = true;
+                }
+                lastStatusLog = std::chrono::steady_clock::now();
+                continue;
+            }
+
+            const auto now = std::chrono::steady_clock::now();
+            const bool connected = receiver->isConnected();
+            const bool frameIsStale =
+                now - lastStatusLog > std::chrono::seconds(2);
+
+            if (!connected || frameIsStale) {
+                if (playbackWasActive) {
+                    spdlog::warn(
+                        "NDI video stopped; waiting for the source to recover"
+                    );
+                    playbackWasActive = false;
+                }
+
+                if (!displayIsClear) {
+                    renderer.clear();
+                    displayIsClear = true;
+                }
             }
         }
     } catch (const std::exception& error) {
-        spdlog::critical("NDI discovery failed: {}", error.what());
+        spdlog::critical("Veyra stopped after an error: {}", error.what());
         exitCode = EXIT_FAILURE;
     }
 
-    // Discovery is destroyed before the global NDI runtime is shut down.
+    // All NDI finder and receiver instances are destroyed before the runtime.
     NDIlib_destroy();
 
-    spdlog::info("Veyra discovery stage finished");
+    spdlog::info("Veyra shut down");
     return exitCode;
 }
