@@ -327,7 +327,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           ndiSourceName: device.ndi_source_name,
           uptimeSeconds: device.uptime_seconds,
           createdAt: device.created_at,
-          credentialRevokedAt: device.credential_revoked_at,\n          credentialStatus: device.credential_revoked_at ? "revoked" : "active",
+          credentialRevokedAt: device.credential_revoked_at,
+          credentialStatus: device.credential_revoked_at ? "revoked" : "active",
         };
       }),
     };
