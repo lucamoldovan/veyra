@@ -18,7 +18,7 @@ NDI audio is intentionally not captured or played.
 
 ## Current implementation status
 
-The repository currently contains an early **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage, operator sessions, one-time receiver pairing, authenticated heartbeats, a protected device inventory, and operator-controlled credential revocation. SQLite schema upgrades are versioned and tested against a populated version-1 database. Non-loopback server binding now requires configured TLS certificate and private-key files. The native receiver enrollment and discovery-reporting client, per-device source assignment, remote configuration, device playlist assignment, and offline fallback synchronization remain in development. The dashboard now includes a receiver-reported NDI source inventory page. The dashboard now includes a working local image library and ordered playlist editor. Server and dashboard dependencies are pinned with committed npm lockfiles and installed reproducibly in CI. The server and dashboard still use separate development processes; production dashboard serving and packaging are not implemented.
+The repository currently contains an early **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage, operator sessions, one-time receiver pairing, authenticated heartbeats, a protected device inventory, and operator-controlled credential revocation. SQLite schema upgrades are versioned and tested against a populated version-1 database. Non-loopback server binding now requires configured TLS certificate and private-key files. The C++ receiver control-plane client now implements pairing, TLS-verified heartbeats, source snapshots, retry/backoff, and protected credential storage. It is compiled independently in CI, but has not yet been validated in the complete native player build against the official NDI SDK. Per-device source assignment, remote configuration, device playlist assignment, and offline fallback synchronization remain in development. The dashboard now includes a receiver-reported NDI source inventory page. The dashboard now includes a working local image library and ordered playlist editor. Server and dashboard dependencies are pinned with committed npm lockfiles and installed reproducibly in CI. The server and dashboard still use separate development processes; production dashboard serving and packaging are not implemented.
 
 The native receiver foundation includes:
 
@@ -31,7 +31,7 @@ The native receiver foundation includes:
 - Leaves the NDI receiver alive during source loss so the SDK can reconnect when the source returns.
 - Loads and validates local JSON configuration.
 
-Receiver-side enrollment and discovery reporting, remote commands, device source/playlist assignment, and per-device cached fallback are **not yet implemented**. The server can aggregate source snapshots reported by receivers, and the dashboard can display that inventory. The dashboard's Media Library supports local PNG/JPEG/WebP uploads, and Playlists supports ordered image sequences with editable display durations. The server can issue one-time pairing codes, register a receiver, accept authenticated heartbeats, and provide a protected device inventory. The dashboard's current empty states are intentional and do not use fabricated device or media data. On first server launch, copy the one-time setup key from the server terminal into the dashboard to create the local administrator.
+Receiver-side pairing and discovery heartbeat reporting are implemented in the C++ control-plane client, but the complete native player still needs an official NDI SDK build and hardware validation. Remote commands, device source/playlist assignment, and per-device cached fallback are **not yet implemented**. The server can aggregate source snapshots reported by receivers, and the dashboard can display that inventory. The dashboard's Media Library supports local PNG/JPEG/WebP uploads, and Playlists supports ordered image sequences with editable display durations. The server can issue one-time pairing codes, register a receiver, accept authenticated heartbeats, and provide a protected device inventory. The dashboard's current empty states are intentional and do not use fabricated device or media data. On first server launch, copy the one-time setup key from the server terminal into the dashboard to create the local administrator.
 
 The player has not yet been compiled against an installed official NDI SDK or validated on the target Mac mini. The SDK-independent configuration tests run in GitHub Actions. See the [development plan](docs/development.md) for implementation and validation status.
 
@@ -65,6 +65,7 @@ See [docs/architecture.md](docs/architecture.md) for the system topology, compon
 - C++20 compiler
 - CMake 3.20+
 - SDL2 development files
+- libcurl development files
 - spdlog
 - nlohmann/json
 - Official NDI SDK for Linux
@@ -74,7 +75,7 @@ Install the Debian dependencies:
 
 ```bash
 sudo apt update
-sudo apt install build-essential cmake pkg-config libsdl2-dev libspdlog-dev nlohmann-json3-dev avahi-daemon
+sudo apt install build-essential cmake pkg-config libsdl2-dev libcurl4-openssl-dev libspdlog-dev nlohmann-json3-dev avahi-daemon
 sudo systemctl enable --now avahi-daemon
 ```
 
@@ -108,6 +109,16 @@ Before editing the config, list the sources visible on the LAN:
 ```
 
 Set `ndi.sourceAddress` to the address printed by that command. This is preferred because it identifies the NDI source more precisely. If the address is unavailable, set `ndi.sourceName`. If neither is set, Veyra selects a source automatically only when exactly one source remains after the initial five-second discovery window and a further two-second stable-source window.
+
+To enroll the receiver with the local server, configure the optional `controlPlane` section in `/etc/veyra/config.json`:
+
+- Set `serverUrl` to the server's HTTPS origin, for example `https://veyra-server.local:8787`.
+- Set `deviceName` to a unique display name.
+- Create a fresh 12-digit pairing code in the dashboard and set `pairingCode`.
+- Set `caCertificatePath` if the server uses a private CA that is not already trusted by the operating system.
+- Leave `credentialPath` at its default unless you need a different protected location.
+
+The client verifies TLS certificates and rejects plaintext HTTP to non-loopback hosts. After pairing, it stores the device token in an owner-only file and sends heartbeats and NDI discovery snapshots. If the credential is revoked, stop Veyra, remove the token file, create a new pairing code, and pair again. See [the Mac mini validation checklist](docs/mac-mini-validation.md) for the full sequence.
 
 Run the player:
 
