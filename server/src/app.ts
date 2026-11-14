@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
-import { randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { openDatabase, type VeyraDatabase } from "./database.js";
@@ -11,6 +11,8 @@ interface BuildAppOptions {
   databasePath?: string;
   setupKeyPath?: string;
   setupKey?: string;
+  pairingSecretPath?: string;
+  pairingSecret?: string;
   https?: { key: Buffer; cert: Buffer; minVersion: "TLSv1.2" };
   secureCookies?: boolean;
 }
@@ -55,6 +57,36 @@ function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key:
   const key = randomBytes(24).toString("base64url");
   writeFileSync(setupKeyPath, key + "\n", { mode: 0o600, flag: "wx" });
   return { key, path: setupKeyPath, generated: true };
+}
+
+function readPairingSecret(options: BuildAppOptions): Buffer {
+  if (options.pairingSecret) {
+    const secret = Buffer.from(options.pairingSecret, "utf8");
+    if (secret.length < 32) throw new Error("Veyra pairing secret must be at least 32 bytes");
+    return secret;
+  }
+
+  const secretPath = resolve(options.pairingSecretPath ?? process.env.VEYRA_PAIRING_SECRET_PATH ?? "data/pairing-secret");
+  mkdirSync(dirname(secretPath), { recursive: true });
+
+  if (existsSync(secretPath)) {
+    const fileInfo = lstatSync(secretPath);
+    if (!fileInfo.isFile()) throw new Error("Veyra pairing secret path must be a regular file");
+    chmodSync(secretPath, 0o600);
+    const value = readFileSync(secretPath, "utf8").trim();
+    if (!/^[a-f0-9]{64}$/i.test(value)) {
+      throw new Error("Veyra pairing secret file is invalid; restore it from backup or remove it to rotate pairing verification");
+    }
+    return Buffer.from(value, "hex");
+  }
+
+  const secret = randomBytes(32);
+  writeFileSync(secretPath, secret.toString("hex") + "\n", { mode: 0o600, flag: "wx" });
+  return secret;
+}
+
+function hashPairingCode(code: string, secret: Buffer): string {
+  return createHmac("sha256", secret).update(code).digest("hex");
 }
 
 function safeEqual(left: string, right: string): boolean {
@@ -104,6 +136,7 @@ function setSessionCookie(reply: FastifyReply, token: string, secureCookies: boo
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const database = openDatabase(options.databasePath);
   const setup = readSetupKey(database, options);
+  const pairingSecret = readPairingSecret(options);
   const secureCookies = Boolean(options.https) || options.secureCookies === true ||
     process.env.VEYRA_COOKIE_SECURE === "true";
   const app = Fastify({
@@ -239,7 +272,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const operator = getAuthenticatedOperator(database, request, reply);
     if (!operator) return;
 
-    const code = randomInt(0, 100_000_000).toString().padStart(8, "0");
+    const code = randomInt(0, 1_000_000_000_000).toString().padStart(12, "0");
     database.prepare("DELETE FROM pairing_codes WHERE expires_at <= ? OR used_at IS NOT NULL")
       .run(new Date().toISOString());
     const now = new Date();
@@ -248,7 +281,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     database.prepare(`
       INSERT INTO pairing_codes (id, code_hash, created_by, expires_at, created_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run(randomUUID(), hashSessionToken(code), operator.id, expiresAt, now.toISOString());
+    `).run(randomUUID(), hashPairingCode(code, pairingSecret), operator.id, expiresAt, now.toISOString());
 
     return reply.code(201).send({ code, expiresAt });
   });
@@ -323,7 +356,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           SELECT id, expires_at, used_at
           FROM pairing_codes
           WHERE code_hash = ?
-        `).get(hashSessionToken(code)) as { id: string; expires_at: string; used_at: string | null } | undefined;
+        `).get(hashPairingCode(code, pairingSecret)) as { id: string; expires_at: string; used_at: string | null } | undefined;
 
         if (!pairing || pairing.used_at || Date.parse(pairing.expires_at) <= Date.now()) return false;
 
