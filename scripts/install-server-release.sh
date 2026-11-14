@@ -25,7 +25,7 @@ fi
 [[ -f "$ARCHIVE" && -f "$SIGNATURE" && -f "$CA_BUNDLE" ]] || { echo "Archive, signature or CA bundle is missing." >&2; exit 1; }
 printf '%s  %s\\n' "$EXPECTED_SHA" "$ARCHIVE" | sha256sum --check --status || { echo "Release SHA-256 mismatch." >&2; exit 1; }
 openssl pkeyutl -verify -rawin -pubin -inkey /etc/veyra/release-signing.pub -sigfile "$SIGNATURE" -in "$ARCHIVE" >/dev/null
-PREFIX="veyra-$VERSION/"
+PREFIX="ndiview-$VERSION/"
 if ! tar -tzf "$ARCHIVE" | awk -v p="$PREFIX" 'index($0,p)!=1 || $0 ~ /(^|\\/)\\.\\.(\\/|$)/ || $0 ~ /^\\// { exit 1 }'; then
   echo "Release archive contains an unsafe or unexpected path." >&2; exit 1
 fi
@@ -45,8 +45,10 @@ if [[ ! -f "$ENV_FILE" ]]; then
   echo "Created $ENV_FILE. Configure TLS certificate/key paths and run this command again." >&2
   exit 1
 fi
-CERT_PATH="$(sed -n 's/^VEYRA_TLS_CERT_PATH=//p' "$ENV_FILE" | tail -n 1)"
-KEY_PATH="$(sed -n 's/^VEYRA_TLS_KEY_PATH=//p' "$ENV_FILE" | tail -n 1)"
+CERT_PATH="$(sed -n 's/^NDIVIEW_TLS_CERT_PATH=//p' "$ENV_FILE" | tail -n 1)"
+if [[ -z "$CERT_PATH" ]]; then CERT_PATH="$(sed -n 's/^VEYRA_TLS_CERT_PATH=//p' "$ENV_FILE" | tail -n 1)"; fi
+KEY_PATH="$(sed -n 's/^NDIVIEW_TLS_KEY_PATH=//p' "$ENV_FILE" | tail -n 1)"
+if [[ -z "$KEY_PATH" ]]; then KEY_PATH="$(sed -n 's/^VEYRA_TLS_KEY_PATH=//p' "$ENV_FILE" | tail -n 1)"; fi
 if [[ -z "$CERT_PATH" || -z "$KEY_PATH" || ! -f "$CERT_PATH" || ! -f "$KEY_PATH" ]]; then
   echo "server.env must point to existing TLS certificate and private-key files." >&2; exit 1
 fi
@@ -86,7 +88,7 @@ systemctl restart veyra-server.service || true
 
 HEALTHY=0
 for attempt in $(seq 1 20); do
-  if curl --fail --silent --show-error --max-time 5 --cacert "$CA_BUNDLE" "$HEALTH_URL" -o /tmp/veyra-health.json &&
+  if curl --fail --silent --show-error --max-time 5 --cacert "$CA_BUNDLE" "$HEALTH_URL" -o /tmp/ndiview-health.json &&
      grep -q '"status":"ok"' /tmp/veyra-health.json; then HEALTHY=1; break; fi
   sleep 3
 done
