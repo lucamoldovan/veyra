@@ -175,6 +175,7 @@ int main(int argc, char* argv[]) {
         auto fallbackSlideStartedAt = std::chrono::steady_clock::now();
         int appliedConfigVersion = -1;
         int appliedPlaylistRevision = -1;
+        std::string appliedFallbackSignature;
         veyra::config::NdiConfig activeNdiConfig = config.ndi;
         std::vector<veyra::control_plane::CachedMediaItem> fallbackItems;
         std::string activeSourceName;
@@ -260,9 +261,19 @@ int main(int argc, char* argv[]) {
             const auto loopNow = std::chrono::steady_clock::now();
             if (controlPlane) {
                 const auto synchronized = controlPlane->syncSnapshot();
+                std::string fallbackSignature;
+                for (const auto& item : synchronized.fallbackItems) {
+                    fallbackSignature += item.mediaId;
+                    fallbackSignature.push_back('\\0');
+                    fallbackSignature += item.sha256;
+                    fallbackSignature.push_back('\\0');
+                    fallbackSignature += std::to_string(item.durationSeconds);
+                    fallbackSignature.push_back('\\0');
+                }
                 if (synchronized.hasValidCachedState &&
                     (synchronized.configVersion != appliedConfigVersion ||
-                     synchronized.playlistRevision != appliedPlaylistRevision)) {
+                     synchronized.playlistRevision != appliedPlaylistRevision ||
+                     fallbackSignature != appliedFallbackSignature)) {
                     const bool sourceChanged =
                         activeNdiConfig.sourceName != synchronized.ndiSourceName ||
                         activeNdiConfig.sourceAddress != synchronized.ndiSourceAddress;
@@ -273,6 +284,7 @@ int main(int argc, char* argv[]) {
                     fallbackVisible = false;
                     appliedConfigVersion = synchronized.configVersion;
                     appliedPlaylistRevision = synchronized.playlistRevision;
+                    appliedFallbackSignature = std::move(fallbackSignature);
                     spdlog::info("Applied receiver config v{} and {} cached fallback image(s)",
                                  appliedConfigVersion, fallbackItems.size());
                     if (sourceChanged && receiver) {
