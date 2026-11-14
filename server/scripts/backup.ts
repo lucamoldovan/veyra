@@ -1,9 +1,10 @@
-import { constants, chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
+import { constants, chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { openDatabase } from "../src/database.js";
 
 const databasePath = resolve(process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite");
 const pairingSecretPath = resolve(process.env.VEYRA_PAIRING_SECRET_PATH ?? "data/pairing-secret");
+const mediaDirectoryPath = resolve(process.env.VEYRA_MEDIA_DIRECTORY ?? "data/media");
 const backupDirectory = resolve(process.argv[2] ?? "backups");
 
 if (!existsSync(databasePath)) {
@@ -26,6 +27,7 @@ const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const databaseBackup = join(backupDirectory, `veyra-${timestamp}.sqlite`);
 const secretBackup = join(backupDirectory, `pairing-secret-${timestamp}`);
 const manifestPath = join(backupDirectory, `veyra-${timestamp}.json`);
+const mediaBackupDirectory = join(backupDirectory, `media-${timestamp}`);
 
 const database = openDatabase(databasePath);
 try {
@@ -37,6 +39,31 @@ try {
 copyFileSync(pairingSecretPath, secretBackup, constants.COPYFILE_EXCL);
 chmodSync(databaseBackup, 0o600);
 chmodSync(secretBackup, 0o600);
+
+mkdirSync(mediaBackupDirectory, { recursive: false, mode: 0o700 });
+let mediaFileCount = 0;
+let mediaBytes = 0;
+if (existsSync(mediaDirectoryPath)) {
+  const mediaInfo = lstatSync(mediaDirectoryPath);
+  if (!mediaInfo.isDirectory()) {
+    throw new Error("Veyra media path must be a regular directory");
+  }
+  for (const entry of readdirSync(mediaDirectoryPath, { withFileTypes: true })) {
+    if (!entry.isFile()) {
+      throw new Error("Veyra media directory contains a non-regular entry; refusing an incomplete backup");
+    }
+    const sourcePath = join(mediaDirectoryPath, entry.name);
+    const sourceInfo = lstatSync(sourcePath);
+    if (!sourceInfo.isFile()) {
+      throw new Error("Veyra media directory contains a non-regular file");
+    }
+    const destinationPath = join(mediaBackupDirectory, entry.name);
+    copyFileSync(sourcePath, destinationPath, constants.COPYFILE_EXCL);
+    chmodSync(destinationPath, 0o600);
+    mediaFileCount += 1;
+    mediaBytes += sourceInfo.size;
+  }
+}
 
 const manifest = {
   formatVersion: 1,
@@ -51,4 +78,4 @@ writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", {
   flag: "wx",
 });
 
-process.stdout.write(`Veyra backup created:\n- ${databaseBackup}\n- ${secretBackup}\n- ${manifestPath}\n`);
+process.stdout.write(`Veyra backup created:\n- ${databaseBackup}\n- ${secretBackup}\n- ${mediaBackupDirectory}\n- ${manifestPath}\n`);
