@@ -27,7 +27,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, removeRevokedDevice, type ConnectionState, type Device, type Operator, type PairingCode, type ServerHealth } from "./api";
+import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getPlaylists, getSources, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, removeRevokedDevice, updateDeviceConfig, type ConnectionState, type Device, type NdiSource, type PlaylistSummary, type Operator, type PairingCode, type ServerHealth } from "./api";
 import { MediaPage, PlaylistsPage, SourcesPage } from "./MediaPages";
 
 type Page = "overview" | "devices" | "sources" | "media" | "playlists" | "system";
@@ -571,6 +571,10 @@ function DevicesPage() {
   const [copied, setCopied] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
+  const [sources, setSources] = useState<NdiSource[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, { sourceAddress: string; fallbackPlaylistId: string }>>({});
+  const [savingConfigId, setSavingConfigId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -582,9 +586,23 @@ function DevicesPage() {
       controller = currentController;
 
       try {
-        const result = await getDevices(currentController.signal);
+        const [result, sourceResult, playlistResult] = await Promise.all([
+          getDevices(currentController.signal), getSources(currentController.signal), getPlaylists(currentController.signal),
+        ]);
         if (!active) return;
         setDevices(result.devices);
+        setSources(sourceResult.sources);
+        setPlaylists(playlistResult.playlists);
+        setDrafts((current) => {
+          const next = { ...current };
+          for (const device of result.devices) {
+            if (!next[device.id]) next[device.id] = {
+              sourceAddress: device.assignedNdiSourceAddress ?? "",
+              fallbackPlaylistId: device.fallbackPlaylistId ?? "",
+            };
+          }
+          return next;
+        });
         setError("");
       } catch (loadError) {
         if (!active || currentController.signal.aborted) return;
@@ -640,6 +658,31 @@ function DevicesPage() {
       setError(revokeError instanceof Error ? revokeError.message : "Could not revoke receiver access.");
     } finally {
       setRevokingDeviceId(null);
+    }
+  };
+
+
+  const saveDeviceConfig = async (device: Device) => {
+    const draft = drafts[device.id] ?? { sourceAddress: device.assignedNdiSourceAddress ?? "", fallbackPlaylistId: device.fallbackPlaylistId ?? "" };
+    const selectedSource = sources.find((source) => source.address === draft.sourceAddress);
+    if (draft.sourceAddress && !selectedSource) {
+      setError("That NDI source is no longer in the current source inventory. Refresh the list and select it again.");
+      return;
+    }
+    setSavingConfigId(device.id);
+    setError("");
+    try {
+      await updateDeviceConfig(device.id, {
+        ndiSourceName: selectedSource?.name ?? null,
+        ndiSourceAddress: selectedSource?.address ?? null,
+        fallbackPlaylistId: draft.fallbackPlaylistId || null,
+      });
+      setDrafts((current) => ({ ...current, [device.id]: draft }));
+      setRefreshTick((tick) => tick + 1);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save receiver configuration.");
+    } finally {
+      setSavingConfigId(null);
     }
   };
 
@@ -724,6 +767,23 @@ function DevicesPage() {
                 <div><span className={`device-status device-status-${device.status}`}><span />{device.status}</span></div>
                 <div className="device-playback"><strong>{device.playbackMode}</strong><span>{device.ndiSourceName ?? "No NDI source reported"}</span></div>
                 <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}{device.credentialStatus === "active" ? <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void revokeCredential(device)}>{revokingDeviceId === device.id ? "Revoking…" : "Revoke access"}</button> : <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void removeDevice(device)}>{revokingDeviceId === device.id ? "Removing…" : "Remove device"}</button>}</div>
+                <div className="device-assignment">
+                  <label>NDI source
+                    <select disabled={device.credentialStatus !== "active"} value={(drafts[device.id]?.sourceAddress ?? device.assignedNdiSourceAddress) ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { sourceAddress: event.target.value, fallbackPlaylistId: current[device.id]?.fallbackPlaylistId ?? device.fallbackPlaylistId ?? "" } }))}>
+                      <option value="">Automatic / unassigned</option>
+                      {device.assignedNdiSourceAddress && !sources.some((source) => source.address === device.assignedNdiSourceAddress) && <option value={device.assignedNdiSourceAddress}>{device.assignedNdiSourceName ?? "Previously assigned source"} (not currently discovered)</option>}
+                      {sources.filter((source) => source.address).map((source) => <option key={source.address} value={source.address!}>{source.name}</option>)}
+                    </select>
+                  </label>
+                  <label>Fallback playlist
+                    <select disabled={device.credentialStatus !== "active"} value={(drafts[device.id]?.fallbackPlaylistId ?? device.fallbackPlaylistId) ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { sourceAddress: current[device.id]?.sourceAddress ?? device.assignedNdiSourceAddress ?? "", fallbackPlaylistId: event.target.value } }))}>
+                      <option value="">No fallback assigned</option>
+                      {playlists.map((playlist) => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
+                    </select>
+                  </label>
+                  <button className="button button-secondary" disabled={device.credentialStatus !== "active" || savingConfigId === device.id} onClick={() => void saveDeviceConfig(device)}>{savingConfigId === device.id ? "Saving…" : "Save assignment"}</button>
+                  <span>Config v{device.configVersion}</span>
+                </div>
               </div>
             ))}
           </div>
