@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -106,8 +107,11 @@ int main() {
     std::atomic_bool serverFailed{false};
     const std::string token(43, 't');
 
+    std::atomic_int configRequestCount{0};
+    std::atomic_int manifestRequestCount{0};
+    std::atomic_bool failedMediaRequestSeen{false};
     std::thread mockServer([&] {
-        for (int index = 0; index < 8; ++index) {
+        for (int index = 0; index < 10; ++index) {
             pollfd descriptor{listener, POLLIN, 0};
             if (::poll(&descriptor, 1, 7000) <= 0) {
                 serverFailed = true;
@@ -130,27 +134,49 @@ int main() {
             const std::string assetHash = "260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159";
             std::string responseBody;
             std::string contentType = "application/json";
-            const int status = index == 0 ? 201 : index == 7 ? 404 : 200;
-            const std::string reason = index == 0 ? "Created" : index == 7 ? "Not Found" : "OK";
-            if (index == 0) {
+            int status = 200;
+            std::string reason = "OK";
+
+            if (request.find("POST /api/v1/receiver/pair ") != std::string::npos) {
+                status = 201;
+                reason = "Created";
                 responseBody = "{\"deviceId\":\"device-test\",\"deviceToken\":\"" + token +
                     "\",\"heartbeatIntervalSeconds\":120}";
-            } else if (index == 1) {
+            } else if (request.find("POST /api/v1/receiver/heartbeat ") != std::string::npos) {
                 responseBody = "{}";
-            } else if (index == 2) {
-                responseBody = "{\"schemaVersion\":1,\"configVersion\":2,\"ndi\":{\"sourceName\":\"Camera 1\",\"sourceAddress\":\"ndi://camera-1.local\"},\"fallbackPlaylistId\":\"fallback-1\"}";
-            } else if (index == 3) {
-                responseBody = "{\"schemaVersion\":1,\"configVersion\":2,\"playlistId\":\"fallback-1\",\"playlistRevision\":3,\"items\":[{\"mediaId\":\"media-1\",\"position\":0,\"durationSeconds\":12,\"mimeType\":\"image/png\",\"sizeBytes\":16,\"sha256\":\"" + assetHash + "\",\"downloadPath\":\"/api/v1/receiver/media/media-1\"}]}";
-            } else if (index == 4) {
+            } else if (request.find("GET /api/v1/receiver/config ") != std::string::npos) {
+                const int version = ++configRequestCount == 1 ? 2 : 3;
+                const std::string sourceName = version == 2 ? "Camera 1" : "Camera 2";
+                const std::string sourceAddress = version == 2
+                    ? "ndi://camera-1.local" : "ndi://camera-2.local";
+                responseBody = "{\"schemaVersion\":1,\"configVersion\":" +
+                    std::to_string(version) + ",\"ndi\":{\"sourceName\":\"" +
+                    sourceName + "\",\"sourceAddress\":\"" + sourceAddress +
+                    "\"},\"fallbackPlaylistId\":\"fallback-1\"}";
+            } else if (request.find("GET /api/v1/receiver/media-manifest ") != std::string::npos) {
+                const int revision = ++manifestRequestCount == 1 ? 3 : 4;
+                const int version = revision == 3 ? 2 : 3;
+                const std::string mediaId = revision == 3 ? "media-1" : "media-2";
+                responseBody = "{\"schemaVersion\":1,\"configVersion\":" +
+                    std::to_string(version) + ",\"playlistId\":\"fallback-1\",\"playlistRevision\":" +
+                    std::to_string(revision) + ",\"items\":[{\"mediaId\":\"" + mediaId +
+                    "\",\"position\":0,\"durationSeconds\":12,\"mimeType\":\"image/png\",\"sizeBytes\":16,\"sha256\":\"" +
+                    assetHash + "\",\"downloadPath\":\"/api/v1/receiver/media/" + mediaId + "\"}]}";
+            } else if (request.find("GET /api/v1/receiver/media/media-1 ") != std::string::npos) {
                 responseBody = asset;
                 contentType = "image/png";
-            } else if (index == 5) {
-                responseBody = "{\"schemaVersion\":1,\"configVersion\":3,\"ndi\":{\"sourceName\":\"Camera 2\",\"sourceAddress\":\"ndi://camera-2.local\"},\"fallbackPlaylistId\":\"fallback-1\"}";
-            } else if (index == 6) {
-                responseBody = "{\"schemaVersion\":1,\"configVersion\":3,\"playlistId\":\"fallback-1\",\"playlistRevision\":4,\"items\":[{\"mediaId\":\"media-2\",\"position\":0,\"durationSeconds\":20,\"mimeType\":\"image/png\",\"sizeBytes\":16,\"sha256\":\"260f2cc234c5ee0384d6bc4ff21bfbaac52f72b7a28ac97cbecb45c605075159\",\"downloadPath\":\"/api/v1/receiver/media/media-2\"}]}";
-            } else {
+            } else if (request.find("GET /api/v1/receiver/media/media-2 ") != std::string::npos) {
+                status = 404;
+                reason = "Not Found";
                 responseBody = "{\"error\":\"Assigned media item not found\"}";
+                failedMediaRequestSeen = true;
+            } else {
+                status = 404;
+                reason = "Not Found";
+                responseBody = "{\"error\":\"Unexpected mock request\"}";
+                serverFailed = true;
             }
+
             const std::string response =
                 "HTTP/1.1 " + std::to_string(status) + " " + reason + "\r\n" +
                 "Content-Type: " + contentType + "\r\n" +
@@ -159,6 +185,7 @@ int main() {
             if (!sendAll(clientSocket, response)) serverFailed = true;
             ::shutdown(clientSocket, SHUT_RDWR);
             ::close(clientSocket);
+            if (failedMediaRequestSeen.load()) break;
         }
     });
 
@@ -189,8 +216,8 @@ int main() {
 
         {
             std::unique_lock lock(requestsMutex);
-            requestsChanged.wait_for(lock, std::chrono::seconds(15), [&] {
-                return requests.size() >= 8 || serverFailed;
+            requestsChanged.wait_for(lock, std::chrono::seconds(20), [&] {
+                return failedMediaRequestSeen.load() || serverFailed;
             });
         }
 
@@ -210,26 +237,21 @@ int main() {
             (directoryInfo.st_mode & 0777) == 0700;
 
         std::lock_guard lock(requestsMutex);
-        const bool pairRequestOk = requests.size() >= 1 &&
-            requests[0].find("POST /api/v1/receiver/pair ") != std::string::npos &&
-            requests[0].find("123456789012") != std::string::npos &&
-            requests[0].find("Test Display") != std::string::npos;
-        const bool heartbeatRequestOk = requests.size() >= 2 &&
-            requests[1].find("POST /api/v1/receiver/heartbeat ") != std::string::npos &&
-            requests[1].find("Authorization: Bearer " + token) != std::string::npos &&
-            requests[1].find("Camera 1") != std::string::npos &&
-            requests[1].find("\"playbackMode\":\"ndi\"") != std::string::npos;
-
-        const bool configRequestOk = requests.size() >= 3 &&
-            requests[2].find("GET /api/v1/receiver/config ") != std::string::npos;
-        const bool manifestRequestOk = requests.size() >= 4 &&
-            requests[3].find("GET /api/v1/receiver/media-manifest ") != std::string::npos;
-        const bool assetRequestOk = requests.size() >= 5 &&
-            requests[4].find("GET /api/v1/receiver/media/media-1 ") != std::string::npos;
-        const bool failedUpdateAttempted = requests.size() >= 8 &&
-            requests[5].find("GET /api/v1/receiver/config ") != std::string::npos &&
-            requests[6].find("GET /api/v1/receiver/media-manifest ") != std::string::npos &&
-            requests[7].find("GET /api/v1/receiver/media/media-2 ") != std::string::npos;
+        const auto hasRequest = [&](const std::string& fragment) {
+            return std::any_of(requests.begin(), requests.end(), [&](const std::string& request) {
+                return request.find(fragment) != std::string::npos;
+            });
+        };
+        const bool pairRequestOk = hasRequest("POST /api/v1/receiver/pair ") &&
+            hasRequest("123456789012") && hasRequest("Test Display");
+        const bool heartbeatRequestOk = hasRequest("POST /api/v1/receiver/heartbeat ") &&
+            hasRequest("Authorization: Bearer " + token) &&
+            hasRequest("Camera 1") && hasRequest("\"playbackMode\":\"ndi\"");
+        const bool configRequestOk = configRequestCount.load() >= 2;
+        const bool manifestRequestOk = manifestRequestCount.load() >= 2;
+        const bool assetRequestOk = hasRequest("GET /api/v1/receiver/media/media-1 ");
+        const bool failedUpdateAttempted = failedMediaRequestSeen.load() &&
+            hasRequest("GET /api/v1/receiver/media/media-2 ");
         const auto synced = client.syncSnapshot();
         std::ifstream stateInput(config.cachePath / "state.json");
         const std::string persistedState((std::istreambuf_iterator<char>(stateInput)), {});
