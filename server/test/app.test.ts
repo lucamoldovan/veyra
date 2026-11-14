@@ -911,6 +911,98 @@ test("operator can queue receiver restart and full-device reboot separately", as
   }
 });
 
+test("receiver action timeout uses claim time even when the receiver keeps heartbeating", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "ndiview-command-timeout-"));
+  const databasePath = join(directory, "ndiview.sqlite");
+  let app = buildApp({
+    databasePath,
+    setupKey: "test-setup-key",
+    pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
+  });
+
+  try {
+    const setup = await app.inject({
+      method: "POST",
+      url: "/api/v1/setup",
+      payload: { setupKey: "test-setup-key", username: "admin", password: "a-very-long-test-password" },
+    });
+    const cookie = String(setup.headers["set-cookie"]).split(";")[0];
+    const pairing = await app.inject({
+      method: "POST",
+      url: "/api/v1/devices/pairing-codes",
+      headers: { cookie },
+    });
+    const paired = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/pair",
+      payload: {
+        code: pairing.json().code,
+        deviceName: "Timeout test receiver",
+        platform: "linux-x86_64",
+        version: "0.1.0",
+      },
+    });
+    const credentials = paired.json() as { deviceId: string; deviceToken: string };
+    const auth = { authorization: "Bearer " + credentials.deviceToken };
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/heartbeat",
+      headers: auth,
+      payload: { version: "0.1.0", platform: "linux-x86_64", uptimeSeconds: 10, deviceUptimeSeconds: 1000 },
+    });
+
+    const requested = await app.inject({
+      method: "POST",
+      url: "/api/v1/devices/" + credentials.deviceId + "/restart",
+      headers: { cookie },
+    });
+    assert.equal(requested.statusCode, 201);
+    const commandId = requested.json().id as string;
+    const claimed = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/commands/poll",
+      headers: auth,
+      payload: {},
+    });
+    assert.equal(claimed.json().command.id, commandId);
+    const restarting = await app.inject({
+      method: "POST",
+      url: "/api/v1/receiver/commands/" + commandId + "/status",
+      headers: auth,
+      payload: { status: "restarting" },
+    });
+    assert.equal(restarting.statusCode, 200);
+
+    await app.close();
+    const database = openDatabase(databasePath);
+    try {
+      const old = new Date(Date.now() - 240_000).toISOString();
+      database.prepare("UPDATE device_commands SET created_at = ?, claimed_at = ? WHERE id = ?")
+        .run(old, old, commandId);
+      database.prepare("UPDATE devices SET last_seen_at = ? WHERE id = ?")
+        .run(new Date().toISOString(), credentials.deviceId);
+    } finally {
+      database.close();
+    }
+
+    app = buildApp({
+      databasePath,
+      setupKey: "test-setup-key",
+      pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
+    });
+    const devices = await app.inject({
+      method: "GET",
+      url: "/api/v1/devices",
+      headers: { cookie },
+    });
+    assert.equal(devices.json().devices[0].restartCommand.status, "timed_out");
+    assert.match(devices.json().devices[0].restartCommand.message, /did not confirm/i);
+  } finally {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("production dashboard assets are served with safe cache headers and SPA fallback", async () => {
   const directory = mkdtempSync(join(tmpdir(), "ndiview-dashboard-test-"));
   mkdirSync(join(directory, "assets"), { recursive: true });
