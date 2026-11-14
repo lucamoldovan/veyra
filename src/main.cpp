@@ -409,7 +409,28 @@ int main(int argc, char* argv[]) {
             }
 
             if (captureFailed.load()) {
-                throw std::runtime_error("NDI capture worker stopped unexpectedly");
+                spdlog::error("NDI capture worker failed; returning to discovery and fallback playback");
+                if (captureThread.joinable()) {
+                    captureThread.request_stop();
+                    captureThread.join();
+                }
+                receiver.reset();
+                {
+                    std::lock_guard lock(latestFrameMutex);
+                    latestFrame.reset();
+                }
+                captureFailed.store(false);
+                sourceConnected.store(false);
+                activeSourceName.clear();
+                playbackWasActive = false;
+                connectionWasActive = false;
+                sourceSetSignature.clear();
+                sourceSetStableSince = loopNow;
+                if (!renderFallback(loopNow) && !displayIsClear) {
+                    renderer.clear();
+                    displayIsClear = true;
+                }
+                continue;
             }
 
             const auto now = std::chrono::steady_clock::now();
