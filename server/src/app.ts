@@ -884,10 +884,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           }
           const source = rawSource as { name?: unknown; url?: unknown };
           const sourceName = typeof source.name === "string"
-            ? source.name.replace(/[\\u0000-\\u001f\\u007f]/g, "").trim().slice(0, 256)
+            ? stripControlCharacters(source.name)
             : "";
           const sourceUrl = typeof source.url === "string"
-            ? source.url.replace(/[\\u0000-\\u001f\\u007f]/g, "").trim().slice(0, 512)
+            ? stripControlCharacters(source.url)
             : "";
           if (!sourceName) {
             return reply.code(400).send({ error: "Each discovered source needs a valid name" });
