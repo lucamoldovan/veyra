@@ -1,6 +1,6 @@
-# Veyra local server
+# NDIView local server
 
-TypeScript/Fastify service and SQLite-backed control plane for the Veyra local-network platform.
+TypeScript/Fastify service and SQLite-backed control plane for the NDIView local-network platform.
 
 ## Requirements
 
@@ -45,7 +45,7 @@ npm run backup -- /path/to/secure-backup-directory
 
 The command uses SQLite's online backup API and copies the pairing secret and media directory alongside the database. It creates owner-only backup files and a small manifest. Store the backup directory somewhere protected; the pairing secret is sensitive and must not be published or committed.
 
-To restore, stop the Veyra server first, then restore the database file to `VEYRA_DATABASE_PATH` and the matching pairing-secret file to `VEYRA_PAIRING_SECRET_PATH`. Keep the database and pairing secret from the same backup together. The backup utility includes the server database, matching pairing secret, and the local media directory. Restore all three from the same backup set.
+To restore, stop the NDIView server first, then restore the database file to `VEYRA_DATABASE_PATH` and the matching pairing-secret file to `VEYRA_PAIRING_SECRET_PATH`. Keep the database and pairing secret from the same backup together. The backup utility includes the server database, matching pairing secret, and the local media directory. Restore all three from the same backup set.
 
 ## Configuration
 
@@ -62,7 +62,7 @@ To restore, stop the Veyra server first, then restore the database file to `VEYR
 | `VEYRA_TLS_KEY_PATH` | unset | PEM private key path; required with the certificate for non-loopback binds |
 | `VEYRA_COOKIE_SECURE` | `false` on loopback HTTP; `true` with TLS | Force Secure session cookies |
 
-The service binds to loopback by default. The SQLite database must live in a dedicated directory (not a shared system directory); Veyra restricts that directory to owner access and the database file to owner read/write. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
+The service binds to loopback by default. The SQLite database must live in a dedicated directory (not a shared system directory); NDIView restricts that directory to owner access and the database file to owner read/write. Binding to any non-loopback address is rejected unless both TLS certificate and private-key paths are configured. TLS uses a minimum of TLS 1.2, and session cookies are automatically marked Secure when TLS is enabled. Use a certificate trusted by the receiver devices; do not disable TLS or place bearer credentials on plaintext LAN HTTP.
 
 ## Current scope
 
