@@ -233,11 +233,15 @@ int main() {
                 reloaded.hasValidCachedState && reloaded.fallbackItems.size() == 1 &&
                 reloaded.fallbackItems[0].sha256 == synced.fallbackItems[0].sha256;
             struct stat cacheDirectoryInfo{};
+            struct stat mediaDirectoryInfo{};
             struct stat cacheFileInfo{};
+            const auto mediaDirectory = config.cachePath / "media";
             cachePermissionsOk =
                 ::stat(config.cachePath.c_str(), &cacheDirectoryInfo) == 0 &&
+                ::stat(mediaDirectory.c_str(), &mediaDirectoryInfo) == 0 &&
                 ::stat(synced.fallbackItems[0].path.c_str(), &cacheFileInfo) == 0 &&
                 (cacheDirectoryInfo.st_mode & 0777) == 0700 &&
+                (mediaDirectoryInfo.st_mode & 0777) == 0700 &&
                 (cacheFileInfo.st_mode & 0777) == 0600;
         }
 
