@@ -8,7 +8,7 @@ Its first deployment environment is churches, but Veyra is designed as a general
 
 ## The platform
 
-- **Veyra Receiver** — native Linux playback process for video-only NDI reception, fullscreen display, and locally cached fallback playback.
+- **Veyra Receiver** — native Linux playback process for video-only NDI reception and fullscreen display; locally cached fallback playback is planned but not implemented yet.
 - **Veyra Server** — local management service for authentication, devices, sources, media, playlists, configuration, commands, and system state.
 - **Veyra Dashboard** — browser-based interface for device management, NDI source assignment, media, playlists, diagnostics, and system settings.
 
@@ -18,7 +18,7 @@ NDI audio is intentionally not captured or played.
 
 ## Current implementation status
 
-The repository currently contains an early **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage, operator sessions, one-time receiver pairing, authenticated heartbeats, a protected device inventory, and operator-controlled credential revocation. SQLite schema upgrades are versioned and tested against a populated version-1 database. Non-loopback server binding now requires configured TLS certificate and private-key files. The C++ receiver control-plane client now implements pairing, TLS-verified heartbeats, source snapshots, retry/backoff, and protected credential storage. It is compiled independently in CI, but has not yet been validated in the complete native player build against the official NDI SDK. Per-device source assignment, remote configuration, device playlist assignment, and offline fallback synchronization remain in development. The dashboard now includes a receiver-reported NDI source inventory page. The dashboard now includes a working local image library and ordered playlist editor. Server and dashboard dependencies are pinned with committed npm lockfiles and installed reproducibly in CI. The server and dashboard still use separate development processes; production dashboard serving and packaging are not implemented.
+The repository currently contains an early **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage, operator sessions, one-time receiver pairing, authenticated heartbeats, a protected device inventory, operator-controlled credential revocation, image uploads, and playlist management. SQLite schema upgrades are versioned and tested against a populated version-1 database. Non-loopback server binding now requires configured TLS certificate and private-key files. The C++ receiver control-plane client now implements pairing, TLS-verified heartbeats, source snapshots, retry/backoff, and protected credential storage. It is compiled independently in CI, but has not yet been validated in the complete native player build against the official NDI SDK. Per-device source assignment, remote configuration, device playlist assignment, and offline fallback synchronization remain in development. The dashboard now includes a receiver-reported NDI source inventory page. The dashboard now includes a working local image library and ordered playlist editor. Server and dashboard dependencies are pinned with committed npm lockfiles and installed reproducibly in CI. The server and dashboard still use separate development processes; production dashboard serving and packaging are not implemented.
 
 The native receiver foundation includes:
 
@@ -31,9 +31,9 @@ The native receiver foundation includes:
 - Leaves the NDI receiver alive during source loss so the SDK can reconnect when the source returns.
 - Loads and validates local JSON configuration.
 
-Receiver-side pairing and discovery heartbeat reporting are implemented in the C++ control-plane client, but the complete native player still needs an official NDI SDK build and hardware validation. Remote commands, device source/playlist assignment, and per-device cached fallback are **not yet implemented**. The server can aggregate source snapshots reported by receivers, and the dashboard can display that inventory. The dashboard's Media Library supports local PNG/JPEG/WebP uploads, and Playlists supports ordered image sequences with editable display durations. The server can issue one-time pairing codes, register a receiver, accept authenticated heartbeats, and provide a protected device inventory. The dashboard's current empty states are intentional and do not use fabricated device or media data. On first server launch, copy the one-time setup key from the server terminal into the dashboard to create the local administrator.
+Receiver-side pairing and discovery heartbeat reporting are implemented in the C++ control-plane client, but the complete native player still needs an official NDI SDK build and hardware validation. Remote commands, device source/playlist assignment, and per-device cached fallback are **not yet implemented**. The server can aggregate source snapshots reported by receivers, and the dashboard can display that inventory. The dashboard's Media Library supports local PNG/JPEG/WebP uploads, and Playlists supports ordered image sequences with editable display durations. The server can issue one-time pairing codes, register a receiver, accept authenticated heartbeats, and provide a protected device inventory. Empty states are used only where a feature is not yet connected; the media library and playlist editor use persisted server data. On first server launch, copy the one-time setup key from the server terminal into the dashboard to create the local administrator.
 
-The player has not yet been compiled against an installed official NDI SDK or validated on the target Mac mini. The SDK-independent configuration tests run in GitHub Actions. See the [development plan](docs/development.md) for implementation and validation status.
+The player has not yet been compiled against an installed official NDI SDK or validated on the target Mac mini. SDK-independent CI builds the renderer and control-plane client, runs configuration and mock-server pairing/heartbeat tests, and tests the server and dashboard. See the [development plan](docs/development.md) for implementation and validation status.
 
 ## Run the dashboard
 
@@ -97,9 +97,10 @@ If the SDK is installed into standard system include/library directories, CMake 
 Create the system configuration directory and copy the example:
 
 ```bash
-sudo install -d /etc/veyra
-sudo cp config/veyra.example.json /etc/veyra/config.json
-sudo nano /etc/veyra/config.json
+sudo install -d -m 755 /etc/veyra
+sudo install -m 600 config/veyra.example.json /etc/veyra/config.json
+sudo chown "$USER":"$(id -gn)" /etc/veyra/config.json
+nano /etc/veyra/config.json
 ```
 
 Before editing the config, list the sources visible on the LAN:
