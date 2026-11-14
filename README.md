@@ -41,7 +41,7 @@ Start the local server in one terminal:
 
 \`\`\`bash
 cd server
-npm install
+npm ci
 npm run dev
 \`\`\`
 
@@ -49,7 +49,7 @@ Start the dashboard in another terminal:
 
 \`\`\`bash
 cd dashboard
-npm install
+npm ci
 npm run dev
 \`\`\`
 
