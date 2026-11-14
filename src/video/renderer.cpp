@@ -211,8 +211,8 @@ bool Renderer::uploadPixels(
     return true;
 }
 
-void Renderer::convertUyvyToBgra(const ndi::VideoFrame& frame) {
-    if (frame.format != ndi::PixelFormat::UYVY || frame.width <= 0 ||
+void Renderer::convertUyvyToBgra(const VideoFrame& frame) {
+    if (frame.format != PixelFormat::UYVY || frame.width <= 0 ||
         frame.height <= 0 || (frame.width % 2) != 0 ||
         static_cast<std::int64_t>(frame.stride) <
             static_cast<std::int64_t>(frame.width) * 2) {
