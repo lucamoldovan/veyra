@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
-import type { VeyraDatabase } from "./database.js";
+import type { NDIViewDatabase } from "./database.js";
 
 const KEY_LENGTH = 64;
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -51,7 +51,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
 }
 
 export function createSession(
-  database: VeyraDatabase,
+  database: NDIViewDatabase,
   operatorId: string,
 ): { token: string; expiresAt: string } {
   const token = randomBytes(32).toString("base64url");
