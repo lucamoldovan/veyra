@@ -30,7 +30,7 @@ test("health endpoint reports the local server status", async () => {
     assert.equal(response.headers["x-content-type-options"], "nosniff");
     assert.deepEqual(response.json(), {
       status: "ok",
-      service: "veyra-server",
+      service: "ndiview-server",
       version: "0.1.0",
     });
   } finally {
@@ -332,7 +332,7 @@ test("operator assigns a receiver source and fallback playlist; receiver sync is
 
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
     const upload = await app.inject({ method: "POST", url: "/api/v1/media", headers: {
-      cookie, "content-type": "image/png", "x-veyra-filename": "Fallback.png",
+      cookie, "content-type": "image/png", "x-ndiview-filename": "Fallback.png",
     }, payload: png });
     const media = upload.json() as { id: string; sha256: string };
     const playlistResponse = await app.inject({ method: "POST", url: "/api/v1/playlists", headers: { cookie }, payload: { name: "Fallback" } });
@@ -423,7 +423,7 @@ test("media library validates image signatures and protects playlist references"
       headers: {
         cookie,
         "content-type": "image/png",
-        "x-veyra-filename": encodeURIComponent("../Lobby screen.png"),
+        "x-ndiview-filename": encodeURIComponent("../Lobby screen.png"),
       },
       payload: png,
     });
@@ -817,7 +817,7 @@ test("operator can queue receiver restart and full-device reboot separately", as
 test("production dashboard assets are served with safe cache headers and SPA fallback", async () => {
   const directory = mkdtempSync(join(tmpdir(), "veyra-dashboard-test-"));
   mkdirSync(join(directory, "assets"), { recursive: true });
-  writeFileSync(join(directory, "index.html"), "<!doctype html><title>Veyra</title>");
+  writeFileSync(join(directory, "index.html"), "<!doctype html><title>NDIView</title>");
   writeFileSync(join(directory, "assets", "app-a1b2c3.js"), "console.log(1)");
   const app = buildApp({ databasePath: ":memory:", setupKey: "test-setup-key", pairingSecret: "test-pairing-secret-with-at-least-32-bytes", dashboardDirectory: directory });
   try {
@@ -827,7 +827,7 @@ test("production dashboard assets are served with safe cache headers and SPA fal
     assert.equal(index.headers["cache-control"], "no-cache");
     const route = await app.inject({ method: "GET", url: "/devices" });
     assert.equal(route.statusCode, 200);
-    assert.match(route.body, /Veyra/);
+    assert.match(route.body, /NDIView/);
     const asset = await app.inject({ method: "GET", url: "/assets/app-a1b2c3.js" });
     assert.equal(asset.statusCode, 200);
     assert.equal(asset.headers["cache-control"], "public, max-age=31536000, immutable");
