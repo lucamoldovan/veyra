@@ -731,7 +731,7 @@ function DevicesPage() {
           </div>
           <div className="pairing-foot">
             <span>This code expires at {new Date(pairingCode.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} and can only be used once.</span>
-            <span>Receiver enrollment client is the next integration step.</span>
+            <span>Enter this code in the receiver configuration to pair it with this server.</span>
           </div>
         </section>
       )}
@@ -829,7 +829,7 @@ function SystemPage({
           <div className="system-card-icon"><Wifi size={19} /></div>
           <div className="system-card-label">RECEIVER NETWORK</div>
           <h2>Awaiting receiver client</h2>
-          <p>Server-side pairing and heartbeat APIs are ready. The native receiver client still needs to be connected.</p>
+          <p>Pairing, heartbeat, and receiver configuration APIs are connected. Full NDI SDK build and hardware validation remain.</p>
           <div className="system-card-foot"><span className="status-dot dot-pending" />Server APIs ready · receiver integration pending</div>
         </div>
         <div className="panel system-card">
