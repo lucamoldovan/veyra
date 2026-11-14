@@ -4,7 +4,7 @@ import rateLimit from "@fastify/rate-limit";
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, resolve, sep } from "node:path";
-import { openDatabase, type VeyraDatabase } from "./database.js";
+import { openDatabase, type NDIViewDatabase } from "./database.js";
 import { createSession, hashPassword, SESSION_COOKIE, SESSION_TTL, hashSessionToken, verifyPassword } from "./security.js";
 
 interface BuildAppOptions {
@@ -30,9 +30,9 @@ interface LoginBody {
   password?: unknown;
 }
 
-function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key: string | null; path: string | null; generated: boolean } {
+function readSetupKey(database: NDIViewDatabase, options: BuildAppOptions): { key: string | null; path: string | null; generated: boolean } {
   const operatorCount = database.prepare("SELECT COUNT(*) AS count FROM operators").get() as { count: number };
-  const setupKeyPath = resolve(options.setupKeyPath ?? process.env.VEYRA_SETUP_KEY_PATH ?? "data/setup-key");
+  const setupKeyPath = resolve(options.setupKeyPath ?? (process.env.NDIVIEW_SETUP_KEY_PATH ?? process.env.VEYRA_SETUP_KEY_PATH) ?? "data/setup-key");
 
   if (operatorCount.count > 0) {
     if (!options.setupKey) rmSync(setupKeyPath, { force: true });
@@ -46,12 +46,12 @@ function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key:
   if (existsSync(setupKeyPath)) {
     const fileInfo = lstatSync(setupKeyPath);
     if (!fileInfo.isFile()) {
-      throw new Error("Veyra setup key path must be a regular file, not a symlink or special file");
+      throw new Error("NDIView setup key path must be a regular file, not a symlink or special file");
     }
     chmodSync(setupKeyPath, 0o600);
     const existingKey = readFileSync(setupKeyPath, "utf8").trim();
     if (existingKey.length < 32) {
-      throw new Error("Veyra setup key file is empty or invalid; remove it to generate a new key");
+      throw new Error("NDIView setup key file is empty or invalid; remove it to generate a new key");
     }
     return { key: existingKey, path: setupKeyPath, generated: false };
   }
@@ -64,20 +64,20 @@ function readSetupKey(database: VeyraDatabase, options: BuildAppOptions): { key:
 function readPairingSecret(options: BuildAppOptions): Buffer {
   if (options.pairingSecret) {
     const secret = Buffer.from(options.pairingSecret, "utf8");
-    if (secret.length < 32) throw new Error("Veyra pairing secret must be at least 32 bytes");
+    if (secret.length < 32) throw new Error("NDIView pairing secret must be at least 32 bytes");
     return secret;
   }
 
-  const secretPath = resolve(options.pairingSecretPath ?? process.env.VEYRA_PAIRING_SECRET_PATH ?? "data/pairing-secret");
+  const secretPath = resolve(options.pairingSecretPath ?? (process.env.NDIVIEW_PAIRING_SECRET_PATH ?? process.env.VEYRA_PAIRING_SECRET_PATH) ?? "data/pairing-secret");
   mkdirSync(dirname(secretPath), { recursive: true });
 
   if (existsSync(secretPath)) {
     const fileInfo = lstatSync(secretPath);
-    if (!fileInfo.isFile()) throw new Error("Veyra pairing secret path must be a regular file");
+    if (!fileInfo.isFile()) throw new Error("NDIView pairing secret path must be a regular file");
     chmodSync(secretPath, 0o600);
     const value = readFileSync(secretPath, "utf8").trim();
     if (!/^[a-f0-9]{64}$/i.test(value)) {
-      throw new Error("Veyra pairing secret file is invalid; restore it from backup or remove it to rotate pairing verification");
+      throw new Error("NDIView pairing secret file is invalid; restore it from backup or remove it to rotate pairing verification");
     }
     return Buffer.from(value, "hex");
   }
@@ -130,7 +130,7 @@ function ensurePrivateDirectory(path: string): void {
   const absolutePath = resolve(path);
   const homeDirectory = process.env.HOME ? resolve(process.env.HOME) : "";
   if (absolutePath === process.cwd() || (homeDirectory && absolutePath === homeDirectory)) {
-    throw new Error("Veyra media storage must use a dedicated subdirectory");
+    throw new Error("NDIView media storage must use a dedicated subdirectory");
   }
   const unsafeTargets = new Set([
     "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
@@ -138,12 +138,12 @@ function ensurePrivateDirectory(path: string): void {
     "/sys", "/boot",
   ]);
   if (unsafeTargets.has(absolutePath)) {
-    throw new Error("Veyra media storage must use a dedicated private directory");
+    throw new Error("NDIView media storage must use a dedicated private directory");
   }
   mkdirSync(absolutePath, { recursive: true, mode: 0o700 });
   const info = lstatSync(absolutePath);
   if (!info.isDirectory() || info.isSymbolicLink()) {
-    throw new Error("Veyra media storage path must be a real directory, not a symlink");
+    throw new Error("NDIView media storage path must be a real directory, not a symlink");
   }
   chmodSync(absolutePath, 0o700);
 }
@@ -158,7 +158,7 @@ function safeEqual(left: string, right: string): boolean {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function getSessionOperator(database: VeyraDatabase, token: string | undefined): { id: string; username: string } | null {
+function getSessionOperator(database: NDIViewDatabase, token: string | undefined): { id: string; username: string } | null {
   if (!token) return null;
 
   const row = database.prepare(`
@@ -177,7 +177,7 @@ function getSessionOperator(database: VeyraDatabase, token: string | undefined):
   return { id: row.id, username: row.username };
 }
 
-function getAuthenticatedOperator(database: VeyraDatabase, request: FastifyRequest, reply: FastifyReply): { id: string; username: string } | null {
+function getAuthenticatedOperator(database: NDIViewDatabase, request: FastifyRequest, reply: FastifyReply): { id: string; username: string } | null {
   const operator = getSessionOperator(database, request.cookies[SESSION_COOKIE]);
   if (!operator) {
     reply.code(401).send({ error: "Authentication required" });
@@ -208,14 +208,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     throw error;
   }
   const secureCookies = Boolean(options.https) || options.secureCookies === true ||
-    process.env.VEYRA_COOKIE_SECURE === "true";
+    (process.env.NDIVIEW_COOKIE_SECURE ?? process.env.VEYRA_COOKIE_SECURE) === "true";
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
     },
     ...(options.https ? { https: options.https } : {}),
   });
-  const mediaDirectory = resolve(options.mediaDirectory ?? process.env.VEYRA_MEDIA_DIRECTORY ?? "data/media");
+  const mediaDirectory = resolve(options.mediaDirectory ?? (process.env.NDIVIEW_MEDIA_DIRECTORY ?? process.env.VEYRA_MEDIA_DIRECTORY) ?? "data/media");
   app.addContentTypeParser(
     ["image/png", "image/jpeg", "image/webp"],
     { parseAs: "buffer", bodyLimit: MAX_MEDIA_BYTES },
@@ -231,7 +231,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   if (setup.generated && setup.key) {
-    app.log.warn({ setupKey: setup.key }, "Veyra first-run setup key — enter this in the dashboard");
+    app.log.warn({ setupKey: setup.key }, "NDIView first-run setup key — enter this in the dashboard");
   }
 
   app.register(cookie);
@@ -243,7 +243,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.get("/api/v1/health", async () => ({
     status: "ok",
-    service: "veyra-server",
+    service: "ndiview-server",
     version: "0.1.0",
   }));
 
@@ -291,7 +291,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       if (error instanceof Error && error.message === "SETUP_ALREADY_COMPLETED") {
         return reply.code(409).send({ error: "Initial setup has already been completed" });
       }
-      request.log.error(error, "Could not create initial Veyra operator");
+      request.log.error(error, "Could not create initial NDIView operator");
       return reply.code(409).send({ error: "Initial setup could not be completed" });
     }
 
@@ -431,7 +431,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const extension = detectedMime === "image/png" ? "png" : detectedMime === "image/jpeg" ? "jpg" : "webp";
     const id = randomUUID();
     const storageKey = `${id}.${extension}`;
-    const filenameHeader = request.headers["x-veyra-filename"];
+    const filenameHeader = request.headers["x-ndiview-filename"] ?? request.headers["x-veyra-filename"];
     const displayName = safeDisplayName(typeof filenameHeader === "string" ? filenameHeader : undefined);
     const createdAt = new Date().toISOString();
     const sha256 = createHash("sha256").update(image).digest("hex");
@@ -448,7 +448,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       `).run(id, displayName, storageKey, detectedMime, image.length, sha256, createdAt);
     } catch (error) {
       if (fileCreated) rmSync(filePath, { force: true });
-      request.log.error(error, "Could not store uploaded Veyra media");
+      request.log.error(error, "Could not store uploaded NDIView media");
       return reply.code(500).send({ error: "Image could not be stored" });
     }
 
@@ -513,7 +513,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         .header("Content-Disposition", "inline")
         .send(content);
     } catch (error) {
-      request.log.error(error, "Stored Veyra media file is missing or unreadable");
+      request.log.error(error, "Stored NDIView media file is missing or unreadable");
       return reply.code(404).send({ error: "Media file is unavailable" });
     }
   });
@@ -542,7 +542,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       database.prepare("DELETE FROM media_assets WHERE id = ?").run(request.params.mediaId);
       return reply.code(204).send();
     } catch (error) {
-      request.log.error(error, "Could not delete Veyra media");
+      request.log.error(error, "Could not delete NDIView media");
       return reply.code(500).send({ error: "Image could not be deleted" });
     }
   });
@@ -1016,7 +1016,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       if (dirname(filePath) !== mediaDirectory) return reply.code(404).send({ error: "Media item not found" });
       return reply.type(asset.mime_type).header("Cache-Control", "private, no-store").send(readFileSync(filePath));
     } catch (error) {
-      request.log.error(error, "Assigned Veyra media is missing or unreadable");
+      request.log.error(error, "Assigned NDIView media is missing or unreadable");
       return reply.code(404).send({ error: "Media file is unavailable" });
     }
   });
@@ -1168,12 +1168,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
   );
 
-  const dashboardDirectory = resolve(options.dashboardDirectory ?? process.env.VEYRA_DASHBOARD_DIRECTORY ?? "../dashboard/dist");
+  const dashboardDirectory = resolve(options.dashboardDirectory ?? (process.env.NDIVIEW_DASHBOARD_DIRECTORY ?? process.env.VEYRA_DASHBOARD_DIRECTORY) ?? "../dashboard/dist");
   const dashboardIndex = resolve(dashboardDirectory, "index.html");
   if (existsSync(dashboardIndex)) {
     const serveDashboard = async (request: FastifyRequest, reply: FastifyReply) => {
       let pathname: string;
-      try { pathname = decodeURIComponent(new URL(request.url, "http://veyra.local").pathname); }
+      try { pathname = decodeURIComponent(new URL(request.url, "http://ndiview.local").pathname); }
       catch { return reply.code(400).send({ error: "Invalid dashboard path" }); }
       if (pathname === "/api" || pathname.startsWith("/api/")) return reply.code(404).send({ error: "API route not found" });
       const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");

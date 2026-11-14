@@ -2,11 +2,11 @@ import Database from "better-sqlite3";
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-export type VeyraDatabase = Database.Database;
+export type NDIViewDatabase = Database.Database;
 
 const CURRENT_SCHEMA_VERSION = 8;
 
-export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite"): VeyraDatabase {
+export function openDatabase(databasePath = process.env.NDIVIEW_DATABASE_PATH ?? process.env.VEYRA_DATABASE_PATH ?? "data/ndiview.sqlite"): NDIViewDatabase {
   const resolvedPath = databasePath === ":memory:" ? databasePath : resolve(databasePath);
 
   if (resolvedPath !== ":memory:") {
@@ -14,7 +14,7 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
     const absoluteDirectory = resolve(directory);
     const homeDirectory = process.env.HOME ? resolve(process.env.HOME) : "";
     if (absoluteDirectory === process.cwd() || (homeDirectory && absoluteDirectory === homeDirectory)) {
-      throw new Error("Veyra database must live in a dedicated private subdirectory");
+      throw new Error("NDIView database must live in a dedicated private subdirectory");
     }
     const unsafeTargets = new Set([
       "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
@@ -22,19 +22,19 @@ export function openDatabase(databasePath = process.env.VEYRA_DATABASE_PATH ?? "
       "/sys", "/boot",
     ]);
     if (unsafeTargets.has(absoluteDirectory)) {
-      throw new Error("Veyra database must live in a dedicated private directory");
+      throw new Error("NDIView database must live in a dedicated private directory");
     }
     mkdirSync(absoluteDirectory, { recursive: true, mode: 0o700 });
     const directoryInfo = lstatSync(absoluteDirectory);
     if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
-      throw new Error("Veyra database directory must be a real directory, not a symlink");
+      throw new Error("NDIView database directory must be a real directory, not a symlink");
     }
     chmodSync(absoluteDirectory, 0o700);
 
     if (existsSync(resolvedPath)) {
       const databaseInfo = lstatSync(resolvedPath);
       if (!databaseInfo.isFile() || databaseInfo.isSymbolicLink()) {
-        throw new Error("Veyra database path must be a regular file, not a symlink");
+        throw new Error("NDIView database path must be a regular file, not a symlink");
       }
       chmodSync(resolvedPath, 0o600);
     } else {
