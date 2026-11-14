@@ -64,8 +64,8 @@ See [docs/architecture.md](docs/architecture.md) for the system topology, compon
 - Debian 13, 64-bit x86_64
 - C++20 compiler
 - CMake 3.20+
-- SDL2 development files
-- libcurl development files
+- SDL2 and SDL2_image development files
+- libcurl and OpenSSL development files
 - spdlog
 - nlohmann/json
 - Official NDI SDK for Linux
