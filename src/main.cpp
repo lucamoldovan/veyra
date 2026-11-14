@@ -14,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -91,7 +92,8 @@ int main(int argc, char* argv[]) {
 
         bool displayIsClear = true;
         bool playbackWasActive = false;
-        auto lastStatusLog = std::chrono::steady_clock::now();
+        auto lastFrameAt = std::chrono::steady_clock::now();
+        auto lastDiscoveryLog = lastFrameAt;
 
         spdlog::info("Waiting for the configured NDI source");
 
@@ -109,12 +111,12 @@ int main(int argc, char* argv[]) {
                     );
                     receiver =
                         std::make_unique<veyra::ndi::Receiver>(*selected);
-                    lastStatusLog = std::chrono::steady_clock::now();
+                    lastFrameAt = std::chrono::steady_clock::now();
                     continue;
                 }
 
                 const auto now = std::chrono::steady_clock::now();
-                if (now - lastStatusLog >= std::chrono::seconds(5)) {
+                if (now - lastDiscoveryLog >= std::chrono::seconds(5)) {
                     if (sources.empty()) {
                         spdlog::info("No NDI sources are currently available");
                     } else if (config.ndi.sourceName.empty() &&
@@ -136,7 +138,7 @@ int main(int argc, char* argv[]) {
                             "Configured NDI source is not currently available"
                         );
                     }
-                    lastStatusLog = now;
+                    lastDiscoveryLog = now;
                 }
 
                 if (!displayIsClear) {
@@ -159,14 +161,14 @@ int main(int argc, char* argv[]) {
                     );
                     playbackWasActive = true;
                 }
-                lastStatusLog = std::chrono::steady_clock::now();
+                lastFrameAt = std::chrono::steady_clock::now();
                 continue;
             }
 
             const auto now = std::chrono::steady_clock::now();
             const bool connected = receiver->isConnected();
             const bool frameIsStale =
-                now - lastStatusLog > std::chrono::seconds(2);
+                now - lastFrameAt > std::chrono::seconds(2);
 
             if (!connected || frameIsStale) {
                 if (playbackWasActive) {
