@@ -709,7 +709,7 @@ test("database upgrades a populated version-one schema without losing devices", 
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run("device-1", "Lobby", "token-hash", "linux-x86_64", "0.1.0",
       "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
-    legacy.exec("DROP TABLE playlist_items; DROP TABLE playlists; DROP TABLE media_assets;");
+    legacy.exec("DROP TABLE playlist_items; DROP TABLE playlists; DROP TABLE media_assets; DROP TABLE IF EXISTS device_commands;");
     legacy.pragma("user_version = 1");
     legacy.close();
 
