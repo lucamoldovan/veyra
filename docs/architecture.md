@@ -10,36 +10,57 @@ One native process owns the display and playback lifecycle. It runs locally on t
 
 Core subsystems:
 
-- **NDI discovery:** enumerate sources on the LAN and expose stable source identity plus display name.
-- **NDI receiver:** connect to the selected source, receive video frames, detect stale/missing frames, and reconnect.
-- **Renderer:** present frames in a fullscreen SDL2 window at the configured output size.
-- **Playback controller:** coordinate startup, source selection, connection loss, reconnect attempts, and error states.
-- **Configuration:** load and validate a local configuration file; retain safe defaults when optional values are absent.
-- **Logging/health:** report state transitions and meaningful errors without flooding logs.
+- **NDI discovery:** enumerate LAN sources and copy their display name and URL into Veyra-owned strings.
+- **NDI receiver:** connect to the selected source, receive video frames, report connection state, and rely on the SDK's automatic reconnect behavior.
+- **Renderer:** present video in a fullscreen SDL2 window while preserving the source aspect ratio.
+- **Playback loop:** coordinate source selection, frame freshness, black-screen fallback, and shutdown.
+- **Configuration:** load and validate a local JSON file.
+- **Logging:** report startup, source selection, playback transitions, and failures.
 
-## Threading principles
+## Threading and frame ownership
 
-Keep NDI frame reception separate from rendering so a slow display operation cannot block frame acquisition. Use a bounded frame queue; when overloaded, prefer the newest frame rather than building latency with stale frames. Protect shared state explicitly and make shutdown cooperative.
+The SDL event/render loop runs on the main thread. NDI frame capture runs on a dedicated worker thread.
 
-The first implementation should avoid unnecessary worker threads. Add complexity only where the SDK or measured performance requires it.
+The capture worker copies each supported NDI frame into Veyra-owned memory and frees the SDK frame immediately. It publishes into a single latest-frame slot protected by a mutex. If rendering falls behind, a newer frame replaces the pending frame rather than allowing latency to grow without bound.
 
-## Playback state model
+The capture thread uses a bounded timeout so shutdown can request a stop and join the worker before destroying the receiver or global NDI runtime.
 
-- `STARTING`: initialize configuration, SDL, and NDI runtime.
-- `DISCOVERING`: enumerate available sources.
-- `DISCONNECTED`: no selected source is currently available.
-- `CONNECTING`: attempting to connect to the selected source.
-- `PLAYING`: fresh video frames are being presented.
-- `RECONNECTING`: the source disappeared or frames became stale; retrying.
-- `ERROR`: unrecoverable initialization or runtime failure.
+## NDI receive format
 
-A missing source is not, by itself, a reason to reboot the machine. Recreate/reconnect the receiver first and report the state clearly.
+The receiver requests NDI's UYVY/BGRA receive format:
+
+- Sources without alpha are delivered as packed UYVY.
+- Sources with alpha are delivered as BGRA.
+- Audio and metadata pointers passed to the NDI capture function are null; Veyra does not receive or play NDI audio.
+- Interlaced sources are deinterlaced by the SDK by setting the video-fields option to false.
+
+UYVY is uploaded directly to an SDL streaming texture when supported. If the renderer cannot create or lock a UYVY texture, Veyra converts the frame to BGRA and uses a BGRA texture instead. The conversion uses BT.709 coefficients for HD and BT.601 for SD.
+
+## Source selection
+
+The preferred configured identity is the NDI source URL/address (ndi.sourceAddress). If it is not configured, Veyra can select by exact source name (ndi.sourceName).
+
+If neither is configured, Veyra automatically selects a source only when exactly one source is discovered. It does not arbitrarily choose between multiple sources.
+
+The finder owns the source array returned by the current-sources API. Veyra copies the name and URL before calling the finder again.
+
+## Playback and recovery
+
+- No configured source is found: keep the display black and continue discovery.
+- Source is discovered: create a receiver and start the capture worker.
+- Fresh video arrives: render it and mark playback active.
+- No fresh frame for two seconds: clear the display and report the loss once.
+- Source disappears: keep the receiver alive; the NDI SDK automatically attempts to reconnect when the source returns.
+- Process exits unexpectedly: the deployment service should restart it.
+- Machine reboots: the deployment service should start it after the graphical session is available.
+
+The application does not reboot the machine because a source is unavailable.
 
 ## Local configuration
 
-Initial configuration lives at `/etc/veyra/config.json` for system installations. Development builds may accept an explicit config path.
+The default configuration path is /etc/veyra/config.json. Development builds may pass another path using --config.
 
-Example:
+Supported version-1 configuration:
 
 ```json
 {
@@ -54,38 +75,26 @@ Example:
     "targetFps": 30,
     "fullscreen": true,
     "vsync": true
-  },
-  "reconnect": {
-    "enabled": true,
-    "initialDelayMs": 1000,
-    "maxDelayMs": 10000
-  },
-  "logging": {
-    "level": "info"
   }
 }
 ```
 
-Source identity should use the strongest stable identifier provided by the NDI SDK (for example, the source URL/address) rather than relying only on a human-readable name. The exact SDK fields will be confirmed during implementation.
+The display dimensions configure the window when it is not fullscreen. Fullscreen desktop mode uses the display's current desktop resolution. targetFps is validated and reserved for frame pacing; current playback is paced by incoming NDI frames and renderer vsync.
 
 ## Target environment
 
-- Debian 13, 64-bit x86_64, XFCE during development
+- Debian 13, 64-bit x86_64, XFCE/X11 during development
 - Apple Mac mini (Late 2014), Intel Core i5-4278U, 8 GB RAM, Intel Iris 5100
 - Initial target output: 1920×1080 at 30 FPS
 - Wired LAN preferred
+- Avahi daemon available and running for LAN discovery
 
 The initial hardware has a mechanical HDD; development must not assume an SSD. Actual performance and long-duration stability must be measured on the target hardware when it is available.
 
-## Failure handling
+## Current validation boundary
 
-- NDI source disappears: mark the stream unavailable and retry with bounded backoff.
-- No frames arrive: detect frame staleness independently of discovery state.
-- Renderer fails: log the failure and attempt controlled recovery where safe.
-- Process exits: systemd restarts it.
-- Machine reboots: systemd starts Veyra automatically.
-- Network is unavailable: remain alive, continue discovery/retry, and recover when the LAN returns.
+The configuration loader has SDK-independent unit tests and runs in GitHub Actions. The complete player still needs to be built against the installed official NDI SDK and SDL2 on Debian 13, then tested with real NDI senders and the target Mac mini.
 
 ## Security and licensing
 
-Veyra should not expose a network control server in its first version. NDI traffic remains on the local network. Do not bundle or redistribute NDI SDK binaries until the applicable SDK license and redistribution terms have been reviewed.
+Veyra does not expose a network control server. NDI traffic remains on the local network. Do not bundle or redistribute NDI SDK binaries until the applicable SDK license and redistribution terms have been reviewed.
