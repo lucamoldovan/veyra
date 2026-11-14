@@ -28,7 +28,7 @@ apt-get install --yes lightdm xserver-xorg x11-xserver-utils dbus-x11 unclutter 
 install -d -m 0755 /usr/local/libexec /usr/share/xsessions /etc/lightdm/lightdm.conf.d /home/veyra-kiosk/.config/systemd/user
 install -m 0755 scripts/veyra-kiosk-session /usr/local/libexec/veyra-kiosk-session
 install -o root -g root -m 0755 scripts/veyra-reboot /usr/local/libexec/veyra-reboot
-printf '%s\\n' 'veyra-kiosk ALL=(root) NOPASSWD: /usr/local/libexec/veyra-reboot' > /etc/sudoers.d/veyra-reboot
+printf '%s\n' 'veyra-kiosk ALL=(root) NOPASSWD: /usr/local/libexec/veyra-reboot' > /etc/sudoers.d/veyra-reboot
 chmod 0440 /etc/sudoers.d/veyra-reboot
 visudo -cf /etc/sudoers.d/veyra-reboot
 install -m 0644 systemd/veyra.service /home/veyra-kiosk/.config/systemd/user/veyra.service
