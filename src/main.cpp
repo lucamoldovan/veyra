@@ -362,7 +362,7 @@ int main(int argc, char* argv[]) {
                                     }
                                 }
                             } catch (const std::exception& error) {
-                                spdlog::critical(
+                                spdlog::error(
                                     "NDI capture worker failed: {}",
                                     error.what()
                                 );
