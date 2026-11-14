@@ -1,10 +1,10 @@
 # Veyra control-plane contract (draft)
 
-This document defines the intended communication contract for the Veyra local server, dashboard, and receiver agents. The operator setup/session routes, device inventory, receiver pairing, and heartbeat endpoints listed as implemented below exist today. The remaining routes, WebSocket messages, and workflows are design targets, not implemented behavior. Treat this as an evolving contract and keep it aligned with tested implementation.
+This document defines the intended communication contract for the Veyra local server, dashboard, and receiver agents. The operator setup/session routes, device inventory, receiver pairing, heartbeat endpoints, per-device assignments, receiver configuration polling, assigned-media manifests, and media downloads listed as implemented below exist today. Remote commands, WebSocket messages, and detailed health workflows remain design targets. Treat this as an evolving contract and keep it aligned with tested implementation.
 
 ## Design principles
 
-1. The server is the authority for shared device assignments, media, playlists, and operator accounts. The initial device-pairing and heartbeat endpoints are implemented; this document remains the broader evolving protocol contract.
+1. The server is the authority for shared device assignments, media, playlists, and operator accounts. Receivers poll versioned configuration and media manifests, and activate only fully downloaded, SHA-256-verified cache snapshots.
 2. A receiver is authoritative for what is actually happening on its own display.
 3. A receiver must keep playing without an active server connection.
 4. NDI discovery and video transport are independent of the Veyra management channel.
@@ -106,12 +106,10 @@ Planned endpoints:
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET | `/api/v1/receiver/config` | Fetch the latest desired configuration |
-| GET | `/api/v1/receiver/media-manifest` | Fetch assigned media metadata and versions |
 | POST | `/api/v1/receiver/playback` | Report playback/source/fallback transitions |
 | POST | `/api/v1/receiver/commands/{commandId}/ack` | Acknowledge a received command and report its result |
 
-The pairing endpoint accepts a short-lived, single-use 12-digit code. The receiver receives its device credential once; the server stores only its HMAC-SHA-256 verifier for pairing codes; the HMAC key is stored separately in a restrictive local file. Heartbeats use the device credential as a bearer token. The C++ receiver client implements one-time pairing, TLS-verified bearer heartbeats, source snapshots, bounded retry/backoff, and owner-only credential storage. It is compiled independently of the NDI SDK in CI; the complete native player still requires an official NDI SDK build and hardware validation.
+The pairing endpoint accepts a short-lived, single-use 12-digit code. The receiver receives its device credential once; the server stores only its HMAC-SHA-256 verifier for pairing codes; the HMAC key is stored separately in a restrictive local file. Heartbeats use the device credential as a bearer token. The C++ receiver client implements one-time pairing, TLS-verified bearer heartbeats, source snapshots, bounded retry/backoff, owner-only credential storage, versioned config and manifest polling, SHA-256-verified media downloads, persistent local cache, and image fallback. It is compiled independently of the NDI SDK in CI; the complete native player still requires an official NDI SDK build and hardware validation.
 
 ## WebSocket event envelope
 
