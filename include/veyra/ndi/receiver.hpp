@@ -9,6 +9,7 @@
 
 namespace veyra::ndi {
 
+using PixelFormat = video::PixelFormat;
 using VideoFrame = video::VideoFrame;
 
 class Receiver {
