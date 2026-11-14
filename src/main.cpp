@@ -197,9 +197,16 @@ int main(int argc, char* argv[]) {
             if (fallbackVisible) {
                 if (now - fallbackSlideStartedAt <
                     std::chrono::seconds(fallbackItems[fallbackIndex].durationSeconds)) {
-                    return true;
+                    try {
+                        renderer.presentImage(fallbackItems[fallbackIndex].path);
+                        return true;
+                    } catch (const std::exception& error) {
+                        spdlog::error("Fallback image redraw failed: {}", error.what());
+                        fallbackIndex = (fallbackIndex + 1) % fallbackItems.size();
+                    }
+                } else {
+                    fallbackIndex = (fallbackIndex + 1) % fallbackItems.size();
                 }
-                fallbackIndex = (fallbackIndex + 1) % fallbackItems.size();
             }
             for (std::size_t attempt = 0; attempt < fallbackItems.size(); ++attempt) {
                 fallbackIndex %= fallbackItems.size();
