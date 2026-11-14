@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <fcntl.h>
 #include <fstream>
@@ -151,6 +152,12 @@ std::unordered_set<std::string> previousStateFiles(const std::filesystem::path& 
 
 void ensurePrivateDirectory(const std::filesystem::path& path) {
     const auto absolute = std::filesystem::absolute(path).lexically_normal();
+    const char* homeEnvironment = std::getenv("HOME");
+    const auto home = homeEnvironment == nullptr
+        ? std::filesystem::path{} : std::filesystem::path(homeEnvironment).lexically_normal();
+    if (absolute == std::filesystem::current_path() || (!home.empty() && absolute == home)) {
+        throw std::runtime_error("Receiver cache path must be a dedicated subdirectory");
+    }
     static const std::array<std::filesystem::path, 17> unsafeTargets{
         "/", "/tmp", "/var", "/var/cache", "/var/lib", "/home", "/root",
         "/etc", "/usr", "/opt", "/run", "/mnt", "/media", "/dev", "/proc",
