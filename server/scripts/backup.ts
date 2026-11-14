@@ -70,7 +70,10 @@ const manifest = {
   createdAt: new Date().toISOString(),
   databaseFile: databaseBackup.split(/[\\/]/).pop(),
   pairingSecretFile: secretBackup.split(/[\\/]/).pop(),
-  note: "Restore both the SQLite database and pairing secret together while the Veyra server is stopped.",
+  mediaDirectory: mediaBackupDirectory.split(/[\\/]/).pop(),
+  mediaFileCount,
+  mediaBytes,
+  note: "Restore the SQLite database, matching pairing secret, and media directory together while the Veyra server is stopped.",
 };
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", {
   encoding: "utf8",
