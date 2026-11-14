@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -277,6 +277,26 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
   }
 });
 
+
+
+test("invalid pairing secret fails startup without leaking the database handle", () => {
+  const directory = mkdtempSync(join(tmpdir(), "veyra-invalid-secret-"));
+  const databasePath = join(directory, "veyra.sqlite");
+  const pairingSecretPath = join(directory, "pairing-secret");
+
+  try {
+    writeFileSync(pairingSecretPath, "not-a-valid-secret", { mode: 0o600 });
+    assert.throws(
+      () => buildApp({ databasePath, setupKey: "test-setup-key", pairingSecretPath }),
+      /pairing secret file is invalid/i,
+    );
+
+    const database = openDatabase(databasePath);
+    database.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("pairing secret is generated with restrictive permissions and remains stable", async () => {
   const directory = mkdtempSync(join(tmpdir(), "veyra-pairing-secret-"));
