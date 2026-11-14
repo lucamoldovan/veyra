@@ -666,7 +666,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
       const now = new Date().toISOString();
       const replaceItems = database.transaction(() => {
-        database.prepare("UPDATE playlists SET name = ?, description = ?, updated_at = ? WHERE id = ?")
+        database.prepare("UPDATE playlists SET name = ?, description = ?, updated_at = ?, revision = revision + 1 WHERE id = ?")
           .run(name, description, now, request.params.playlistId);
         database.prepare("DELETE FROM playlist_items WHERE playlist_id = ?").run(request.params.playlistId);
         const insert = database.prepare(`
@@ -799,8 +799,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         : typeof body.fallbackPlaylistId === "string" ? body.fallbackPlaylistId : undefined;
 
       if (sourceName === undefined || sourceAddress === undefined || fallbackPlaylistId === undefined ||
-          (sourceName !== null && sourceName.length > 160) ||
-          (sourceAddress !== null && sourceAddress.length > 2048)) {
+          (sourceName !== null && (sourceName.length === 0 || sourceName.length > 160)) ||
+          (sourceAddress !== null && (sourceAddress.length === 0 || sourceAddress.length > 2048))) {
         return reply.code(400).send({ error: "Invalid device configuration values" });
       }
       if ((sourceName === null) !== (sourceAddress === null)) {
@@ -878,10 +878,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const device = authenticateReceiver(request, reply);
     if (!device) return;
     const assignment = database.prepare(`
-      SELECT d.config_version, d.fallback_playlist_id, p.updated_at
+      SELECT d.config_version, d.fallback_playlist_id, p.updated_at, p.revision
       FROM devices d LEFT JOIN playlists p ON p.id = d.fallback_playlist_id
       WHERE d.id = ?
-    `).get(device.id) as { config_version: number; fallback_playlist_id: string | null; updated_at: string | null };
+    `).get(device.id) as { config_version: number; fallback_playlist_id: string | null; updated_at: string | null; revision: number | null };
     const items = assignment.fallback_playlist_id ? database.prepare(`
       SELECT pi.position, pi.duration_seconds, ma.id, ma.mime_type, ma.size_bytes, ma.sha256
       FROM playlist_items pi
@@ -896,6 +896,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       configVersion: assignment.config_version,
       playlistId: assignment.fallback_playlist_id,
       playlistUpdatedAt: assignment.updated_at,
+      playlistRevision: assignment.revision,
       items: items.map((item) => ({
         mediaId: item.id,
         position: item.position,
