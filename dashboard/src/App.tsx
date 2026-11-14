@@ -569,7 +569,7 @@ function DevicesPage() {
       window.clearInterval(interval);
       controller?.abort();
     };
-  }, []);
+  }, [refreshTick]);
 
   const createCode = async () => {
     setCreatingCode(true);
