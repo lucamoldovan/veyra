@@ -54,6 +54,8 @@ int main() {
     check(defaults.controlPlane.serverUrl.empty(), "control-plane integration is disabled by default");
     check(defaults.controlPlane.heartbeatIntervalSeconds == 15, "heartbeat defaults to 15 seconds");
     check(defaults.controlPlane.credentialPath.is_absolute(), "default device credential path expands to an absolute home path");
+    check(defaults.controlPlane.cachePath.is_absolute(), "default receiver cache path expands to an absolute home path");
+    check(defaults.controlPlane.syncIntervalSeconds == 10, "receiver sync defaults to ten seconds");
 
     writeFile(
         configPath,
@@ -106,7 +108,7 @@ int main() {
 
     writeFile(
         configPath,
-        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://veyra.local:8787","deviceName":"Lobby Display","pairingCode":"123456789012","caCertificatePath":"/etc/veyra/ca.pem","credentialPath":"/var/lib/veyra/device-token","heartbeatIntervalSeconds":20}})"
+        R"({"schemaVersion":1,"controlPlane":{"serverUrl":"https://veyra.local:8787","deviceName":"Lobby Display","pairingCode":"123456789012","caCertificatePath":"/etc/veyra/ca.pem","credentialPath":"/var/lib/veyra/device-token","cachePath":"/var/cache/veyra","syncIntervalSeconds":30,"heartbeatIntervalSeconds":20}})"
     );
     const auto controlPlane = veyra::config::load(configPath).controlPlane;
     check(controlPlane.serverUrl == "https://veyra.local:8787", "loads HTTPS control-plane URL");
@@ -115,6 +117,8 @@ int main() {
     check(controlPlane.caCertificatePath == "/etc/veyra/ca.pem", "loads custom CA certificate path");
     check(controlPlane.credentialPath == "/var/lib/veyra/device-token", "loads device credential path");
     check(controlPlane.heartbeatIntervalSeconds == 20, "loads heartbeat interval");
+    check(controlPlane.cachePath == "/var/cache/veyra", "loads custom receiver cache path");
+    check(controlPlane.syncIntervalSeconds == 30, "loads receiver sync interval");
 
     writeFile(
         configPath,
