@@ -184,6 +184,18 @@ void atomicWrite(const std::filesystem::path& target, const std::string& bytes) 
         ::unlink(temporary.c_str());
         throw std::runtime_error("Could not atomically commit receiver cache file");
     }
+
+    const auto parent = target.parent_path().empty()
+        ? std::filesystem::path(".") : target.parent_path();
+    const int directory = ::open(parent.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (directory < 0) {
+        throw std::runtime_error("Could not open receiver cache directory for synchronization");
+    }
+    const bool directorySynced = ::fsync(directory) == 0;
+    const bool directoryClosed = ::close(directory) == 0;
+    if (!directorySynced || !directoryClosed) {
+        throw std::runtime_error("Could not synchronize receiver cache directory metadata");
+    }
 }
 
 SyncSnapshot parseState(const Json& state, const std::filesystem::path& root, bool verify) {
