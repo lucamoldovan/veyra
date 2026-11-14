@@ -202,16 +202,15 @@ function App() {
               <strong>Need a hand?</strong>
               <span>Hosted on your local network</span>
             </div>
-            <ArrowRight size={15} />
           </div>
-          <div className="profile-row">
-            <div className="profile-avatar">L</div>
+          <button className="profile-row profile-button" onClick={() => void handleLogout()} title="Sign out">
+            <div className="profile-avatar">{operator.username.slice(0, 1).toUpperCase()}</div>
             <div className="profile-copy">
-              <strong>Local administrator</strong>
-              <span>Administrator</span>
+              <strong>{operator.username}</strong>
+              <span>Administrator · Sign out</span>
             </div>
-            <MoreHorizontal size={18} className="muted-icon" />
-          </div>
+            <LogOut size={16} className="muted-icon" />
+          </button>
         </div>
       </aside>
 
