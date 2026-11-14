@@ -25,7 +25,7 @@ The receiver remains useful on its own: playback must not depend on the dashboar
 | Internet dependency | None for normal local operation |
 | Initial receiver target | Debian 13 on x86_64, including the Late-2014 Mac mini |
 
-The dashboard and server are part of the product scope. They are planned platform components; they are not yet implemented in the current repository.
+The dashboard and server are part of the product scope. The repository now includes the dashboard foundation and a local server with persistent SQLite storage and operator authentication. Device management, content workflows, and receiver integration remain in development.
 
 ## System topology
 
@@ -103,13 +103,13 @@ Responsibilities:
 - Remote commands, including changing source, selecting a playlist, requesting a resync, and restarting the receiver process.
 - Playback state, health metrics, logs, and diagnostics.
 
-The server exposes a LAN API for request/response operations and a persistent connection (planned WebSocket channel) for heartbeats, live state, and commands. The exact API contract and authentication mechanism must be specified before implementation.
+The server currently exposes a versioned health endpoint and local operator setup/session routes. The planned control plane will add a LAN API for request/response operations and a persistent WebSocket channel for heartbeats, live state, and commands. Receiver authentication and the LAN transport-security policy must be specified before LAN deployment.
 
-The server is not a cloud service. Do not introduce an internet account, external database, or mandatory third-party runtime dependency.
+The server currently uses a local SQLite database in WAL mode. The initial operator authentication uses scrypt password hashes, random opaque session tokens stored as hashes, HttpOnly/SameSite=Strict cookies, and rate-limited setup/login routes. The server defaults to loopback binding. It is not a cloud service; do not introduce an internet account, external database, or mandatory third-party runtime dependency.
 
 ### 3. Veyra Dashboard
 
-A browser-based operator interface served by the local server.
+A browser-based operator interface that communicates with the local server. The current development build runs through Vite; production static serving is still to be implemented.
 
 Primary sections:
 
