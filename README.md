@@ -18,7 +18,7 @@ NDI audio is intentionally not captured or played.
 
 ## Current implementation status
 
-The repository currently contains the **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage and operator sessions, but receiver/device-management routes are still being built.
+The repository currently contains the **native receiver foundation**, a React/Vite dashboard, and a SQLite-backed TypeScript/Fastify server. The dashboard includes workspace navigation, an overview, Devices, NDI Sources, Media Library, Playlists, and System pages, plus first-run administrator setup, sign-in, sign-out, and live server health. The server supports persistent local storage, operator sessions, one-time receiver pairing, authenticated heartbeats, and a protected device inventory. The native receiver enrollment client, remote configuration, and source/media/playlist management remain in development.
 
 The native receiver foundation includes:
 
