@@ -82,7 +82,7 @@ mkdir -m 0700 "$BACKUP"
 if [[ -d "$DATA" ]]; then cp -a "$DATA/." "$BACKUP/"; fi
 ln -s "$RELEASE" "$BASE/current.next"
 mv -Tf "$BASE/current.next" "$BASE/current"
-systemctl restart veyra-server.service
+systemctl restart veyra-server.service || true
 
 HEALTHY=0
 for attempt in $(seq 1 20); do
