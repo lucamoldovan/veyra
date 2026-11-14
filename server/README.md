@@ -77,8 +77,10 @@ Implemented:
 - Single-use receiver pairing that returns a device ID and one-time device credential; only a hash of the credential is stored.
 - Bearer-authenticated receiver heartbeats and derived online/stale/offline state. Online means a heartbeat within 45 seconds, stale means 46–120 seconds, and offline means older than 120 seconds. Source snapshots older than 120 seconds are omitted from the aggregated source inventory.
 - Operator-controlled device credential revocation and safe removal of revoked device records.
+- Per-device NDI source and fallback-playlist assignments with monotonically increasing configuration versions.
+- Receiver-authenticated configuration and assigned-media manifest polling, plus media downloads restricted to assets in that receiver's assigned fallback playlist.
 - Per-device NDI discovery snapshots reported through heartbeats and an authenticated aggregated source inventory endpoint.
-- Transactional SQLite schema migrations through version 4, including a populated version-1 upgrade test.
+- Transactional SQLite schema migrations through version 5, including a populated version-1 upgrade test.
 - Authenticated local image uploads for PNG, JPEG, and WebP, with content-signature checks, a 20 MB limit, SHA-256 metadata, and owner-only file storage.
 - Authenticated media listing, inline content delivery, and safe deletion blocked while a playlist references the asset.
 - Playlist CRUD with ordered image items and validated per-item display durations from 1 to 3600 seconds.
@@ -87,4 +89,4 @@ Implemented:
 
 The C++ receiver client now implements one-time pairing, TLS-verified bearer heartbeats, discovery snapshots, bounded retry/backoff, and owner-only credential storage. It is compiled and tested independently of the NDI SDK in CI, but the complete native player has not yet been built against the official NDI SDK.
 
-Not implemented yet: receiver configuration/media synchronization, WebSocket events, device playlist assignment, remote commands, and production dashboard serving.
+The server now exposes `PUT /api/v1/devices/:id/config`, receiver `GET /api/v1/receiver/config`, `GET /api/v1/receiver/media-manifest`, and authenticated `GET /api/v1/receiver/media/:mediaId`. The receiver-side polling, verified local cache, and fallback renderer are still being implemented. WebSocket events, remote commands, and production dashboard serving are also not implemented.
