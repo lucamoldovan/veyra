@@ -91,6 +91,24 @@ int main() {
         "rejects out-of-range display width"
     );
 
+    writeFile(
+        configPath,
+        R"({"schemaVersion":1,"display":{"targetFps":121}})"
+    );
+    check(
+        throws([&] { (void)veyra::config::load(configPath); }),
+        "rejects an output frame rate above 120 FPS"
+    );
+
+    writeFile(
+        configPath,
+        R"({"schemaVersion":1,"ndi":{"sourceName":42}})"
+    );
+    check(
+        throws([&] { (void)veyra::config::load(configPath); }),
+        "rejects a non-string NDI source name"
+    );
+
     writeFile(configPath, R"({"schemaVersion":2})");
     check(
         throws([&] { (void)veyra::config::load(configPath); }),
