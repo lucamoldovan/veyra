@@ -67,6 +67,7 @@ import sys
 import tarfile
 archive = sys.argv[1]
 seen_binary = False
+seen_names = set()
 with tarfile.open(archive, "r:gz") as bundle:
     for member in bundle.getmembers():
         name = member.name
@@ -75,6 +76,10 @@ with tarfile.open(archive, "r:gz") as bundle:
         path = pathlib.PurePosixPath(name)
         if path.is_absolute() or ".." in path.parts:
             raise SystemExit(f"Unsafe archive path: {member.name}")
+        normalized = str(path)
+        if normalized in seen_names:
+            raise SystemExit(f"Duplicate archive entry: {member.name}")
+        seen_names.add(normalized)
         if member.issym() or member.islnk() or member.isdev() or member.isfifo():
             raise SystemExit(f"Unsupported archive entry type: {member.name}")
         if name in ("", "."):
@@ -94,7 +99,13 @@ if not seen_binary:
 PY
 
 mkdir -p "$STORE_ROOT/$VERSION"
-DEST="$STORE_ROOT/$VERSION/$PLATFORM"
+VERSION_DIR="$STORE_ROOT/$VERSION"
+if [[ -L "$VERSION_DIR" ]]; then
+  echo "Refusing to publish through a symlinked version directory." >&2
+  exit 1
+fi
+mkdir -p "$VERSION_DIR"
+DEST="$VERSION_DIR/$PLATFORM"
 if [[ -e "$DEST" || -L "$DEST" ]]; then
   echo "Receiver release already exists and is immutable: $VERSION/$PLATFORM" >&2
   exit 1
@@ -107,7 +118,7 @@ install -m 0440 "$MANIFEST" "$STAGE/manifest.json"
 install -m 0440 "$SIGNATURE" "$STAGE/manifest.sig"
 if id veyra-server >/dev/null 2>&1; then chown -R root:veyra-server "$STAGE"; fi
 chmod 0550 "$STAGE"
-mv "$STAGE" "$DEST"
+mv -T "$STAGE" "$DEST"
 trap - EXIT
 echo "Published immutable NDIView receiver release: $VERSION ($PLATFORM)"
 echo "Stored at: $DEST"
