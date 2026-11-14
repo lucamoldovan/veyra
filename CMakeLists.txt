@@ -18,6 +18,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 if(VEYRA_BUILD_PLAYER)
     find_package(PkgConfig REQUIRED)
     find_package(Threads REQUIRED)
+    find_package(CURL REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
 
     find_package(spdlog CONFIG REQUIRED)
@@ -56,6 +57,7 @@ if(VEYRA_BUILD_PLAYER)
     add_executable(veyra
         src/main.cpp
         src/config/config.cpp
+        src/control_plane/client.cpp
         src/ndi/discovery.cpp
         src/ndi/receiver.cpp
         src/video/renderer.cpp
@@ -69,6 +71,7 @@ if(VEYRA_BUILD_PLAYER)
         PkgConfig::SDL2
         Threads::Threads
         spdlog::spdlog
+        CURL::libcurl
         nlohmann_json::nlohmann_json
         "${NDI_LIBRARY}"
     )
@@ -110,6 +113,45 @@ if(VEYRA_BUILD_TESTS)
         -Wextra
         -Wpedantic
     )
+
+    find_package(Threads REQUIRED)
+    find_package(CURL REQUIRED)
+
+    add_library(veyra_control_plane_compile OBJECT
+        src/control_plane/client.cpp
+    )
+    target_include_directories(veyra_control_plane_compile PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_link_libraries(veyra_control_plane_compile PRIVATE
+        CURL::libcurl
+        Threads::Threads
+        nlohmann_json::nlohmann_json
+    )
+    target_compile_options(veyra_control_plane_compile PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
+
+    add_executable(veyra_control_plane_tests
+        src/control_plane/client.cpp
+        tests/control_plane_tests.cpp
+    )
+    target_include_directories(veyra_control_plane_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_link_libraries(veyra_control_plane_tests PRIVATE
+        CURL::libcurl
+        Threads::Threads
+        nlohmann_json::nlohmann_json
+    )
+    target_compile_options(veyra_control_plane_tests PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
+    add_test(NAME veyra_control_plane_tests COMMAND veyra_control_plane_tests)
 
     add_executable(veyra_config_tests
         src/config/config.cpp
