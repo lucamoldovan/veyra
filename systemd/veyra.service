@@ -11,7 +11,7 @@ ExecStart=/usr/local/bin/veyra --config /etc/veyra/config.json
 Restart=always
 RestartSec=2
 KillSignal=SIGTERM
-TimeoutStopSec=5
+TimeoutStopSec=15
 
 [Install]
 WantedBy=default.target
