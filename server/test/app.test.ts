@@ -661,14 +661,30 @@ test("database upgrades a populated version-one schema without losing devices", 
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run("device-1", "Lobby", "token-hash", "linux-x86_64", "0.1.0",
       "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
-    legacy.exec("DROP INDEX devices_credential_revoked_at_idx");
-    legacy.exec("DROP INDEX devices_fallback_playlist_id_idx");
-    legacy.exec("ALTER TABLE devices DROP COLUMN credential_revoked_at");
-    legacy.exec("ALTER TABLE devices DROP COLUMN discovered_sources_json");
-    legacy.exec("ALTER TABLE devices DROP COLUMN config_version");
-    legacy.exec("ALTER TABLE devices DROP COLUMN assigned_ndi_source_name");
-    legacy.exec("ALTER TABLE devices DROP COLUMN assigned_ndi_source_address");
-    legacy.exec("ALTER TABLE devices DROP COLUMN fallback_playlist_id");
+    legacy.exec("DROP TRIGGER IF EXISTS devices_fallback_playlist_deleted");
+    legacy.exec("DROP TABLE devices");
+    legacy.exec(`
+      CREATE TABLE devices (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        device_token_hash TEXT NOT NULL UNIQUE,
+        platform TEXT NOT NULL DEFAULT 'unknown',
+        software_version TEXT NOT NULL DEFAULT 'unknown',
+        last_seen_at TEXT,
+        last_ip TEXT,
+        playback_mode TEXT NOT NULL DEFAULT 'unknown',
+        ndi_source_name TEXT,
+        uptime_seconds INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+    legacy.prepare(`
+      INSERT INTO devices (
+        id, name, device_token_hash, platform, software_version, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run("device-1", "Lobby", "token-hash", "linux-x86_64", "0.1.0",
+      "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
     legacy.exec("DROP TABLE playlist_items; DROP TABLE playlists; DROP TABLE media_assets;");
     legacy.pragma("user_version = 1");
     legacy.close();
