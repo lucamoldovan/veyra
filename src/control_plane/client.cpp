@@ -319,14 +319,14 @@ void Client::processPendingCommand() {
         const auto command = payload.at("command");
         const std::string id = command.at("id").get<std::string>();
         const std::string type = command.at("type").get<std::string>();
-        if (id.empty() || type != "restart") {
+        if (id.empty() || (type != "restart" && type != "reboot")) {
             if (!id.empty()) (void)reportCommandStatus(id, "failed", "Unsupported command type");
             return;
         }
         if (!reportCommandStatus(id, "restarting")) return;
-        if (!requestSystemRestart()) {
-            (void)reportCommandStatus(id, "failed", "Restricted reboot helper failed");
-            std::cerr << "Veyra could not execute the restricted reboot helper\\n";
+        if (!requestSystemAction(type)) {
+            (void)reportCommandStatus(id, "failed", "Restricted NDIView action helper failed");
+            std::cerr << "NDIView could not execute the requested device action\\n";
         }
     } catch (const std::exception& error) {
         std::clog << "Veyra command response was invalid: " << error.what() << '\\n';
@@ -341,11 +341,12 @@ bool Client::reportCommandStatus(const std::string& commandId, const std::string
     return response.status == 200;
 }
 
-bool Client::requestSystemRestart() {
+bool Client::requestSystemAction(const std::string& action) {
+    if (action != "restart" && action != "reboot") return false;
     const pid_t child = ::fork();
     if (child < 0) return false;
     if (child == 0) {
-        ::execl("/usr/bin/sudo", "sudo", "-n", "/usr/local/libexec/veyra-reboot", static_cast<char*>(nullptr));
+        ::execl("/usr/bin/sudo", "sudo", "-n", "/usr/local/libexec/ndiview-action", action.c_str(), static_cast<char*>(nullptr));
         ::_exit(127);
     }
     int status = 0;

@@ -51,7 +51,7 @@ private:
     [[nodiscard]] bool sendHeartbeat();
     void processPendingCommand();
     [[nodiscard]] bool reportCommandStatus(const std::string& commandId, const std::string& status, const std::string& message = {});
-    [[nodiscard]] bool requestSystemRestart();
+    [[nodiscard]] bool requestSystemAction(const std::string& action);
     [[nodiscard]] HttpResponse postJson(
         const std::string& path,
         const std::string& body,

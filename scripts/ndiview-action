@@ -1,0 +1,28 @@
+#!/bin/sh
+# Root-owned allowlist: this helper accepts exactly two fixed actions.
+set -eu
+if [ "$#" -ne 1 ]; then
+  echo "Usage: ndiview-action restart|reboot" >&2
+  exit 64
+fi
+case "$1" in
+  restart)
+    uid="$(/usr/bin/id -u veyra-kiosk)"
+    runtime="/run/user/$uid"
+    if [ ! -S "$runtime/bus" ]; then
+      echo "NDIView user service manager is unavailable; refusing an unsafe restart." >&2
+      exit 69
+    fi
+    exec /usr/sbin/runuser -u veyra-kiosk -- /usr/bin/env \
+      XDG_RUNTIME_DIR="$runtime" \
+      DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" \
+      /usr/bin/systemctl --user restart ndiview.service
+    ;;
+  reboot)
+    exec /usr/bin/systemctl reboot
+    ;;
+  *)
+    echo "Unsupported NDIView action." >&2
+    exit 64
+    ;;
+esac
