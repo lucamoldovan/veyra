@@ -91,6 +91,26 @@ endif()
 if(VEYRA_BUILD_TESTS)
     enable_testing()
 
+    # Compile the SDL renderer independently from the proprietary NDI SDK.
+    # This catches renderer/interface regressions in the public CI environment.
+    if(NOT TARGET PkgConfig::SDL2)
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+    endif()
+
+    add_library(veyra_renderer_compile OBJECT
+        src/video/renderer.cpp
+    )
+    target_include_directories(veyra_renderer_compile PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_link_libraries(veyra_renderer_compile PRIVATE PkgConfig::SDL2)
+    target_compile_options(veyra_renderer_compile PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
+
     add_executable(veyra_config_tests
         src/config/config.cpp
         tests/config_tests.cpp
