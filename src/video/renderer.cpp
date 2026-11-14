@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -158,18 +161,70 @@ void Renderer::destroyTexture() noexcept {
     textureFormat_ = SDL_PIXELFORMAT_UNKNOWN;
 }
 
+bool Renderer::uploadPixels(
+    const std::uint8_t* pixels,
+    const int sourcePitch,
+    const int rowBytes,
+    const int height
+) {
+    if (pixels == nullptr || sourcePitch < rowBytes || rowBytes <= 0 ||
+        height <= 0) {
+        return false;
+    }
+
+    void* texturePixels = nullptr;
+    int texturePitch = 0;
+    if (SDL_LockTexture(
+            texture_,
+            nullptr,
+            &texturePixels,
+            &texturePitch
+        ) != 0) {
+        return false;
+    }
+
+    if (texturePixels == nullptr || texturePitch < rowBytes) {
+        SDL_UnlockTexture(texture_);
+        return false;
+    }
+
+    const auto* source = pixels;
+    auto* destination = static_cast<std::uint8_t*>(texturePixels);
+    for (int row = 0; row < height; ++row) {
+        std::memcpy(
+            destination + static_cast<std::size_t>(row) *
+                static_cast<std::size_t>(texturePitch),
+            source + static_cast<std::size_t>(row) *
+                static_cast<std::size_t>(sourcePitch),
+            static_cast<std::size_t>(rowBytes)
+        );
+    }
+
+    SDL_UnlockTexture(texture_);
+    return true;
+}
+
 void Renderer::convertUyvyToBgra(const ndi::VideoFrame& frame) {
     if (frame.format != ndi::PixelFormat::UYVY || frame.width <= 0 ||
         frame.height <= 0 || (frame.width % 2) != 0 ||
-        frame.stride < frame.width * 2) {
+        static_cast<std::int64_t>(frame.stride) <
+            static_cast<std::int64_t>(frame.width) * 2) {
         throw std::runtime_error("Invalid UYVY frame supplied to renderer");
+    }
+
+    const auto inputStride = static_cast<std::size_t>(frame.stride);
+    const auto height = static_cast<std::size_t>(frame.height);
+    if (height > frame.pixels.size() / inputStride) {
+        throw std::runtime_error("UYVY frame buffer is smaller than its dimensions");
     }
 
     const std::size_t outputStride =
         static_cast<std::size_t>(frame.width) * 4U;
-    conversionBuffer_.resize(
-        outputStride * static_cast<std::size_t>(frame.height)
-    );
+    constexpr std::size_t maxConvertedFrameBytes = 512U * 1024U * 1024U;
+    if (height > maxConvertedFrameBytes / outputStride) {
+        throw std::runtime_error("Converted video frame exceeds the memory limit");
+    }
+    conversionBuffer_.resize(outputStride * height);
 
     const bool isHd = frame.width > 720 || frame.height > 576;
 
@@ -224,14 +279,31 @@ void Renderer::present(const ndi::VideoFrame& frame) {
         throw std::runtime_error("Renderer received an invalid video frame");
     }
 
+    const int bytesPerPixel =
+        frame.format == ndi::PixelFormat::UYVY ? 2 : 4;
+    if (frame.format == ndi::PixelFormat::UYVY && (frame.width % 2) != 0) {
+        throw std::runtime_error("UYVY video width must be even");
+    }
+
+    const auto rowBytes64 =
+        static_cast<std::int64_t>(frame.width) * bytesPerPixel;
+    if (rowBytes64 > std::numeric_limits<int>::max() ||
+        frame.stride < rowBytes64) {
+        throw std::runtime_error("Video frame stride is invalid");
+    }
+
+    const auto inputStride = static_cast<std::size_t>(frame.stride);
+    const auto frameHeight = static_cast<std::size_t>(frame.height);
+    if (frameHeight > frame.pixels.size() / inputStride) {
+        throw std::runtime_error("Video frame buffer is smaller than its dimensions");
+    }
+
+    const int rowBytes = static_cast<int>(rowBytes64);
     Uint32 desiredFormat = frame.format == ndi::PixelFormat::UYVY
         ? SDL_PIXELFORMAT_UYVY
         : SDL_PIXELFORMAT_BGRA32;
 
-    const void* pixels = frame.pixels.data();
-    int pitch = frame.stride;
     bool converted = false;
-
     if (!createTexture(frame.width, frame.height, desiredFormat)) {
         if (frame.format != ndi::PixelFormat::UYVY) {
             throw sdlError("Could not create the video texture");
@@ -239,16 +311,23 @@ void Renderer::present(const ndi::VideoFrame& frame) {
 
         convertUyvyToBgra(frame);
         desiredFormat = SDL_PIXELFORMAT_BGRA32;
-        pixels = conversionBuffer_.data();
-        pitch = frame.width * 4;
         converted = true;
-
         if (!createTexture(frame.width, frame.height, desiredFormat)) {
             throw sdlError("Could not create the fallback video texture");
         }
     }
 
-    if (SDL_UpdateTexture(texture_, nullptr, pixels, pitch) != 0) {
+    bool uploaded = false;
+    if (!converted) {
+        uploaded = uploadPixels(
+            frame.pixels.data(),
+            frame.stride,
+            rowBytes,
+            frame.height
+        );
+    }
+
+    if (!uploaded) {
         if (frame.format != ndi::PixelFormat::UYVY || converted) {
             throw sdlError("Could not upload the video frame");
         }
@@ -262,12 +341,13 @@ void Renderer::present(const ndi::VideoFrame& frame) {
             throw sdlError("Could not create the fallback video texture");
         }
 
-        if (SDL_UpdateTexture(
-                texture_,
-                nullptr,
-                conversionBuffer_.data(),
-                frame.width * 4
-            ) != 0) {
+        uploaded = uploadPixels(
+            conversionBuffer_.data(),
+            frame.width * 4,
+            frame.width * 4,
+            frame.height
+        );
+        if (!uploaded) {
             throw sdlError("Could not upload the converted video frame");
         }
     }
