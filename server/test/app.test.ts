@@ -299,6 +299,87 @@ test("operator can pair a receiver and read its heartbeat state", async () => {
 
 
 
+
+test("operator assigns a receiver source and fallback playlist; receiver sync is scoped to assigned media", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "veyra-assignment-test-"));
+  const app = buildApp({
+    databasePath: ":memory:",
+    setupKey: "test-setup-key",
+    pairingSecret: "test-pairing-secret-with-at-least-32-bytes",
+    mediaDirectory: join(directory, "media"),
+  });
+  try {
+    await app.inject({ method: "POST", url: "/api/v1/setup", payload: {
+      setupKey: "test-setup-key", username: "admin", password: "a-very-long-test-password",
+    }});
+    const login = await app.inject({ method: "POST", url: "/api/v1/auth/session", payload: {
+      username: "admin", password: "a-very-long-test-password",
+    }});
+    const cookie = String(login.headers["set-cookie"]).split(";")[0];
+    const codeResponse = await app.inject({ method: "POST", url: "/api/v1/devices/pairing-codes", headers: { cookie } });
+    const paired = await app.inject({ method: "POST", url: "/api/v1/receiver/pair", payload: {
+      code: codeResponse.json().code, deviceName: "Lobby", platform: "linux-x86_64", version: "0.1.0",
+    }});
+    const { deviceId, deviceToken } = paired.json() as { deviceId: string; deviceToken: string };
+    const auth = { authorization: `Bearer ${deviceToken}` };
+
+    const noAssignment = await app.inject({ method: "GET", url: "/api/v1/receiver/config", headers: auth });
+    assert.equal(noAssignment.statusCode, 200);
+    assert.equal(noAssignment.json().configVersion, 1);
+    assert.equal(noAssignment.json().ndi.sourceName, null);
+    assert.equal(noAssignment.json().fallbackPlaylistId, null);
+    assert.equal((await app.inject({ method: "GET", url: "/api/v1/receiver/media-manifest", headers: auth })).json().items.length, 0);
+
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+    const upload = await app.inject({ method: "POST", url: "/api/v1/media", headers: {
+      cookie, "content-type": "image/png", "x-veyra-filename": "Fallback.png",
+    }, payload: png });
+    const media = upload.json() as { id: string; sha256: string };
+    const playlistResponse = await app.inject({ method: "POST", url: "/api/v1/playlists", headers: { cookie }, payload: { name: "Fallback" } });
+    const playlistId = playlistResponse.json().id as string;
+    const playlistUpdate = await app.inject({ method: "PUT", url: `/api/v1/playlists/${playlistId}`, headers: { cookie }, payload: {
+      name: "Fallback", description: "", items: [{ mediaId: media.id, durationSeconds: 12 }],
+    }});
+    assert.equal(playlistUpdate.statusCode, 200);
+
+    const invalidAssignment = await app.inject({ method: "PUT", url: `/api/v1/devices/${deviceId}/config`, headers: { cookie }, payload: {
+      ndiSourceName: "Camera", ndiSourceAddress: null, fallbackPlaylistId: playlistId,
+    }});
+    assert.equal(invalidAssignment.statusCode, 400);
+    const assigned = await app.inject({ method: "PUT", url: `/api/v1/devices/${deviceId}/config`, headers: { cookie }, payload: {
+      ndiSourceName: "Camera 1", ndiSourceAddress: "ndi://camera-1.local", fallbackPlaylistId: playlistId,
+    }});
+    assert.equal(assigned.statusCode, 200);
+    assert.equal(assigned.json().configVersion, 2);
+
+    const receiverConfig = await app.inject({ method: "GET", url: "/api/v1/receiver/config", headers: auth });
+    assert.deepEqual(receiverConfig.json(), {
+      schemaVersion: 1, configVersion: 2,
+      ndi: { sourceName: "Camera 1", sourceAddress: "ndi://camera-1.local" },
+      fallbackPlaylistId: playlistId,
+    });
+    const manifest = await app.inject({ method: "GET", url: "/api/v1/receiver/media-manifest", headers: auth });
+    assert.equal(manifest.statusCode, 200);
+    assert.equal(manifest.json().items.length, 1);
+    assert.equal(manifest.json().items[0].mediaId, media.id);
+    assert.equal(manifest.json().items[0].sha256, media.sha256);
+    assert.equal(manifest.json().items[0].durationSeconds, 12);
+
+    const mediaDownload = await app.inject({ method: "GET", url: `/api/v1/receiver/media/${media.id}`, headers: auth });
+    assert.equal(mediaDownload.statusCode, 200);
+    assert.deepEqual(mediaDownload.rawPayload, png);
+    const unauthenticatedDownload = await app.inject({ method: "GET", url: `/api/v1/receiver/media/${media.id}` });
+    assert.equal(unauthenticatedDownload.statusCode, 401);
+
+    const devices = await app.inject({ method: "GET", url: "/api/v1/devices", headers: { cookie } });
+    assert.equal(devices.json().devices[0].assignedNdiSourceName, "Camera 1");
+    assert.equal(devices.json().devices[0].fallbackPlaylistId, playlistId);
+  } finally {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("media library validates image signatures and protects playlist references", async () => {
   const directory = mkdtempSync(join(tmpdir(), "veyra-media-test-"));
   const app = buildApp({
