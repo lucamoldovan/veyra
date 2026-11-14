@@ -185,6 +185,7 @@ void Client::runSync(const std::stop_token stopToken, std::string deviceToken) {
     while (!stopToken.stop_requested()) {
         try {
             auto synced = sync_.synchronize(config_.serverUrl, deviceToken, config_.caCertificatePath, stopToken);
+            synced.syncGeneration = ++syncGeneration_;
             {
                 std::lock_guard lock(syncMutex_);
                 syncSnapshot_ = std::move(synced);
