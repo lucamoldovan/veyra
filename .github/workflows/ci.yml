@@ -57,3 +57,26 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  dashboard-build:
+    name: Dashboard type-check and production build
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: dashboard
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Type-check and build
+        run: npm run build
