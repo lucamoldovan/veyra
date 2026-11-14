@@ -1,0 +1,54 @@
+import { constants, chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { openDatabase } from "../src/database.js";
+
+const databasePath = resolve(process.env.VEYRA_DATABASE_PATH ?? "data/veyra.sqlite");
+const pairingSecretPath = resolve(process.env.VEYRA_PAIRING_SECRET_PATH ?? "data/pairing-secret");
+const backupDirectory = resolve(process.argv[2] ?? "backups");
+
+if (!existsSync(databasePath)) {
+  throw new Error(`Veyra database does not exist: ${databasePath}`);
+}
+if (!existsSync(pairingSecretPath)) {
+  throw new Error(`Veyra pairing secret does not exist: ${pairingSecretPath}`);
+}
+
+const secretInfo = lstatSync(pairingSecretPath);
+if (!secretInfo.isFile()) {
+  throw new Error("Veyra pairing secret must be a regular file");
+}
+chmodSync(pairingSecretPath, 0o600);
+
+mkdirSync(backupDirectory, { recursive: true, mode: 0o700 });
+chmodSync(backupDirectory, 0o700);
+
+const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+const databaseBackup = join(backupDirectory, `veyra-${timestamp}.sqlite`);
+const secretBackup = join(backupDirectory, `pairing-secret-${timestamp}`);
+const manifestPath = join(backupDirectory, `veyra-${timestamp}.json`);
+
+const database = openDatabase(databasePath);
+try {
+  await database.backup(databaseBackup);
+} finally {
+  database.close();
+}
+
+copyFileSync(pairingSecretPath, secretBackup, constants.COPYFILE_EXCL);
+chmodSync(databaseBackup, 0o600);
+chmodSync(secretBackup, 0o600);
+
+const manifest = {
+  formatVersion: 1,
+  createdAt: new Date().toISOString(),
+  databaseFile: databaseBackup.split(/[\\/]/).pop(),
+  pairingSecretFile: secretBackup.split(/[\\/]/).pop(),
+  note: "Restore both the SQLite database and pairing secret together while the Veyra server is stopped.",
+};
+writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", {
+  encoding: "utf8",
+  mode: 0o600,
+  flag: "wx",
+});
+
+process.stdout.write(`Veyra backup created:\n- ${databaseBackup}\n- ${secretBackup}\n- ${manifestPath}\n`);
