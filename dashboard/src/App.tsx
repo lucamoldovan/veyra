@@ -28,7 +28,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getServerHealth, getSetupStatus, login, logout, type ConnectionState, type Device, type Operator, type PairingCode, type ServerHealth } from "./api";
+import { createDevicePairingCode, createInitialOperator, getAuthSession, getDevices, getServerHealth, getSetupStatus, login, logout, revokeDeviceCredential, type ConnectionState, type Device, type Operator, type PairingCode, type ServerHealth } from "./api";
 
 type Page = "overview" | "devices" | "sources" | "media" | "playlists" | "system";
 type AuthState = "checking" | "setup" | "login" | "authenticated" | "unavailable";
@@ -570,6 +570,7 @@ function DevicesPage() {
   const [creatingCode, setCreatingCode] = useState(false);
   const [copied, setCopied] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -624,6 +625,21 @@ function DevicesPage() {
       setCopied(true);
     } catch {
       setError("Clipboard access is unavailable. You can select and copy the code manually.");
+    }
+  };
+
+  const revokeCredential = async (device: Device) => {
+    if (device.credentialStatus === "revoked") return;
+    if (!window.confirm(`Revoke access for "${device.name}"? This receiver will no longer be able to send heartbeats. It will need to be removed and paired again to reconnect.`)) return;
+    setRevokingDeviceId(device.id);
+    setError("");
+    try {
+      await revokeDeviceCredential(device.id);
+      setRefreshTick((tick) => tick + 1);
+    } catch (revokeError) {
+      setError(revokeError instanceof Error ? revokeError.message : "Could not revoke receiver access.");
+    } finally {
+      setRevokingDeviceId(null);
     }
   };
 
@@ -688,11 +704,11 @@ function DevicesPage() {
               <div className="device-row" key={device.id}>
                 <div className="device-identity">
                   <div className="device-avatar"><MonitorPlay size={18} /></div>
-                  <div><strong>{device.name}</strong><span>{device.platform} · v{device.softwareVersion}</span></div>
+                  <div><strong>{device.name}</strong><span>{device.platform} · v{device.softwareVersion}</span><span className={device.credentialStatus === "revoked" ? "device-credential-revoked" : "device-credential-active"}>{device.credentialStatus === "revoked" ? "Credential revoked" : "Credential active"}</span></div>
                 </div>
                 <div><span className={`device-status device-status-${device.status}`}><span />{device.status}</span></div>
                 <div className="device-playback"><strong>{device.playbackMode}</strong><span>{device.ndiSourceName ?? "No NDI source reported"}</span></div>
-                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}</div>
+                <div className="device-last-seen">{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "Never connected"}{device.credentialStatus === "active" && <button className="button button-secondary device-revoke-button" disabled={revokingDeviceId === device.id} onClick={() => void revokeCredential(device)}>{revokingDeviceId === device.id ? "Revoking…" : "Revoke access"}</button>}</div>
               </div>
             ))}
           </div>
