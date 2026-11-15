@@ -54,10 +54,16 @@ A DHCP reservation plus a router DNS record is preferable for a longer-lived ins
 
 On Windows, import `certs/ca.crt` into **Local Computer > Trusted Root Certification Authorities**. Use the Microsoft certificate import wizard; do not import the private CA key.
 
-On the Debian receiver, copy `certs/ca.crt` to the receiver and install it:
+On the Debian receiver, copy `certs/ca.crt` from the laptop (run this in PowerShell from the repository root, replacing the SSH user/IP if needed):
+
+```powershell
+scp .\\certs\\ca.crt <receiver-user>@<receiver-ip>:/home/<receiver-user>/ndiview-ca.crt
+```
+
+Then, in the Mac mini SSH session, install it:
 
 ```bash
-sudo install -m 0644 ndiview-ca.crt /usr/local/share/ca-certificates/ndiview-local-ca.crt
+sudo install -m 0644 ~/ndiview-ca.crt /usr/local/share/ca-certificates/ndiview-local-ca.crt
 sudo update-ca-certificates
 ```
 
