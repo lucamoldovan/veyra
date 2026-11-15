@@ -1,0 +1,16 @@
+.git
+.github
+**/node_modules
+**/dist
+/build
+/build-tests
+/certs
+**/*.key
+**/*.pem
+**/*.crt
+.env
+.env.*
+**/.env
+**/.env.*
+*.log
+.DS_Store
