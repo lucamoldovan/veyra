@@ -32,16 +32,16 @@ prompt = no
 distinguished_name = distinguished_name
 req_extensions = server_extensions
 
-[ distinguished_name ]
+[distinguished_name]
 CN = $ServerDns
 
-[ server_extensions ]
+[server_extensions]
 basicConstraints = critical,CA:FALSE
 keyUsage = critical,digitalSignature,keyEncipherment
 extendedKeyUsage = serverAuth
 subjectAltName = @subject_alt_names
 
-[ subject_alt_names ]
+[subject_alt_names]
 DNS.1 = $ServerDns
 IP.1 = $ServerIp
 "@
