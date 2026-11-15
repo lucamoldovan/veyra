@@ -61,7 +61,9 @@ See [the Debian 13 kiosk installation guide](docs/kiosk-installation.md) for aut
 
 ## Central server deployment
 
-See [the central server and dashboard deployment guide](docs/server-deployment.md) for signed releases, HTTPS hosting, backups and rollback.
+For a temporary Windows-hosted deployment using Docker Desktop, see [the Docker LAN deployment guide](docs/docker-deployment.md). It builds the production dashboard and serves it from the same HTTPS server container.
+
+For a permanent Debian 13 deployment with signed releases, HTTPS hosting, backups and rollback, see [the central server and dashboard deployment guide](docs/server-deployment.md).
 
 ## Architecture
 
