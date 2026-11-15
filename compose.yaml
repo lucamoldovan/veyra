@@ -1,0 +1,58 @@
+services:
+  ndiview:
+    image: ndiview:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ndiview
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NDIVIEW_HOST: 0.0.0.0
+      NDIVIEW_PORT: "8787"
+      NDIVIEW_TLS_CERT_PATH: /run/ndiview-tls/server.crt
+      NDIVIEW_TLS_KEY_PATH: /run/ndiview-tls/server.key
+      NDIVIEW_COOKIE_SECURE: "true"
+      NDIVIEW_DATABASE_PATH: /var/lib/ndiview/data/ndiview.sqlite
+      NDIVIEW_SETUP_KEY_PATH: /var/lib/ndiview/secrets/setup-key
+      NDIVIEW_PAIRING_SECRET_PATH: /var/lib/ndiview/secrets/pairing-secret
+      NDIVIEW_MEDIA_DIRECTORY: /var/lib/ndiview/media
+      NDIVIEW_DASHBOARD_DIRECTORY: /app/dashboard/dist
+      NDIVIEW_TLS_SERVER_NAME: ${NDIVIEW_TLS_SERVER_NAME:?Set NDIVIEW_TLS_SERVER_NAME in .env}
+      LOG_LEVEL: info
+    ports:
+      - "${NDIVIEW_PORT:-8787}:8787"
+    volumes:
+      - ndiview_data:/var/lib/ndiview
+      - ./certs/server.crt:/run/ndiview-tls/server.crt:ro
+      - ./certs/server.key:/run/ndiview-tls/server.key:ro
+      - ./certs/ca.crt:/run/ndiview-tls/ca.crt:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          const fs=require('node:fs');
+          const https=require('node:https');
+          const req=https.get({hostname:'127.0.0.1',port:8787,path:'/api/v1/health',
+          ca:fs.readFileSync('/run/ndiview-tls/ca.crt'),
+          servername:process.env.NDIVIEW_TLS_SERVER_NAME,timeout:3000},
+          res=>{res.resume();process.exitCode=res.statusCode===200?0:1});
+          req.on('error',()=>process.exit(1));
+          req.on('timeout',()=>{req.destroy();process.exit(1)});
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  ndiview_data:
