@@ -25,3 +25,7 @@
 /dashboard/.env
 /dashboard/.env.*
 !/dashboard/.env.example
+
+# Temporary local Docker deployment secrets and configuration
+/.env
+/certs/
