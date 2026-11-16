@@ -35,6 +35,11 @@ req_extensions = server_extensions
 [distinguished_name]
 CN = $ServerDns
 
+[ca_extensions]
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+
 [server_extensions]
 basicConstraints = critical,CA:FALSE
 keyUsage = critical,digitalSignature,keyEncipherment
@@ -54,7 +59,8 @@ docker run --rm -v "${certDir}:/certs" alpine:3.22 sh -ec '
   apk add --no-cache openssl >/dev/null
   openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
     -keyout /certs/ca.key -out /certs/ca.crt \
-    -subj "/CN=NDIView Local Development CA"
+    -subj "/CN=NDIView Local Development CA" \
+    -config /certs/server.cnf -extensions ca_extensions
   openssl req -new -newkey rsa:3072 -nodes \
     -keyout /certs/server.key -out /certs/server.csr \
     -config /certs/server.cnf
